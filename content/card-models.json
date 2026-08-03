@@ -1,0 +1,312 @@
+[
+  {
+    "id": "card-01",
+    "card": "［蓮ノ空歌留多］日野下花帆",
+    "model": "石川県立歴史博物館（館内階段）",
+    "address": "石川県金沢市出羽町3-1",
+    "confidence": "A",
+    "note": "第1部 No.60 と重複",
+    "spotId": "ishikawa-history-museum",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%9F%B3%E5%B7%9D%E7%9C%8C%E7%AB%8B%E6%AD%B4%E5%8F%B2%E5%8D%9A%E7%89%A9%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%87%BA%E7%BE%BD%E7%94%BA3-1"
+  },
+  {
+    "id": "card-02",
+    "card": "［蓮ノ空歌留多］村野さやか",
+    "model": "兼六園（徽軫灯籠・霞ヶ池付近）",
+    "address": "石川県金沢市兼六町1",
+    "confidence": "A",
+    "note": "第1部 No.16 と重複",
+    "spotId": "kenrokuen",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%85%BC%E5%85%AD%E5%9C%92%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%85%BC%E5%85%AD%E7%94%BA1"
+  },
+  {
+    "id": "card-03",
+    "card": "［蓮ノ空歌留多］乙宗梢",
+    "model": "（公財）大野からくり記念館",
+    "address": "石川県金沢市大野町4丁目甲2番29",
+    "confidence": "A",
+    "note": "第1部 No.54 と重複",
+    "spotId": "ohno-karakuri",
+    "sourceUrl": "https://www.ohno-karakuri.jp/"
+  },
+  {
+    "id": "card-04",
+    "card": "［蓮ノ空歌留多］夕霧綴理",
+    "model": "長町武家屋敷跡（長町二の橋から東向き）",
+    "address": "石川県金沢市長町2丁目付近",
+    "confidence": "A",
+    "note": "第1部 No.61 と重複",
+    "spotId": "nagamachi-samurai",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%95%B7%E7%94%BA%E6%AD%A6%E5%AE%B6%E5%B1%8B%E6%95%B7%E8%B7%A1%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%95%B7%E7%94%BA1%E4%B8%81%E7%9B%AE%E3%83%BB2%E4%B8%81%E7%9B%AE%E4%B8%80%E5%B8%AF"
+  },
+  {
+    "id": "card-05",
+    "card": "［蓮ノ空歌留多］大沢瑠璃乃",
+    "model": "金沢城 石川門・石川橋",
+    "address": "石川県金沢市丸の内1-1／石川県金沢市丸の内・兼六町間",
+    "confidence": "A",
+    "note": "第1部 No.15 と一部重複",
+    "spotId": "ishikawa-bridge",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%9F%B3%E5%B7%9D%E6%A9%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%85%E3%83%BB%E5%85%BC%E5%85%AD%E7%94%BA%E9%96%93"
+  },
+  {
+    "id": "card-06",
+    "card": "［蓮ノ空歌留多］藤島慈",
+    "model": "懐華樓（ひがし茶屋街）",
+    "address": "石川県金沢市東山1-14-8",
+    "confidence": "A",
+    "note": "第1部 No.76 と重複",
+    "spotId": "kaikaro",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E6%87%90%E8%8F%AF%E6%A8%93%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-14-8"
+  },
+  {
+    "id": "card-07",
+    "card": "［蓮ノ空歌留多］百生吟子",
+    "model": "尾山神社",
+    "address": "石川県金沢市尾山町11-1",
+    "confidence": "A",
+    "note": "第1部 No.30 と重複",
+    "spotId": "oyama-shrine",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B0%BE%E5%B1%B1%E7%A5%9E%E7%A4%BE%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%B1%B1%E7%94%BA11-1"
+  },
+  {
+    "id": "card-08",
+    "card": "［蓮ノ空歌留多］徒町小鈴",
+    "model": "主計町茶屋街（浅野川沿い）",
+    "address": "石川県金沢市主計町",
+    "confidence": "A",
+    "note": "第1部 No.24 と重複",
+    "spotId": "kazuemachi-chaya",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E4%B8%BB%E8%A8%88%E7%94%BA%E8%8C%B6%E5%B1%8B%E8%A1%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%BB%E8%A8%88%E7%94%BA"
+  },
+  {
+    "id": "card-09",
+    "card": "［蓮ノ空歌留多］安養寺姫芽",
+    "model": "自遊花人水引ミュージアム",
+    "address": "石川県金沢市清川町7-9",
+    "confidence": "A",
+    "note": "第1部 No.78 と重複",
+    "spotId": "jiyukajin-mizuhiki",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%87%AA%E9%81%8A%E8%8A%B1%E4%BA%BA%E6%B0%B4%E5%BC%95%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%B8%E3%82%A2%E3%83%A0%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%B8%85%E5%B7%9D%E7%94%BA7-9"
+  },
+  {
+    "id": "card-10",
+    "card": "［蓮ノ空歌留多］セラス 柳田 リリエンフェルト",
+    "model": "尾張町町民文化館",
+    "address": "石川県金沢市尾張町1-11-8",
+    "confidence": "A",
+    "note": "第1部 No.80 と重複",
+    "spotId": "owari-cho-culture",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B0%BE%E5%BC%B5%E7%94%BA%E7%94%BA%E6%B0%91%E6%96%87%E5%8C%96%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%BC%B5%E7%94%BA1-11-8"
+  },
+  {
+    "id": "card-11",
+    "card": "［蓮ノ空歌留多］桂城泉",
+    "model": "願掛け寺 香林寺",
+    "address": "石川県金沢市野町1-3-15",
+    "confidence": "A",
+    "note": "第1部 No.81 と重複",
+    "spotId": "kourinji",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%A1%98%E6%8E%9B%E3%81%91%E5%AF%BA%20%E9%A6%99%E6%9E%97%E5%AF%BA%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%87%8E%E7%94%BA1-3-15"
+  },
+  {
+    "id": "card-12",
+    "card": "［喫茶ハスノソラ］大沢瑠璃乃",
+    "model": "金沢城公園 百間堀園地（石川門・石川橋下付近）",
+    "address": "石川県金沢市丸の内1-1 周辺",
+    "confidence": "A",
+    "note": "第1部 No.11～15 の近接地点",
+    "spotId": "kanazawa-castle-shinmaru",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E5%9F%8E%E5%85%AC%E5%9C%92%20%E6%96%B0%E4%B8%B8%E5%BA%83%E5%A0%B4%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%851-1"
+  },
+  {
+    "id": "card-13",
+    "card": "［喫茶ハスノソラ］村野さやか・夕霧綴理",
+    "model": "大正浪漫喫茶 金魚庵",
+    "address": "石川県金沢市東山1-10-4",
+    "confidence": "B",
+    "note": "（ファンによる内観比較。店舗撮影は必ず許可を確認）",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E6%AD%A3%E6%B5%AA%E6%BC%AB%E5%96%AB%E8%8C%B6%20%E9%87%91%E9%AD%9A%E5%BA%B5%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-10-4"
+  },
+  {
+    "id": "card-14",
+    "card": "［プチパティシエール］大沢瑠璃乃",
+    "model": "香林坊・旧ホテルトラスティ金沢香林坊前",
+    "address": "石川県金沢市香林坊1-2-16",
+    "confidence": "A",
+    "note": "現施設はKOKO HOTEL Premier 金沢香林坊",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%A6%99%E6%9E%97%E5%9D%8A%E3%83%BB%E6%97%A7%E3%83%9B%E3%83%86%E3%83%AB%E3%83%88%E3%83%A9%E3%82%B9%E3%83%86%E3%82%A3%E9%87%91%E6%B2%A2%E9%A6%99%E6%9E%97%E5%9D%8A%E5%89%8D%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%A6%99%E6%9E%97%E5%9D%8A1-2-16"
+  },
+  {
+    "id": "card-15",
+    "card": "［Trick & Cute］日野下花帆",
+    "model": "ひがし茶屋街（金沢市眺望点「ひがし茶屋街広見側」付近）",
+    "address": "石川県金沢市東山1丁目",
+    "confidence": "A",
+    "note": "第1部 No.23 と重複",
+    "spotId": "higashi-chaya",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%B2%E3%81%8C%E3%81%97%E8%8C%B6%E5%B1%8B%E8%A1%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11%E4%B8%81%E7%9B%AE"
+  },
+  {
+    "id": "card-16",
+    "card": "［素顔のピクセル］日野下花帆",
+    "model": "ひがし茶屋街・宇多須神社／東山菅原神社付近の通り",
+    "address": "石川県金沢市東山1丁目",
+    "confidence": "A",
+    "note": "第1部 No.23 と重複",
+    "spotId": "higashi-chaya",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%B2%E3%81%8C%E3%81%97%E8%8C%B6%E5%B1%8B%E8%A1%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11%E4%B8%81%E7%9B%AE"
+  },
+  {
+    "id": "card-17",
+    "card": "［アオクハルカ］百生吟子",
+    "model": "八百萬本舗",
+    "address": "石川県金沢市尾張町2-14-20",
+    "confidence": "A",
+    "note": "第1部 No.26 と重複",
+    "spotId": "yaoyorozu-honpo",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%85%AB%E7%99%BE%E8%90%AC%E6%9C%AC%E8%88%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%BC%B5%E7%94%BA2-14-20"
+  },
+  {
+    "id": "card-18",
+    "card": "［ゆのくにガールズ！］日野下花帆・村野さやか・大沢瑠璃乃・藤島慈",
+    "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
+    "address": "石川県加賀市山代温泉19-49-1",
+    "confidence": "A",
+    "note": "第1部 No.42 と重複。宿泊者以外の館内撮影・見学は要確認",
+    "spotId": "yunokuni-tensyo",
+    "sourceUrl": "https://yunokunitensyo.jp/0/"
+  },
+  {
+    "id": "card-19",
+    "card": "［宇宙演舞☆うさぴょん］日野下花帆・藤島慈",
+    "model": "ゆのくに天祥（売店・和室）",
+    "address": "石川県加賀市山代温泉19-49-1",
+    "confidence": "A",
+    "note": "第1部 No.42 と重複。館内の立入・撮影条件に注意",
+    "spotId": "yunokuni-tensyo",
+    "sourceUrl": "https://yunokunitensyo.jp/0/"
+  },
+  {
+    "id": "card-20",
+    "card": "［月夜見海月］日野下花帆・乙宗梢・百生吟子",
+    "model": "のとじま水族館",
+    "address": "石川県七尾市能登島曲町15部40",
+    "confidence": "A",
+    "note": "第1部 No.62 と重複",
+    "spotId": "noto-aquarium",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%AE%E3%81%A8%E3%81%98%E3%81%BE%E6%B0%B4%E6%97%8F%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E4%B8%83%E5%B0%BE%E5%B8%82%E8%83%BD%E7%99%BB%E5%B3%B6%E6%9B%B2%E7%94%BA15%E9%83%A840"
+  },
+  {
+    "id": "card-21",
+    "card": "［太陽であれ！］村野さやか",
+    "model": "北國花火2025金沢大会会場（石川県営まめだ簡易グラウンド周辺）",
+    "address": "石川県金沢市大豆田本町の犀川緑地周辺（イベント会場／エリア）",
+    "confidence": "A",
+    "note": "開催時のみ同条件。常設の演出ではない",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%8C%97%E5%9C%8B%E8%8A%B1%E7%81%AB2025%E9%87%91%E6%B2%A2%E5%A4%A7%E4%BC%9A%E4%BC%9A%E5%A0%B4%20%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%A4%A7%E8%B1%86%E7%94%B0%E6%9C%AC%E7%94%BA%E3%81%AE%E7%8A%80%E5%B7%9D%E7%B7%91%E5%9C%B0%E5%91%A8%E8%BE%BA%20"
+  },
+  {
+    "id": "card-22",
+    "card": "［夏めきペイン］乙宗梢",
+    "model": "徳光海岸",
+    "address": "石川県白山市徳光町2665-1 周辺",
+    "confidence": "A",
+    "note": "第1部 No.41 と重複",
+    "spotId": "toku-mitsu-coast",
+    "sourceUrl": "https://www.hot-ishikawa.jp/spot/detail_5910.html"
+  },
+  {
+    "id": "card-23",
+    "card": "［にゅーかまー！］大沢瑠璃乃",
+    "model": "小松空港・国際線到着口付近の横断歩道",
+    "address": "石川県小松市浮柳町ヨ50",
+    "confidence": "A",
+    "note": "第1部 No.43 と重複",
+    "spotId": "komatsu-airport",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B0%8F%E6%9D%BE%E7%A9%BA%E6%B8%AF%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E5%B0%8F%E6%9D%BE%E5%B8%82%E6%B5%AE%E6%9F%B3%E7%94%BA%E3%83%A850"
+  },
+  {
+    "id": "card-24",
+    "card": "［365 Days］乙宗梢／［WAWO!］安養寺姫芽",
+    "model": "神田明神",
+    "address": "東京都千代田区外神田2-16-2",
+    "confidence": "A",
+    "note": "",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%A5%9E%E7%94%B0%E6%98%8E%E7%A5%9E%20%E6%9D%B1%E4%BA%AC%E9%83%BD%E5%8D%83%E4%BB%A3%E7%94%B0%E5%8C%BA%E5%A4%96%E7%A5%9E%E7%94%B02-16-2"
+  },
+  {
+    "id": "card-25",
+    "card": "［365 Days］夕霧綴理",
+    "model": "食品サンプル専門店 佐藤サンプル",
+    "address": "東京都台東区松が谷3-1-14 坂東ビル1F（現店舗）",
+    "confidence": "A",
+    "note": "カードに描かれたのは旧店舗。現店舗は近隣へ移転済み",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%A3%9F%E5%93%81%E3%82%B5%E3%83%B3%E3%83%97%E3%83%AB%E5%B0%82%E9%96%80%E5%BA%97%20%E4%BD%90%E8%97%A4%E3%82%B5%E3%83%B3%E3%83%97%E3%83%AB%20%E6%9D%B1%E4%BA%AC%E9%83%BD%E5%8F%B0%E6%9D%B1%E5%8C%BA%E6%9D%BE%E3%81%8C%E8%B0%B73-1-14%20%E5%9D%82%E6%9D%B1%E3%83%93%E3%83%AB1F%20"
+  },
+  {
+    "id": "card-26",
+    "card": "［365 Days］藤島慈",
+    "model": "ラフォーレ原宿（裏口側）",
+    "address": "東京都渋谷区神宮前1-11-6",
+    "confidence": "A",
+    "note": "",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%83%A9%E3%83%95%E3%82%A9%E3%83%BC%E3%83%AC%E5%8E%9F%E5%AE%BF%20%20%E6%9D%B1%E4%BA%AC%E9%83%BD%E6%B8%8B%E8%B0%B7%E5%8C%BA%E7%A5%9E%E5%AE%AE%E5%89%8D1-11-6"
+  },
+  {
+    "id": "card-27",
+    "card": "［Her-bath-rium］日野下花帆（同シリーズ修学旅行組）",
+    "model": "SHIBUYA SKY",
+    "address": "東京都渋谷区渋谷2-24-12 渋谷スクランブルスクエア",
+    "confidence": "A",
+    "note": "",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=SHIBUYA%20SKY%20%E6%9D%B1%E4%BA%AC%E9%83%BD%E6%B8%8B%E8%B0%B7%E5%8C%BA%E6%B8%8B%E8%B0%B72-24-12%20%E6%B8%8B%E8%B0%B7%E3%82%B9%E3%82%AF%E3%83%A9%E3%83%B3%E3%83%96%E3%83%AB%E3%82%B9%E3%82%AF%E3%82%A8%E3%82%A2"
+  },
+  {
+    "id": "card-28",
+    "card": "［ハナムスビ］日野下花帆",
+    "model": "久屋大通公園（Hisaya-odori Park）",
+    "address": "愛知県名古屋市中区久屋大通公園（錦3丁目周辺）",
+    "confidence": "A",
+    "note": "",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E4%B9%85%E5%B1%8B%E5%A4%A7%E9%80%9A%E5%85%AC%E5%9C%92%20%20%E6%84%9B%E7%9F%A5%E7%9C%8C%E5%90%8D%E5%8F%A4%E5%B1%8B%E5%B8%82%E4%B8%AD%E5%8C%BA%E4%B9%85%E5%B1%8B%E5%A4%A7%E9%80%9A%E5%85%AC%E5%9C%92%20"
+  },
+  {
+    "id": "card-29",
+    "card": "［ジョーショーキリュー］大沢瑠璃乃",
+    "model": "立川駅北口",
+    "address": "東京都立川市曙町2丁目",
+    "confidence": "A",
+    "note": "",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%AB%8B%E5%B7%9D%E9%A7%85%E5%8C%97%E5%8F%A3%20%E6%9D%B1%E4%BA%AC%E9%83%BD%E7%AB%8B%E5%B7%9D%E5%B8%82%E6%9B%99%E7%94%BA2%E4%B8%81%E7%9B%AE"
+  },
+  {
+    "id": "card-30",
+    "card": "［バアドケージ］徒町小鈴",
+    "model": "HEP FIVE前",
+    "address": "大阪府大阪市北区角田町5-15",
+    "confidence": "A",
+    "note": "",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=HEP%20FIVE%E5%89%8D%20%E5%A4%A7%E9%98%AA%E5%BA%9C%E5%A4%A7%E9%98%AA%E5%B8%82%E5%8C%97%E5%8C%BA%E8%A7%92%E7%94%B0%E7%94%BA5-15"
+  },
+  {
+    "id": "card-31",
+    "card": "［AURORA FLOWER］徒町小鈴",
+    "model": "アルピコ交通 上高地線 波田駅前",
+    "address": "長野県松本市波田（波田駅前）",
+    "confidence": "B",
+    "note": "（活動記録・現地比較からの特定。公式施設名での明記は未確認）",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%82%A2%E3%83%AB%E3%83%94%E3%82%B3%E4%BA%A4%E9%80%9A%20%E4%B8%8A%E9%AB%98%E5%9C%B0%E7%B7%9A%20%E6%B3%A2%E7%94%B0%E9%A7%85%E5%89%8D%20%E9%95%B7%E9%87%8E%E7%9C%8C%E6%9D%BE%E6%9C%AC%E5%B8%82%E6%B3%A2%E7%94%B0%20"
+  }
+]

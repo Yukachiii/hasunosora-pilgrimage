@@ -1,63 +1,689 @@
 [
   {
     "id": "kanazawa-station",
-    "name": "金沢駅",
-    "shortName": "金沢駅",
-    "area": "金沢",
+    "name": "金沢駅・鼓門",
+    "shortName": "金沢駅・鼓門",
+    "area": "金沢駅周辺",
     "category": "交通",
-    "address": "石川県金沢市木ノ新保町1-1",
+    "address": "石川県金沢市木ノ新保町1-1（金沢駅兼六園口）",
     "lat": 36.5781,
     "lng": 136.6481,
     "description": "旅の起点にしやすい金沢の玄関口。ほかのスポットへ向かう前に、交通手段と帰りの時間を確認しておきましょう。",
     "accessNote": "鉄道・路線バス",
     "sourceUrl": "https://www4.city.kanazawa.lg.jp/soshikikarasagasu/dorokanrika/gyomuannai/30/28323.html",
-    "imageUrl": "/photos/kanazawa-station/20260724-230203-watermarked.webp",
-    "imagePosition": "center center"
+    "appearances": [
+      "せーはす！：103期 #26"
+    ]
+  },
+  {
+    "id": "kanazawa-forus",
+    "name": "金沢フォーラス",
+    "shortName": "金沢フォーラス",
+    "area": "金沢駅周辺",
+    "category": "買い物",
+    "address": "石川県金沢市堀川新町3-1",
+    "lat": 36.57856,
+    "lng": 136.649506,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E3%83%95%E3%82%A9%E3%83%BC%E3%83%A9%E3%82%B9%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%A0%80%E5%B7%9D%E6%96%B0%E7%94%BA3-1",
+    "appearances": [
+      "せーはす！：103期 #26／104期 #34／105期 #36（金沢ゲーマーズ）"
+    ]
   },
   {
     "id": "ohmicho-market",
     "name": "近江町市場",
     "shortName": "近江町市場",
-    "area": "金沢",
-    "category": "まち歩き",
-    "address": "石川県金沢市上近江町50",
+    "area": "近江町・尾張町",
+    "category": "買い物",
+    "address": "石川県金沢市上近江町50 周辺（市場エリア）",
     "lat": 36.571665,
     "lng": 136.656146,
     "description": "金沢の食文化に触れられる市場。通行や営業の妨げにならないよう、撮影時は周囲への配慮を忘れずに。",
     "accessNote": "金沢駅から徒歩約12分",
-    "sourceUrl": "https://www.kanazawa-kankoukyoukai.or.jp/spot/detail_10030.html"
+    "sourceUrl": "https://www.kanazawa-kankoukyoukai.or.jp/spot/detail_10030.html",
+    "appearances": [
+      "せーはす！：103期 #27～#28"
+    ]
+  },
+  {
+    "id": "daimatsu-suisan",
+    "name": "大松水産",
+    "shortName": "大松水産",
+    "area": "近江町・尾張町",
+    "category": "買い物",
+    "address": "石川県金沢市上近江町33（近江町市場内）",
+    "lat": 36.570789,
+    "lng": 136.656235,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E6%9D%BE%E6%B0%B4%E7%94%A3%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%8A%E8%BF%91%E6%B1%9F%E7%94%BA33"
+  },
+  {
+    "id": "hirai-seafood-bowl",
+    "name": "近江町海鮮丼家 ひら井",
+    "shortName": "近江町海鮮丼家 ひら井",
+    "area": "近江町・尾張町",
+    "category": "飲食",
+    "address": "石川県金沢市上近江町29（近江町市場内）",
+    "lat": 36.570999,
+    "lng": 136.656784,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%BF%91%E6%B1%9F%E7%94%BA%E6%B5%B7%E9%AE%AE%E4%B8%BC%E5%AE%B6%20%E3%81%B2%E3%82%89%E4%BA%95%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%8A%E8%BF%91%E6%B1%9F%E7%94%BA29",
+    "appearances": [
+      "せーはす！：103期 #28"
+    ]
+  },
+  {
+    "id": "ippukuya-oden",
+    "name": "近江町市場 金沢おでん いっぷくや",
+    "shortName": "近江町市場 金沢おでん いっぷくや",
+    "area": "近江町・尾張町",
+    "category": "飲食",
+    "address": "石川県金沢市青草町88 近江町いちば館1F",
+    "lat": 36.571659,
+    "lng": 136.656036,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%BF%91%E6%B1%9F%E7%94%BA%E5%B8%82%E5%A0%B4%20%E9%87%91%E6%B2%A2%E3%81%8A%E3%81%A7%E3%82%93%20%E3%81%84%E3%81%A3%E3%81%B7%E3%81%8F%E3%82%84%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%9D%92%E8%8D%89%E7%94%BA88%20%E8%BF%91%E6%B1%9F%E7%94%BA%E3%81%84%E3%81%A1%E3%81%B0%E9%A4%A81F",
+    "appearances": [
+      "せーはす！：103期 #27"
+    ]
+  },
+  {
+    "id": "higashide-coffee",
+    "name": "東出珈琲店",
+    "shortName": "東出珈琲店",
+    "area": "近江町・尾張町",
+    "category": "飲食",
+    "address": "石川県金沢市十間町42",
+    "lat": 36.570641,
+    "lng": 136.657471,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E6%9D%B1%E5%87%BA%E7%8F%88%E7%90%B2%E5%BA%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%8D%81%E9%96%93%E7%94%BA42"
+  },
+  {
+    "id": "kanazawa-katani",
+    "name": "かなざわカタニ",
+    "shortName": "かなざわカタニ",
+    "area": "近江町・尾張町",
+    "category": "買い物",
+    "address": "石川県金沢市下新町6-33",
+    "lat": 36.571995,
+    "lng": 136.662582,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%8B%E3%81%AA%E3%81%96%E3%82%8F%E3%82%AB%E3%82%BF%E3%83%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%8B%E6%96%B0%E7%94%BA6-33",
+    "appearances": [
+      "せーはす！：103期 #32"
+    ]
+  },
+  {
+    "id": "kanazawa-phonograph-museum",
+    "name": "金沢蓄音器館",
+    "shortName": "金沢蓄音器館",
+    "area": "近江町・尾張町",
+    "category": "文化",
+    "address": "石川県金沢市尾張町2-11-21",
+    "lat": 36.571182,
+    "lng": 136.662643,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E8%93%84%E9%9F%B3%E5%99%A8%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%BC%B5%E7%94%BA2-11-21"
+  },
+  {
+    "id": "kanazawa-tourist-info",
+    "name": "金沢中央観光案内所",
+    "shortName": "金沢中央観光案内所",
+    "area": "近江町・尾張町",
+    "category": "文化",
+    "address": "石川県金沢市南町4-1 金沢ニューグランドビル1F",
+    "lat": 36.566273,
+    "lng": 136.653717,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E4%B8%AD%E5%A4%AE%E8%A6%B3%E5%85%89%E6%A1%88%E5%86%85%E6%89%80%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%8D%97%E7%94%BA4-1%20%E9%87%91%E6%B2%A2%E3%83%8B%E3%83%A5%E3%83%BC%E3%82%B0%E3%83%A9%E3%83%B3%E3%83%89%E3%83%93%E3%83%AB1F"
+  },
+  {
+    "id": "kanazawa-castle-shinmaru",
+    "name": "金沢城公園 新丸広場",
+    "shortName": "金沢城公園 新丸広場",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市丸の内1-1（金沢城公園内）",
+    "lat": 36.56575,
+    "lng": 136.659271,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E5%9F%8E%E5%85%AC%E5%9C%92%20%E6%96%B0%E4%B8%B8%E5%BA%83%E5%A0%B4%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%851-1",
+    "appearances": [
+      "カード：［喫茶ハスノソラ］大沢瑠璃乃（百間堀園地付近）"
+    ]
+  },
+  {
+    "id": "kanazawa-castle-sannomaru",
+    "name": "金沢城公園 三の丸広場",
+    "shortName": "金沢城公園 三の丸広場",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市丸の内1-1（金沢城公園内）",
+    "lat": 36.56575,
+    "lng": 136.659271,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E5%9F%8E%E5%85%AC%E5%9C%92%20%E4%B8%89%E3%81%AE%E4%B8%B8%E5%BA%83%E5%A0%B4%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%851-1"
+  },
+  {
+    "id": "kanazawa-castle-tsurunomaru",
+    "name": "金沢城公園 鶴の丸休憩館",
+    "shortName": "金沢城公園 鶴の丸休憩館",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市丸の内1-1（金沢城公園内）",
+    "lat": 36.56575,
+    "lng": 136.659271,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E5%9F%8E%E5%85%AC%E5%9C%92%20%E9%B6%B4%E3%81%AE%E4%B8%B8%E4%BC%91%E6%86%A9%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%851-1"
+  },
+  {
+    "id": "gyokuseninmaru-garden",
+    "name": "金沢城公園 玉泉院丸庭園",
+    "shortName": "金沢城公園 玉泉院丸庭園",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市丸の内3（金沢城公園内）",
+    "lat": 36.564407,
+    "lng": 136.657898,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E5%9F%8E%E5%85%AC%E5%9C%92%20%E7%8E%89%E6%B3%89%E9%99%A2%E4%B8%B8%E5%BA%AD%E5%9C%92%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%853",
+    "appearances": [
+      "せーはす！：104期 #34"
+    ]
+  },
+  {
+    "id": "ishikawa-bridge",
+    "name": "石川橋",
+    "shortName": "石川橋",
+    "area": "金沢城・兼六園",
+    "category": "まち歩き",
+    "address": "石川県金沢市丸の内・兼六町間（橋／エリア）",
+    "lat": 36.562954,
+    "lng": 136.662308,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%9F%B3%E5%B7%9D%E6%A9%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%85%E3%83%BB%E5%85%BC%E5%85%AD%E7%94%BA%E9%96%93",
+    "appearances": [
+      "カード：［蓮ノ空歌留多］大沢瑠璃乃"
+    ]
+  },
+  {
+    "id": "kenrokuen",
+    "name": "兼六園",
+    "shortName": "兼六園",
+    "area": "金沢城・兼六園",
+    "category": "まち歩き",
+    "address": "石川県金沢市兼六町1",
+    "lat": 36.563438,
+    "lng": 136.661621,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%85%BC%E5%85%AD%E5%9C%92%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%85%BC%E5%85%AD%E7%94%BA1",
+    "appearances": [
+      "せーはす！：103期 #27～#28／104期 #34～#36",
+      "カード：［蓮ノ空歌留多］村野さやか"
+    ]
+  },
+  {
+    "id": "kaga-yuzen-kaikan",
+    "name": "加賀友禅会館",
+    "shortName": "加賀友禅会館",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市小将町8-8",
+    "lat": 36.564014,
+    "lng": 136.664383,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%8A%A0%E8%B3%80%E5%8F%8B%E7%A6%85%E4%BC%9A%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%8F%E5%B0%86%E7%94%BA8-8",
+    "appearances": [
+      "せーはす！：103期 #26"
+    ]
+  },
+  {
+    "id": "ishikawa-traditional-crafts",
+    "name": "いしかわ生活工芸ミュージアム",
+    "shortName": "いしかわ生活工芸ミュージアム",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市兼六町1-1",
+    "lat": 36.563438,
+    "lng": 136.661621,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%84%E3%81%97%E3%81%8B%E3%82%8F%E7%94%9F%E6%B4%BB%E5%B7%A5%E8%8A%B8%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%B8%E3%82%A2%E3%83%A0%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%85%BC%E5%85%AD%E7%94%BA1-1"
+  },
+  {
+    "id": "shiinoki-cultural-complex",
+    "name": "石川県政記念しいのき迎賓館",
+    "shortName": "石川県政記念しいのき迎賓館",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市広坂2-1-1",
+    "lat": 36.563732,
+    "lng": 136.657104,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%9F%B3%E5%B7%9D%E7%9C%8C%E6%94%BF%E8%A8%98%E5%BF%B5%E3%81%97%E3%81%84%E3%81%AE%E3%81%8D%E8%BF%8E%E8%B3%93%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%BA%83%E5%9D%822-1-1"
+  },
+  {
+    "id": "kanazawa-folklore-museum",
+    "name": "金沢くらしの博物館",
+    "shortName": "金沢くらしの博物館",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市飛梅町3-31",
+    "lat": 36.557854,
+    "lng": 136.667801,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E3%81%8F%E3%82%89%E3%81%97%E3%81%AE%E5%8D%9A%E7%89%A9%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%A3%9B%E6%A2%85%E7%94%BA3-31"
+  },
+  {
+    "id": "yasue-gold-leaf-museum",
+    "name": "金沢市立安江金箔工芸館",
+    "shortName": "金沢市立安江金箔工芸館",
+    "area": "東山・卯辰山",
+    "category": "文化",
+    "address": "石川県金沢市東山1-3-10",
+    "lat": 36.573689,
+    "lng": 136.665756,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E5%B8%82%E7%AB%8B%E5%AE%89%E6%B1%9F%E9%87%91%E7%AE%94%E5%B7%A5%E8%8A%B8%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-3-10"
+  },
+  {
+    "id": "temari-mariya",
+    "name": "加賀てまり 毬屋",
+    "shortName": "加賀てまり 毬屋",
+    "area": "近江町・尾張町",
+    "category": "買い物",
+    "address": "石川県金沢市南町5-7",
+    "lat": 36.566505,
+    "lng": 136.654068,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%8A%A0%E8%B3%80%E3%81%A6%E3%81%BE%E3%82%8A%20%E6%AF%AC%E5%B1%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%8D%97%E7%94%BA5-7"
+  },
+  {
+    "id": "higashi-chaya",
+    "name": "ひがし茶屋街",
+    "shortName": "ひがし茶屋街",
+    "area": "東山・卯辰山",
+    "category": "まち歩き",
+    "address": "石川県金沢市東山1丁目（エリア）",
+    "lat": 36.5714,
+    "lng": 136.666916,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%B2%E3%81%8C%E3%81%97%E8%8C%B6%E5%B1%8B%E8%A1%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11%E4%B8%81%E7%9B%AE",
+    "appearances": [
+      "せーはす！：103期 #28・#33",
+      "カード：［Trick & Cute］日野下花帆",
+      "カード：［素顔のピクセル］日野下花帆"
+    ]
+  },
+  {
+    "id": "kazuemachi-chaya",
+    "name": "主計町茶屋街",
+    "shortName": "主計町茶屋街",
+    "area": "近江町・尾張町",
+    "category": "まち歩き",
+    "address": "石川県金沢市主計町（エリア）",
+    "lat": 36.572338,
+    "lng": 136.663589,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E4%B8%BB%E8%A8%88%E7%94%BA%E8%8C%B6%E5%B1%8B%E8%A1%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%BB%E8%A8%88%E7%94%BA",
+    "appearances": [
+      "せーはす！：103期 #28",
+      "カード：［蓮ノ空歌留多］徒町小鈴"
+    ]
+  },
+  {
+    "id": "asanogawa-bridge",
+    "name": "浅野川大橋",
+    "shortName": "浅野川大橋",
+    "area": "近江町・尾張町",
+    "category": "まち歩き",
+    "address": "石川県金沢市橋場町・主計町間（橋／エリア）",
+    "lat": 36.570091,
+    "lng": 136.665237,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E6%B5%85%E9%87%8E%E5%B7%9D%E5%A4%A7%E6%A9%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%A9%8B%E5%A0%B4%E7%94%BA%E3%83%BB%E4%B8%BB%E8%A8%88%E7%94%BA%E9%96%93",
+    "appearances": [
+      "せーはす！：103期 #28"
+    ]
+  },
+  {
+    "id": "yaoyorozu-honpo",
+    "name": "八百萬本舗",
+    "shortName": "八百萬本舗",
+    "area": "近江町・尾張町",
+    "category": "買い物",
+    "address": "石川県金沢市尾張町2-14-20",
+    "lat": 36.571491,
+    "lng": 136.664047,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%85%AB%E7%99%BE%E8%90%AC%E6%9C%AC%E8%88%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%BC%B5%E7%94%BA2-14-20",
+    "appearances": [
+      "せーはす！：103期 #28／104期 #36",
+      "カード：［Dream Believers］百生吟子"
+    ]
+  },
+  {
+    "id": "nishi-chaya",
+    "name": "にし茶屋街",
+    "shortName": "にし茶屋街",
+    "area": "にし茶屋街・寺町",
+    "category": "まち歩き",
+    "address": "石川県金沢市野町2丁目（エリア）",
+    "lat": 36.556183,
+    "lng": 136.647095,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%AB%E3%81%97%E8%8C%B6%E5%B1%8B%E8%A1%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%87%8E%E7%94%BA2%E4%B8%81%E7%9B%AE",
+    "appearances": [
+      "せーはす！：103期 #28"
+    ]
+  },
+  {
+    "id": "amanatto-kawamura",
+    "name": "甘納豆かわむら",
+    "shortName": "甘納豆かわむら",
+    "area": "にし茶屋街・寺町",
+    "category": "まち歩き",
+    "address": "石川県金沢市野町2-24-7",
+    "lat": 36.556637,
+    "lng": 136.64711,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%94%98%E7%B4%8D%E8%B1%86%E3%81%8B%E3%82%8F%E3%82%80%E3%82%89%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%87%8E%E7%94%BA2-24-7",
+    "appearances": [
+      "せーはす！：103期 #28"
+    ]
+  },
+  {
+    "id": "ninja-weapon-museum",
+    "name": "忍者武器ミュージアム",
+    "shortName": "忍者武器ミュージアム",
+    "area": "にし茶屋街・寺町",
+    "category": "まち歩き",
+    "address": "石川県金沢市野町2-26-1",
+    "lat": 36.557247,
+    "lng": 136.647598,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%BF%8D%E8%80%85%E6%AD%A6%E5%99%A8%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%B8%E3%82%A2%E3%83%A0%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%87%8E%E7%94%BA2-26-1",
+    "appearances": [
+      "せーはす！：103期 #28"
+    ]
+  },
+  {
+    "id": "oyama-shrine",
+    "name": "尾山神社",
+    "shortName": "尾山神社",
+    "area": "近江町・尾張町",
+    "category": "寺社",
+    "address": "石川県金沢市尾山町11-1",
+    "lat": 36.566143,
+    "lng": 136.65448,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B0%BE%E5%B1%B1%E7%A5%9E%E7%A4%BE%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%B1%B1%E7%94%BA11-1",
+    "appearances": [
+      "せーはす！：104期 #35",
+      "カード：［蓮ノ空歌留多］百生吟子"
+    ]
+  },
+  {
+    "id": "grill-otsuka",
+    "name": "グリル オーツカ",
+    "shortName": "グリル オーツカ",
+    "area": "香林坊・長町",
+    "category": "飲食",
+    "address": "石川県金沢市片町2-9-15",
+    "lat": 36.562042,
+    "lng": 136.651917,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%82%B0%E3%83%AA%E3%83%AB%20%E3%82%AA%E3%83%BC%E3%83%84%E3%82%AB%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E7%89%87%E7%94%BA2-9-15",
+    "appearances": [
+      "せーはす！：103期 #27"
+    ]
+  },
+  {
+    "id": "tate-machi",
+    "name": "金沢竪町商店街",
+    "shortName": "金沢竪町商店街",
+    "area": "香林坊・長町",
+    "category": "まち歩き",
+    "address": "石川県金沢市竪町（エリア）",
+    "lat": 36.558884,
+    "lng": 136.654465,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E7%AB%AA%E7%94%BA%E5%95%86%E5%BA%97%E8%A1%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E7%AB%AA%E7%94%BA",
+    "appearances": [
+      "せーはす！：104期 #36"
+    ]
+  },
+  {
+    "id": "saigawa-bridge",
+    "name": "犀川大橋・犀川沿い",
+    "shortName": "犀川大橋・犀川沿い",
+    "area": "にし茶屋街・寺町",
+    "category": "まち歩き",
+    "address": "石川県金沢市片町1丁目・野町1丁目間、および犀川大橋～桜橋間の河川敷（エリア）",
+    "lat": 36.559959,
+    "lng": 136.653259,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%8A%80%E5%B7%9D%E5%A4%A7%E6%A9%8B%E3%83%BB%E7%8A%80%E5%B7%9D%E6%B2%BF%E3%81%84%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E7%89%87%E7%94%BA1%E4%B8%81%E7%9B%AE%E3%83%BB%E9%87%8E%E7%94%BA1%E4%B8%81%E7%9B%AE%E9%96%93%E3%80%81%E3%81%8A%E3%82%88%E3%81%B3%E7%8A%80%E5%B7%9D%E5%A4%A7%E6%A9%8B%EF%BD%9E%E6%A1%9C%E6%A9%8B%E9%96%93%E3%81%AE%E6%B2%B3%E5%B7%9D%E6%95%B7",
+    "appearances": [
+      "せーはす！：103期 #27～#28"
+    ]
   },
   {
     "id": "utatsuyama-viewpoint",
-    "name": "見晴らし台（卯辰山公園）",
-    "shortName": "卯辰山 見晴らし台",
-    "area": "金沢",
+    "name": "卯辰山公園 見晴らし台",
+    "shortName": "卯辰山公園 見晴らし台",
+    "area": "東山・卯辰山",
     "category": "眺望",
-    "address": "石川県金沢市東御影町 卯辰山公園内",
+    "address": "石川県金沢市末広町地内",
     "lat": 36.567969,
     "lng": 136.677228,
     "description": "金沢のまちなかから山並みまで見渡せる展望芝生広場。天候と足元を確認して訪れたいスポットです。",
     "accessNote": "卯辰山公園バス停から徒歩約3分",
-    "sourceUrl": "https://www.kanazawa-kankoukyoukai.or.jp/spot/detail_50344.html"
+    "sourceUrl": "https://www.kanazawa-kankoukyoukai.or.jp/spot/detail_50344.html",
+    "appearances": [
+      "せーはす！：103期 #29"
+    ]
+  },
+  {
+    "id": "oku-utatsuyama-park",
+    "name": "奥卯辰山健民公園",
+    "shortName": "奥卯辰山健民公園",
+    "area": "東山・卯辰山",
+    "category": "レジャー",
+    "address": "石川県金沢市若松町ア32",
+    "lat": 36.559612,
+    "lng": 136.694672,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%A5%A5%E5%8D%AF%E8%BE%B0%E5%B1%B1%E5%81%A5%E6%B0%91%E5%85%AC%E5%9C%92%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E8%8B%A5%E6%9D%BE%E7%94%BA%E3%82%A232"
+  },
+  {
+    "id": "ishikawa-library",
+    "name": "石川県立図書館",
+    "shortName": "石川県立図書館",
+    "area": "東山・卯辰山",
+    "category": "文化",
+    "address": "石川県金沢市小立野2-43-1",
+    "lat": 36.548672,
+    "lng": 136.680328,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%9F%B3%E5%B7%9D%E7%9C%8C%E7%AB%8B%E5%9B%B3%E6%9B%B8%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%8F%E7%AB%8B%E9%87%8E2-43-1",
+    "appearances": [
+      "せーはす！：104期 #37"
+    ]
+  },
+  {
+    "id": "nishi-kanazawa-station",
+    "name": "西金沢駅",
+    "shortName": "西金沢駅",
+    "area": "金沢駅周辺",
+    "category": "交通",
+    "address": "石川県金沢市西金沢1丁目1",
+    "lat": 36.552452,
+    "lng": 136.620422,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "最新の運行・施設情報を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%A5%BF%E9%87%91%E6%B2%A2%E9%A7%85%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E8%A5%BF%E9%87%91%E6%B2%A21%E4%B8%81%E7%9B%AE1"
+  },
+  {
+    "id": "kenmin-sporec",
+    "name": "健民スポレクプラザ",
+    "shortName": "健民スポレクプラザ",
+    "area": "金沢西・港",
+    "category": "レジャー",
+    "address": "石川県金沢市西泉6-188",
+    "lat": 36.555054,
+    "lng": 136.627533,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%81%A5%E6%B0%91%E3%82%B9%E3%83%9D%E3%83%AC%E3%82%AF%E3%83%97%E3%83%A9%E3%82%B6%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E8%A5%BF%E6%B3%896-188",
+    "appearances": [
+      "せーはす！：104期 #37"
+    ]
+  },
+  {
+    "id": "ishikawa-sports-center",
+    "name": "いしかわ総合スポーツセンター",
+    "shortName": "いしかわ総合スポーツセンター",
+    "area": "金沢西・港",
+    "category": "レジャー",
+    "address": "石川県金沢市稚日野町北222",
+    "lat": 36.57859,
+    "lng": 136.598404,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%84%E3%81%97%E3%81%8B%E3%82%8F%E7%B7%8F%E5%90%88%E3%82%B9%E3%83%9D%E3%83%BC%E3%83%84%E3%82%BB%E3%83%B3%E3%82%BF%E3%83%BC%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E7%A8%9A%E6%97%A5%E9%87%8E%E7%94%BA%E5%8C%97222"
+  },
+  {
+    "id": "apina-nonoichi",
+    "name": "アピナ野々市バッティングスタジアム",
+    "shortName": "アピナ野々市バッティングスタジアム",
+    "area": "白山・野々市・能美",
+    "category": "レジャー",
+    "address": "石川県野々市市若松町5-5",
+    "lat": 36.53648,
+    "lng": 136.611221,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%82%A2%E3%83%94%E3%83%8A%E9%87%8E%E3%80%85%E5%B8%82%E3%83%90%E3%83%83%E3%83%86%E3%82%A3%E3%83%B3%E3%82%B0%E3%82%B9%E3%82%BF%E3%82%B8%E3%82%A2%E3%83%A0%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%8E%E3%80%85%E5%B8%82%E5%B8%82%E8%8B%A5%E6%9D%BE%E7%94%BA5-5",
+    "appearances": [
+      "せーはす！：104期 #37"
+    ]
+  },
+  {
+    "id": "toku-mitsu-coast",
+    "name": "徳光海岸（松任海浜公園）",
+    "shortName": "徳光海岸",
+    "area": "白山・野々市・能美",
+    "category": "海辺",
+    "address": "石川県白山市徳光町2665-1 周辺",
+    "lat": 36.540829,
+    "lng": 136.533748,
+    "description": "日本海を望む松任海浜公園に隣接した海岸。季節や天候で状況が変わるため、現地の案内に従って行動してください。",
+    "accessNote": "車での訪問が便利",
+    "sourceUrl": "https://www.hot-ishikawa.jp/spot/detail_5910.html",
+    "appearances": [
+      "カード：［朝顔令嬢］乙宗梢"
+    ]
   },
   {
     "id": "yunokuni-tensyo",
-    "name": "加賀 山代温泉 ゆのくに天祥",
+    "name": "ゆのくに天祥",
     "shortName": "ゆのくに天祥",
-    "area": "加賀",
+    "area": "加賀・小松",
     "category": "宿泊",
     "address": "石川県加賀市山代温泉19-49-1",
     "lat": 36.2887,
     "lng": 136.3604,
     "description": "山代温泉にある宿泊施設。作品との公式コラボ情報もあるため、訪問前に最新の実施内容を公式サイトで確認しましょう。",
     "accessNote": "JR加賀温泉駅から送迎バス約15分",
-    "sourceUrl": "https://yunokunitensyo.jp/0/"
+    "sourceUrl": "https://yunokunitensyo.jp/0/",
+    "appearances": [
+      "せーはす！：104期 #37～#39",
+      "カード：［みらくりえーしょん］安養寺姫芽",
+      "カード：［Secret Christmas］大沢瑠璃乃"
+    ]
+  },
+  {
+    "id": "komatsu-airport",
+    "name": "小松空港",
+    "shortName": "小松空港",
+    "area": "加賀・小松",
+    "category": "交通",
+    "address": "石川県小松市浮柳町ヨ50",
+    "lat": 36.405926,
+    "lng": 136.420837,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "最新の運行・施設情報を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B0%8F%E6%9D%BE%E7%A9%BA%E6%B8%AF%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E5%B0%8F%E6%9D%BE%E5%B8%82%E6%B5%AE%E6%9F%B3%E7%94%BA%E3%83%A850",
+    "appearances": [
+      "カード：［みんなで野外音楽フェス］大沢瑠璃乃"
+    ]
+  },
+  {
+    "id": "komatsu-kabulet",
+    "name": "小松KABULET",
+    "shortName": "小松KABULET",
+    "area": "加賀・小松",
+    "category": "文化",
+    "address": "石川県小松市土居原町10-10",
+    "lat": 36.400505,
+    "lng": 136.452209,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B0%8F%E6%9D%BEKABULET%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E5%B0%8F%E6%9D%BE%E5%B8%82%E5%9C%9F%E5%B1%85%E5%8E%9F%E7%94%BA10-10"
+  },
+  {
+    "id": "abio-city-kaga",
+    "name": "アビオシティ加賀",
+    "shortName": "アビオシティ加賀",
+    "area": "加賀・小松",
+    "category": "文化",
+    "address": "石川県加賀市作見町ル25-1",
+    "lat": 36.320061,
+    "lng": 136.353027,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%82%A2%E3%83%93%E3%82%AA%E3%82%B7%E3%83%86%E3%82%A3%E5%8A%A0%E8%B3%80%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E5%8A%A0%E8%B3%80%E5%B8%82%E4%BD%9C%E8%A6%8B%E7%94%BA%E3%83%AB25-1"
   },
   {
     "id": "matsubaya",
-    "name": "御菓子司 松葉屋",
+    "name": "松葉屋（小松本店）",
     "shortName": "松葉屋",
-    "area": "小松",
+    "area": "加賀・小松",
     "category": "甘味",
     "address": "石川県小松市大文字町69",
     "lat": 36.4018,
@@ -67,29 +693,571 @@
     "sourceUrl": "https://www.matsubaya.jp/access.html"
   },
   {
-    "id": "toku-mitsu-coast",
-    "name": "徳光海岸（徳光海水浴場）",
-    "shortName": "徳光海岸",
-    "area": "白山",
-    "category": "海辺",
-    "address": "石川県白山市徳光町",
-    "lat": 36.540829,
-    "lng": 136.533748,
-    "description": "日本海を望む松任海浜公園に隣接した海岸。季節や天候で状況が変わるため、現地の案内に従って行動してください。",
-    "accessNote": "車での訪問が便利",
-    "sourceUrl": "https://www.hot-ishikawa.jp/spot/detail_5910.html"
+    "id": "tsuchiku-taiyaki",
+    "name": "たい焼き工房 土九 金沢駅あんと西店",
+    "shortName": "たい焼き工房 土九 金沢駅あんと西店",
+    "area": "金沢駅周辺",
+    "category": "甘味",
+    "address": "石川県金沢市木ノ新保町1-1 金沢百番街あんと内",
+    "lat": 36.577168,
+    "lng": 136.647675,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%9F%E3%81%84%E7%84%BC%E3%81%8D%E5%B7%A5%E6%88%BF%20%E5%9C%9F%E4%B9%9D%20%E9%87%91%E6%B2%A2%E9%A7%85%E3%81%82%E3%82%93%E3%81%A8%E8%A5%BF%E5%BA%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9C%A8%E3%83%8E%E6%96%B0%E4%BF%9D%E7%94%BA1-1%20%E9%87%91%E6%B2%A2%E7%99%BE%E7%95%AA%E8%A1%97%E3%81%82%E3%82%93%E3%81%A8%E5%86%85"
+  },
+  {
+    "id": "kanaeki-chikuwa",
+    "name": "かなえきのちくわ",
+    "shortName": "かなえきのちくわ",
+    "area": "金沢駅周辺",
+    "category": "飲食",
+    "address": "石川県金沢市木ノ新保町1-1 金沢百番街 百番キッチン1F",
+    "lat": 36.577168,
+    "lng": 136.647675,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%8B%E3%81%AA%E3%81%88%E3%81%8D%E3%81%AE%E3%81%A1%E3%81%8F%E3%82%8F%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9C%A8%E3%83%8E%E6%96%B0%E4%BF%9D%E7%94%BA1-1%20%E9%87%91%E6%B2%A2%E7%99%BE%E7%95%AA%E8%A1%97%20%E7%99%BE%E7%95%AA%E3%82%AD%E3%83%83%E3%83%81%E3%83%B31F"
+  },
+  {
+    "id": "teramachiya-fushinan",
+    "name": "てらまちや風心庵",
+    "shortName": "てらまちや風心庵",
+    "area": "にし茶屋街・寺町",
+    "category": "まち歩き",
+    "address": "石川県金沢市寺町3-2-32",
+    "lat": 36.551991,
+    "lng": 136.65419,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%A6%E3%82%89%E3%81%BE%E3%81%A1%E3%82%84%E9%A2%A8%E5%BF%83%E5%BA%B5%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%AF%BA%E7%94%BA3-2-32",
+    "appearances": [
+      "せーはす！：104期 #36"
+    ]
+  },
+  {
+    "id": "ushiju-teraoka",
+    "name": "うし重 てらおか",
+    "shortName": "うし重 てらおか",
+    "area": "金沢駅周辺",
+    "category": "飲食",
+    "address": "石川県金沢市安江町12-4",
+    "lat": 36.573685,
+    "lng": 136.654984,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%86%E3%81%97%E9%87%8D%20%E3%81%A6%E3%82%89%E3%81%8A%E3%81%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%AE%89%E6%B1%9F%E7%94%BA12-4",
+    "appearances": [
+      "せーはす！：104期 #40"
+    ]
+  },
+  {
+    "id": "waguri-shiratsuyu",
+    "name": "和栗白露",
+    "shortName": "和栗白露",
+    "area": "東山・卯辰山",
+    "category": "甘味",
+    "address": "石川県金沢市観音町3-1-16",
+    "lat": 36.571976,
+    "lng": 136.668045,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%92%8C%E6%A0%97%E7%99%BD%E9%9C%B2%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E8%A6%B3%E9%9F%B3%E7%94%BA3-1-16",
+    "appearances": [
+      "せーはす！：104期 #40"
+    ]
+  },
+  {
+    "id": "kanazawa-kurumi",
+    "name": "水引アクセサリー工房 金澤くるみ",
+    "shortName": "水引アクセサリー工房 金澤くるみ",
+    "area": "金沢駅周辺",
+    "category": "買い物",
+    "address": "石川県金沢市安江町1-15",
+    "lat": 36.573387,
+    "lng": 136.655396,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E6%B0%B4%E5%BC%95%E3%82%A2%E3%82%AF%E3%82%BB%E3%82%B5%E3%83%AA%E3%83%BC%E5%B7%A5%E6%88%BF%20%E9%87%91%E6%BE%A4%E3%81%8F%E3%82%8B%E3%81%BF%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%AE%89%E6%B1%9F%E7%94%BA1-15",
+    "appearances": [
+      "せーはす！：104期 #41"
+    ]
+  },
+  {
+    "id": "to-an",
+    "name": "to-an（とうあん）",
+    "shortName": "to-an",
+    "area": "金沢西・港",
+    "category": "まち歩き",
+    "address": "石川県金沢市入江2-401",
+    "lat": 36.566425,
+    "lng": 136.625916,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=to-an%EF%BC%88%E3%81%A8%E3%81%86%E3%81%82%E3%82%93%EF%BC%89%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%85%A5%E6%B1%9F2-401",
+    "appearances": [
+      "せーはす！：104期 #41"
+    ]
   },
   {
     "id": "ohno-karakuri",
-    "name": "石川県金沢港 大野からくり記念館",
+    "name": "（公財）大野からくり記念館",
     "shortName": "大野からくり記念館",
-    "area": "金沢港",
+    "area": "金沢西・港",
     "category": "文化",
     "address": "石川県金沢市大野町4丁目甲2番29",
     "lat": 36.619005,
     "lng": 136.6018,
     "description": "大野弁吉の業績とからくりの世界に触れられる記念館。開館日と最終入館時刻を確認してから向かいましょう。",
     "accessNote": "金沢駅から車で約20分",
-    "sourceUrl": "https://www.ohno-karakuri.jp/"
+    "sourceUrl": "https://www.ohno-karakuri.jp/",
+    "appearances": [
+      "せーはす！：104期 #42",
+      "カード：［蓮ノ空歌留多］乙宗梢"
+    ]
+  },
+  {
+    "id": "moromigura",
+    "name": "もろみ蔵",
+    "shortName": "もろみ蔵",
+    "area": "金沢西・港",
+    "category": "飲食",
+    "address": "石川県金沢市大野町2-39",
+    "lat": 36.611511,
+    "lng": 136.605331,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%82%82%E3%82%8D%E3%81%BF%E8%94%B5%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%A4%A7%E9%87%8E%E7%94%BA2-39",
+    "appearances": [
+      "せーはす！：104期 #42"
+    ]
+  },
+  {
+    "id": "kanazawa-sushi",
+    "name": "押寿し体験厨房 金澤寿し",
+    "shortName": "押寿し体験厨房 金澤寿し",
+    "area": "東山・卯辰山",
+    "category": "飲食",
+    "address": "石川県金沢市東山1-15-6",
+    "lat": 36.57235,
+    "lng": 136.666687,
+    "description": "作品・関連企画にまつわる所在地記録です。2025年10月19日で営業終了した旨の案内があるため、営業施設としては案内していません。",
+    "accessNote": "営業終了済み（所在地記録）",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E6%8A%BC%E5%AF%BF%E3%81%97%E4%BD%93%E9%A8%93%E5%8E%A8%E6%88%BF%20%E9%87%91%E6%BE%A4%E5%AF%BF%E3%81%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-15-6",
+    "appearances": [
+      "せーはす！：104期 #43"
+    ]
+  },
+  {
+    "id": "yanagian",
+    "name": "茶房 やなぎ庵",
+    "shortName": "茶房 やなぎ庵",
+    "area": "東山・卯辰山",
+    "category": "飲食",
+    "address": "石川県金沢市東山1-13-24",
+    "lat": 36.572605,
+    "lng": 136.666504,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%8C%B6%E6%88%BF%20%E3%82%84%E3%81%AA%E3%81%8E%E5%BA%B5%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-13-24",
+    "appearances": [
+      "せーはす！：104期 #43"
+    ]
+  },
+  {
+    "id": "akaneya",
+    "name": "茜や",
+    "shortName": "茜や",
+    "area": "香林坊・長町",
+    "category": "甘味",
+    "address": "石川県金沢市里見町53-1（茜やアーカイブギャラリー）",
+    "lat": 36.559441,
+    "lng": 136.655533,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%8C%9C%E3%82%84%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%87%8C%E8%A6%8B%E7%94%BA53-1",
+    "appearances": [
+      "せーはす！：104期 #44"
+    ]
+  },
+  {
+    "id": "wagashi-murakami-nagamachi",
+    "name": "和菓子村上 長町店",
+    "shortName": "和菓子村上 長町店",
+    "area": "香林坊・長町",
+    "category": "甘味",
+    "address": "石川県金沢市長町2-3-32",
+    "lat": 36.564194,
+    "lng": 136.64975,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%92%8C%E8%8F%93%E5%AD%90%E6%9D%91%E4%B8%8A%20%E9%95%B7%E7%94%BA%E5%BA%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%95%B7%E7%94%BA2-3-32",
+    "appearances": [
+      "せーはす！：104期 #44"
+    ]
+  },
+  {
+    "id": "ishikawa-history-museum",
+    "name": "石川県立歴史博物館",
+    "shortName": "石川県立歴史博物館",
+    "area": "金沢城・兼六園",
+    "category": "文化",
+    "address": "石川県金沢市出羽町3-1",
+    "lat": 36.559898,
+    "lng": 136.662491,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%9F%B3%E5%B7%9D%E7%9C%8C%E7%AB%8B%E6%AD%B4%E5%8F%B2%E5%8D%9A%E7%89%A9%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%87%BA%E7%BE%BD%E7%94%BA3-1",
+    "appearances": [
+      "カード：［蓮ノ空歌留多］日野下花帆"
+    ]
+  },
+  {
+    "id": "nagamachi-samurai",
+    "name": "長町武家屋敷跡",
+    "shortName": "長町武家屋敷跡",
+    "area": "香林坊・長町",
+    "category": "まち歩き",
+    "address": "石川県金沢市長町1丁目・2丁目一帯（エリア。カード構図は長町二の橋付近）",
+    "lat": 36.563786,
+    "lng": 136.64917,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%95%B7%E7%94%BA%E6%AD%A6%E5%AE%B6%E5%B1%8B%E6%95%B7%E8%B7%A1%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%95%B7%E7%94%BA1%E4%B8%81%E7%9B%AE%E3%83%BB2%E4%B8%81%E7%9B%AE%E4%B8%80%E5%B8%AF",
+    "appearances": [
+      "せーはす！：104期 #36",
+      "カード：［蓮ノ空歌留多］夕霧綴理"
+    ]
+  },
+  {
+    "id": "noto-aquarium",
+    "name": "のとじま水族館",
+    "shortName": "のとじま水族館",
+    "area": "能登",
+    "category": "レジャー",
+    "address": "石川県七尾市能登島曲町15部40",
+    "lat": 37.137688,
+    "lng": 136.979507,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%AE%E3%81%A8%E3%81%98%E3%81%BE%E6%B0%B4%E6%97%8F%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E4%B8%83%E5%B0%BE%E5%B8%82%E8%83%BD%E7%99%BB%E5%B3%B6%E6%9B%B2%E7%94%BA15%E9%83%A840",
+    "appearances": [
+      "せーはす！：105期 #36～#38",
+      "カード：［夏めきペイン］夕霧綴理"
+    ]
+  },
+  {
+    "id": "wakura-hamazuru",
+    "name": "和倉温泉 はまづる",
+    "shortName": "和倉温泉 はまづる",
+    "area": "能登",
+    "category": "宿泊",
+    "address": "石川県七尾市和倉町ル2-2",
+    "lat": 37.087299,
+    "lng": 136.92131,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%92%8C%E5%80%89%E6%B8%A9%E6%B3%89%20%E3%81%AF%E3%81%BE%E3%81%A5%E3%82%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E4%B8%83%E5%B0%BE%E5%B8%82%E5%92%8C%E5%80%89%E7%94%BA%E3%83%AB2-2",
+    "appearances": [
+      "せーはす！：105期 #39"
+    ]
+  },
+  {
+    "id": "longest-bench",
+    "name": "世界一長いベンチ",
+    "shortName": "世界一長いベンチ",
+    "area": "能登",
+    "category": "眺望",
+    "address": "石川県羽咋郡志賀町富来領家町（増穂浦海岸／エリア）",
+    "lat": 37.138374,
+    "lng": 136.727051,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "天候・足元・立入案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E4%B8%96%E7%95%8C%E4%B8%80%E9%95%B7%E3%81%84%E3%83%99%E3%83%B3%E3%83%81%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E7%BE%BD%E5%92%8B%E9%83%A1%E5%BF%97%E8%B3%80%E7%94%BA%E5%AF%8C%E6%9D%A5%E9%A0%98%E5%AE%B6%E7%94%BA",
+    "appearances": [
+      "せーはす！：105期 #40"
+    ]
+  },
+  {
+    "id": "michi-no-eki-togi",
+    "name": "道の駅 とぎ海街道",
+    "shortName": "道の駅 とぎ海街道",
+    "area": "能登",
+    "category": "レジャー",
+    "address": "石川県羽咋郡志賀町富来領家町甲3-5",
+    "lat": 37.144188,
+    "lng": 136.725708,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%81%93%E3%81%AE%E9%A7%85%20%E3%81%A8%E3%81%8E%E6%B5%B7%E8%A1%97%E9%81%93%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E7%BE%BD%E5%92%8B%E9%83%A1%E5%BF%97%E8%B3%80%E7%94%BA%E5%AF%8C%E6%9D%A5%E9%A0%98%E5%AE%B6%E7%94%BA%E7%94%B23-5",
+    "appearances": [
+      "せーはす！：105期 #40"
+    ]
+  },
+  {
+    "id": "hachiban-ramen-ekinishi",
+    "name": "８番らーめん 金沢駅西本町店",
+    "shortName": "８番らーめん 金沢駅西本町店",
+    "area": "金沢駅周辺",
+    "category": "飲食",
+    "address": "石川県金沢市駅西本町2-1-3",
+    "lat": 36.579632,
+    "lng": 136.636383,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%EF%BC%98%E7%95%AA%E3%82%89%E3%83%BC%E3%82%81%E3%82%93%20%E9%87%91%E6%B2%A2%E9%A7%85%E8%A5%BF%E6%9C%AC%E7%94%BA%E5%BA%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%A7%85%E8%A5%BF%E6%9C%AC%E7%94%BA2-1-3",
+    "appearances": [
+      "せーはす！：105期 #41"
+    ]
+  },
+  {
+    "id": "tedori-fish-land",
+    "name": "手取フィッシュランド",
+    "shortName": "手取フィッシュランド",
+    "area": "白山・野々市・能美",
+    "category": "レジャー",
+    "address": "石川県能美市粟生町ツ58",
+    "lat": 36.458672,
+    "lng": 136.509567,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E6%89%8B%E5%8F%96%E3%83%95%E3%82%A3%E3%83%83%E3%82%B7%E3%83%A5%E3%83%A9%E3%83%B3%E3%83%89%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E8%83%BD%E7%BE%8E%E5%B8%82%E7%B2%9F%E7%94%9F%E7%94%BA%E3%83%8458",
+    "appearances": [
+      "せーはす！：105期 #42"
+    ]
+  },
+  {
+    "id": "myoryuji",
+    "name": "妙立寺（忍者寺）",
+    "shortName": "妙立寺",
+    "area": "にし茶屋街・寺町",
+    "category": "寺社",
+    "address": "石川県金沢市野町1-2-12",
+    "lat": 36.555229,
+    "lng": 136.64946,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%A6%99%E7%AB%8B%E5%AF%BA%EF%BC%88%E5%BF%8D%E8%80%85%E5%AF%BA%EF%BC%89%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%87%8E%E7%94%BA1-2-12",
+    "appearances": [
+      "せーはす！：105期 #42"
+    ]
+  },
+  {
+    "id": "nazoya-coffee-morinosato",
+    "name": "ミステリーカフェ 謎屋珈琲店 金沢杜の里店",
+    "shortName": "ミステリーカフェ 謎屋珈琲店 金沢杜の里店",
+    "area": "東山・卯辰山",
+    "category": "飲食",
+    "address": "石川県金沢市田上さくら3-11 VANGUARD HILL 1F",
+    "lat": 36.546402,
+    "lng": 136.689133,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%83%9F%E3%82%B9%E3%83%86%E3%83%AA%E3%83%BC%E3%82%AB%E3%83%95%E3%82%A7%20%E8%AC%8E%E5%B1%8B%E7%8F%88%E7%90%B2%E5%BA%97%20%E9%87%91%E6%B2%A2%E6%9D%9C%E3%81%AE%E9%87%8C%E5%BA%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E7%94%B0%E4%B8%8A%E3%81%95%E3%81%8F%E3%82%893-11%20VANGUARD%20HILL%201F",
+    "appearances": [
+      "せーはす！：105期 #41"
+    ]
+  },
+  {
+    "id": "kanazawaya-coffee",
+    "name": "金澤屋珈琲 本店",
+    "shortName": "金澤屋珈琲 本店",
+    "area": "金沢城・兼六園",
+    "category": "飲食",
+    "address": "石川県金沢市丸の内5-26",
+    "lat": 36.568604,
+    "lng": 136.658554,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%BE%A4%E5%B1%8B%E7%8F%88%E7%90%B2%20%E6%9C%AC%E5%BA%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%B8%E3%81%AE%E5%86%855-26",
+    "appearances": [
+      "せーはす！：105期 #43"
+    ]
+  },
+  {
+    "id": "ukokkeian-higashiyama",
+    "name": "烏鶏庵 東山店",
+    "shortName": "烏鶏庵 東山店",
+    "area": "東山・卯辰山",
+    "category": "甘味",
+    "address": "石川県金沢市東山1-3-1",
+    "lat": 36.573021,
+    "lng": 136.665192,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%83%8F%E9%B6%8F%E5%BA%B5%20%E6%9D%B1%E5%B1%B1%E5%BA%97%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-3-1",
+    "appearances": [
+      "せーはす！：105期 #43"
+    ]
+  },
+  {
+    "id": "noto-glass-studio",
+    "name": "能登島ガラス工房",
+    "shortName": "能登島ガラス工房",
+    "area": "能登",
+    "category": "文化",
+    "address": "石川県七尾市能登島向田町122-53",
+    "lat": 37.129616,
+    "lng": 137.001999,
+    "description": "『せーので！はすのそら！』に登場した巡礼スポットです。撮影・見学のルールと、周囲の方への配慮を忘れずに訪れましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%83%BD%E7%99%BB%E5%B3%B6%E3%82%AC%E3%83%A9%E3%82%B9%E5%B7%A5%E6%88%BF%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E4%B8%83%E5%B0%BE%E5%B8%82%E8%83%BD%E7%99%BB%E5%B3%B6%E5%90%91%E7%94%B0%E7%94%BA122-53",
+    "appearances": [
+      "せーはす！：105期 #38（同工房製のガラス皿が登場。工房訪問ではない）"
+    ]
+  },
+  {
+    "id": "game-paradise",
+    "name": "ゲーム・パラダイス",
+    "shortName": "ゲーム・パラダイス",
+    "area": "金沢駅周辺",
+    "category": "レジャー",
+    "address": "石川県金沢市堀川新町5-1 アミューズメントスクエア3F",
+    "lat": 36.579815,
+    "lng": 136.651535,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%82%B2%E3%83%BC%E3%83%A0%E3%83%BB%E3%83%91%E3%83%A9%E3%83%80%E3%82%A4%E3%82%B9%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%A0%80%E5%B7%9D%E6%96%B0%E7%94%BA5-1%20%E3%82%A2%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%BA%E3%83%A1%E3%83%B3%E3%83%88%E3%82%B9%E3%82%AF%E3%82%A8%E3%82%A23F"
+  },
+  {
+    "id": "kanazawa-hakomachi",
+    "name": "かなざわはこまち",
+    "shortName": "かなざわはこまち",
+    "area": "近江町・尾張町",
+    "category": "買い物",
+    "address": "石川県金沢市袋町1-1",
+    "lat": 36.572151,
+    "lng": 136.656372,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%8B%E3%81%AA%E3%81%96%E3%82%8F%E3%81%AF%E3%81%93%E3%81%BE%E3%81%A1%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E8%A2%8B%E7%94%BA1-1"
+  },
+  {
+    "id": "korogi-bridge",
+    "name": "山中温泉こおろぎ橋",
+    "shortName": "山中温泉こおろぎ橋",
+    "area": "加賀・小松",
+    "category": "まち歩き",
+    "address": "石川県加賀市山中温泉こおろぎ町（橋／エリア）",
+    "lat": 36.236095,
+    "lng": 136.358246,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B1%B1%E4%B8%AD%E6%B8%A9%E6%B3%89%E3%81%93%E3%81%8A%E3%82%8D%E3%81%8E%E6%A9%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E5%8A%A0%E8%B3%80%E5%B8%82%E5%B1%B1%E4%B8%AD%E6%B8%A9%E6%B3%89%E3%81%93%E3%81%8A%E3%82%8D%E3%81%8E%E7%94%BA"
+  },
+  {
+    "id": "kaikaro",
+    "name": "懐華樓",
+    "shortName": "懐華樓",
+    "area": "東山・卯辰山",
+    "category": "文化",
+    "address": "石川県金沢市東山1-14-8",
+    "lat": 36.572437,
+    "lng": 136.667114,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E6%87%90%E8%8F%AF%E6%A8%93%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-14-8",
+    "appearances": [
+      "カード：［蓮ノ空歌留多］藤島慈"
+    ]
+  },
+  {
+    "id": "koshiyama-kanseido",
+    "name": "金沢・越山甘清堂",
+    "shortName": "金沢・越山甘清堂",
+    "area": "近江町・尾張町",
+    "category": "甘味",
+    "address": "石川県金沢市尾張町2-11-28",
+    "lat": 36.571274,
+    "lng": 136.661896,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%87%91%E6%B2%A2%E3%83%BB%E8%B6%8A%E5%B1%B1%E7%94%98%E6%B8%85%E5%A0%82%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%BC%B5%E7%94%BA2-11-28"
+  },
+  {
+    "id": "jiyukajin-mizuhiki",
+    "name": "自遊花人水引ミュージアム",
+    "shortName": "自遊花人水引ミュージアム",
+    "area": "にし茶屋街・寺町",
+    "category": "買い物",
+    "address": "石川県金沢市清川町7-9",
+    "lat": 36.551113,
+    "lng": 136.657654,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%87%AA%E9%81%8A%E8%8A%B1%E4%BA%BA%E6%B0%B4%E5%BC%95%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%B8%E3%82%A2%E3%83%A0%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%B8%85%E5%B7%9D%E7%94%BA7-9",
+    "appearances": [
+      "カード：［蓮ノ空歌留多］安養寺姫芽"
+    ]
+  },
+  {
+    "id": "nakataya-kintsuba",
+    "name": "きんつば中田屋",
+    "shortName": "きんつば中田屋",
+    "area": "東山・卯辰山",
+    "category": "甘味",
+    "address": "石川県金沢市元町2-4-8（本店所在地）",
+    "lat": 36.579159,
+    "lng": 136.664337,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%8D%E3%82%93%E3%81%A4%E3%81%B0%E4%B8%AD%E7%94%B0%E5%B1%8B%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%85%83%E7%94%BA2-4-8"
+  },
+  {
+    "id": "owari-cho-culture",
+    "name": "尾張町町民文化館",
+    "shortName": "尾張町町民文化館",
+    "area": "近江町・尾張町",
+    "category": "文化",
+    "address": "石川県金沢市尾張町1-11-8",
+    "lat": 36.571465,
+    "lng": 136.659088,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%B0%BE%E5%BC%B5%E7%94%BA%E7%94%BA%E6%B0%91%E6%96%87%E5%8C%96%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E5%B0%BE%E5%BC%B5%E7%94%BA1-11-8",
+    "appearances": [
+      "カード：［蓮ノ空歌留多］セラス 柳田 リリエンフェルト"
+    ]
+  },
+  {
+    "id": "kourinji",
+    "name": "願掛け寺 香林寺",
+    "shortName": "願掛け寺 香林寺",
+    "area": "にし茶屋街・寺町",
+    "category": "寺社",
+    "address": "石川県金沢市野町1-3-15",
+    "lat": 36.553814,
+    "lng": 136.648911,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "通行や周辺の生活に配慮して訪問",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E9%A1%98%E6%8E%9B%E3%81%91%E5%AF%BA%20%E9%A6%99%E6%9E%97%E5%AF%BA%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E9%87%8E%E7%94%BA1-3-15",
+    "appearances": [
+      "カード：［蓮ノ空歌留多］桂城泉"
+    ]
+  },
+  {
+    "id": "kaga-fruit-land",
+    "name": "加賀フルーツランド",
+    "shortName": "加賀フルーツランド",
+    "area": "加賀・小松",
+    "category": "レジャー",
+    "address": "石川県加賀市豊町イ59-1",
+    "lat": 36.327663,
+    "lng": 136.305237,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%8A%A0%E8%B3%80%E3%83%95%E3%83%AB%E3%83%BC%E3%83%84%E3%83%A9%E3%83%B3%E3%83%89%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E5%8A%A0%E8%B3%80%E5%B8%82%E8%B1%8A%E7%94%BA%E3%82%A459-1"
+  },
+  {
+    "id": "ohguchi-suisan",
+    "name": "大口水産",
+    "shortName": "大口水産",
+    "area": "近江町・尾張町",
+    "category": "買い物",
+    "address": "石川県金沢市上近江町38（近江町市場内）",
+    "lat": 36.57132,
+    "lng": 136.656357,
+    "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
+    "accessNote": "訪問前に営業時間・利用案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E5%8F%A3%E6%B0%B4%E7%94%A3%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%8A%E8%BF%91%E6%B1%9F%E7%94%BA38"
   }
 ]
