@@ -2,16 +2,22 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { PilgrimageApp } from "../app/PilgrimageApp";
 import { spots } from "../app/spots";
-import kanazawaStationPhoto from "../public/photos/kanazawa-station/20260724-230203-watermarked.webp";
+import siteSettings from "../content/site.json";
 import "../app/globals.css";
 
-const staticSpotImages: Record<string, string> = {
-  "kanazawa-station": kanazawaStationPhoto,
-};
+const photoModules = import.meta.glob<string>(
+  "../public/photos/**/*.{jpg,jpeg,png,webp}",
+  { eager: true, query: "?url", import: "default" },
+);
+
+function resolvePhotoUrl(source?: string | null) {
+  if (!source?.startsWith("/photos/")) return undefined;
+  return photoModules[`../public${source}`];
+}
 
 const publicSpots = spots.map((spot) => ({
   ...spot,
-  imageUrl: staticSpotImages[spot.id],
+  imageUrl: resolvePhotoUrl(spot.imageUrl),
 }));
 
 createRoot(document.getElementById("root")!).render(
@@ -24,7 +30,7 @@ createRoot(document.getElementById("root")!).render(
       }}
       spots={publicSpots}
       spotImages={{}}
-      heroImage={null}
+      heroImage={resolvePhotoUrl(siteSettings.heroImage) ?? null}
     />
   </StrictMode>,
 );

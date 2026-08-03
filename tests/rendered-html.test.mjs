@@ -72,7 +72,7 @@ test("Google Maps and Routes integration stays guarded", async () => {
 
 test("spot photos can be used as readable card backgrounds", async () => {
   const [spots, app, css, photo] = await Promise.all([
-    readFile(new URL("../app/spots.ts", import.meta.url), "utf8"),
+    readFile(new URL("../content/spots.json", import.meta.url), "utf8"),
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(
@@ -94,28 +94,25 @@ test("spot photos can be used as readable card backgrounds", async () => {
   assert.equal(photo.includes(Buffer.from("Exif\0\0")), false);
 });
 
-test("admin MVP protects edits and stores photos outside the source tree", async () => {
-  const [adminPage, adminApp, auth, schema, hosting, uploadRoute] =
+test("local admin writes publishable files before an explicit GitHub push", async () => {
+  const [adminApp, localMain, localServer, startScript, pagesMain] =
     await Promise.all([
-      readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/admin/AdminApp.tsx", import.meta.url), "utf8"),
-      readFile(new URL("../lib/admin-auth.ts", import.meta.url), "utf8"),
-      readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
-      readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
-      readFile(
-        new URL("../app/api/admin/media/route.ts", import.meta.url),
-        "utf8",
-      ),
+      readFile(new URL("../local-admin/main.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../server.mjs", import.meta.url), "utf8"),
+      readFile(new URL("../start-admin.ps1", import.meta.url), "utf8"),
+      readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
     ]);
 
-  assert.match(adminPage, /requireAdminPage\("\/admin"\)/);
-  assert.match(auth, /ADMIN_EMAIL/);
   assert.match(adminApp, /exifr/);
   assert.match(adminApp, /makePublicDerivative/);
   assert.match(adminApp, /スポットを編集/);
-  assert.match(schema, /media_assets/);
-  assert.match(schema, /spot_overrides/);
-  assert.match(hosting, /"d1": "DB"/);
-  assert.match(hosting, /"r2": "MEDIA"/);
-  assert.match(uploadRoute, /getMediaBucket/);
+  assert.match(localMain, /localMode/);
+  assert.match(localServer, /127\.0\.0\.1/);
+  assert.match(localServer, /writeJsonIfChanged/);
+  assert.match(localServer, /writeToken/);
+  assert.match(localServer, /"add", "--", "content", "public\/photos"/);
+  assert.match(startScript, /build:admin/);
+  assert.match(pagesMain, /content\/site\.json/);
+  assert.match(pagesMain, /import\.meta\.glob/);
 });

@@ -1541,6 +1541,15 @@ footer > span {
   font-weight: 700;
 }
 
+.admin-publish.admin-publish--compact {
+  width: auto;
+  min-width: 174px;
+  justify-content: center;
+  margin-top: 4px;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
 .admin-intro {
   width: min(100% - 48px, 1180px);
   margin: 0 auto;

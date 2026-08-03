@@ -1,7 +1,6 @@
 "use client";
 
 import { gps as readGps } from "exifr/dist/mini.esm.mjs";
-import Link from "next/link";
 import {
   useEffect,
   useMemo,
@@ -12,7 +11,7 @@ import {
 } from "react";
 import type { PilgrimageSpot } from "@/app/spots";
 
-type AdminAsset = {
+export type AdminAsset = {
   id: string;
   originalName: string;
   placement: string;
@@ -28,7 +27,38 @@ type Props = {
   initialSpots: PilgrimageSpot[];
   overriddenSpotIds: string[];
   initialAssets: AdminAsset[];
+  localMode?: boolean;
+  localToken?: string;
 };
+
+type PublishStatus = {
+  available: boolean;
+  remoteConfigured: boolean;
+  identityConfigured: boolean;
+  branch: string;
+  publishToken: string;
+  hasLocalChanges: boolean;
+  error?: string;
+};
+
+async function loadPublishStatus(): Promise<PublishStatus> {
+  try {
+    const response = await fetch("/api/admin/publish-status", { cache: "no-store" });
+    const result = (await response.json()) as PublishStatus;
+    if (!response.ok) throw new Error(result.error ?? "GitHubの状態を確認できませんでした。");
+    return result;
+  } catch (error) {
+    return {
+      available: false,
+      remoteConfigured: false,
+      identityConfigured: false,
+      branch: "",
+      publishToken: "",
+      hasLocalChanges: false,
+      error: error instanceof Error ? error.message : "ローカルサーバーへ接続できません。",
+    };
+  }
+}
 
 type Placement = "spot" | "hero";
 type QueuedPhoto = { file: File; url: string };
@@ -177,6 +207,20 @@ async function makePublicDerivative(
   return jpeg;
 }
 
+function blobToBase64(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("公開用画像を読み込めませんでした。"));
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const separator = result.indexOf(",");
+      if (separator < 0) reject(new Error("公開用画像を変換できませんでした。"));
+      else resolve(result.slice(separator + 1));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
 function formatDistance(distanceM: number) {
   return distanceM < 1000
     ? `約${Math.round(distanceM / 10) * 10}m`
@@ -190,25 +234,94 @@ export function AdminApp({
   initialSpots,
   overriddenSpotIds,
   initialAssets,
+  localMode = false,
+  localToken = "",
 }: Props) {
   const [tab, setTab] = useState<"photos" | "spots">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
   const [overrideIds, setOverrideIds] = useState(new Set(overriddenSpotIds));
   const [assets, setAssets] = useState(initialAssets);
+  const [publishStatus, setPublishStatus] = useState<PublishStatus | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMessage, setPublishMessage] = useState("");
+
+  useEffect(() => {
+    if (!localMode) return;
+    let cancelled = false;
+    void loadPublishStatus().then((result) => {
+      if (!cancelled) setPublishStatus(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [localMode]);
+
+  async function publishToGitHub() {
+    if (!publishStatus?.publishToken || publishing) return;
+    if (!window.confirm(
+      "ローカルファイルへ保存した変更をコミットし、GitHub Pagesへ公開しますか？",
+    )) return;
+
+    setPublishing(true);
+    setPublishMessage("");
+    try {
+      const response = await fetch("/api/admin/publish", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ publishToken: publishStatus.publishToken }),
+      });
+      const result = (await response.json()) as { revision?: string; error?: string };
+      if (!response.ok) throw new Error(result.error ?? "GitHubへ公開できませんでした。");
+      setPublishMessage(
+        result.revision
+          ? `GitHubへ公開しました（${result.revision}）。Actions完了後に反映されます。`
+          : "公開対象の変更はありません。",
+      );
+      setPublishStatus(await loadPublishStatus());
+    } catch (error) {
+      setPublishMessage(error instanceof Error ? error.message : "GitHubへ公開できませんでした。");
+    } finally {
+      setPublishing(false);
+    }
+  }
 
   return (
     <main className="admin-shell">
       <header className="admin-header">
-        <Link className="admin-brand" href="/">
+        <a
+          className="admin-brand"
+          href={localMode ? "https://yukachiii.github.io/hasunosora-pilgrimage/" : "/"}
+        >
           <span>蓮</span>
           <div>
             <strong>蓮ノ旅 管理室</strong>
             <small>CONTENT MANAGEMENT</small>
           </div>
-        </Link>
+        </a>
         <div className="admin-account">
-          <span>{userName}</span>
-          <a href={signOutPath}>ログアウト</a>
+          {localMode ? (
+            <>
+              <span>{publishStatus?.hasLocalChanges ? "未公開の変更あり" : "ローカル専用"}</span>
+              <button
+                className="admin-publish admin-publish--compact"
+                type="button"
+                disabled={
+                  publishing ||
+                  !publishStatus?.available ||
+                  !publishStatus.remoteConfigured ||
+                  !publishStatus.identityConfigured
+                }
+                onClick={publishToGitHub}
+              >
+                {publishing ? "公開中…" : "GitHub Pagesへ公開"}
+              </button>
+            </>
+          ) : (
+            <>
+              <span>{userName}</span>
+              <a href={signOutPath}>ログアウト</a>
+            </>
+          )}
         </div>
       </header>
 
@@ -216,9 +329,12 @@ export function AdminApp({
         <p>ADMIN MVP</p>
         <h1>写真とスポット情報を、<br />落ち着いて整える場所。</h1>
         <p>
-          元写真は非公開で保管し、公開用画像からはEXIFを除去して透かしを入れます。
-          スポット名などの修正は公開画面へすぐ反映されます。
+          {localMode
+            ? "変更はこのPC内の公開用ファイルへ保存されます。GitHub Pagesへ反映するまでは外部公開されません。"
+            : "元写真は非公開で保管し、公開用画像からはEXIFを除去して透かしを入れます。スポット名などの修正は公開画面へすぐ反映されます。"}
         </p>
+        {localMode && publishMessage && <p className="admin-message" role="status">{publishMessage}</p>}
+        {localMode && publishStatus?.error && <p className="admin-message" role="status">{publishStatus.error}</p>}
       </section>
 
       <nav className="admin-tabs" aria-label="管理項目">
@@ -243,6 +359,8 @@ export function AdminApp({
           spots={managedSpots}
           assets={assets}
           setAssets={setAssets}
+          localMode={localMode}
+          localToken={localToken}
         />
       ) : (
         <SpotManager
@@ -251,6 +369,8 @@ export function AdminApp({
           baseSpots={baseSpots}
           overrideIds={overrideIds}
           setOverrideIds={setOverrideIds}
+          localMode={localMode}
+          localToken={localToken}
         />
       )}
     </main>
@@ -261,10 +381,14 @@ function PhotoManager({
   spots,
   assets,
   setAssets,
+  localMode,
+  localToken,
 }: {
   spots: PilgrimageSpot[];
   assets: AdminAsset[];
   setAssets: React.Dispatch<React.SetStateAction<AdminAsset[]>>;
+  localMode: boolean;
+  localToken: string;
 }) {
   const [queue, setQueue] = useState<QueuedPhoto[]>([]);
   const [placement, setPlacement] = useState<Placement>("spot");
@@ -386,35 +510,49 @@ function PhotoManager({
         cropY,
         zoom,
       );
-      const formData = new FormData();
-      formData.append("original", currentFile);
-      formData.append(
-        "derivative",
-        new File(
-          [derivative],
-          derivative.type === "image/webp" ? "public.webp" : "public.jpg",
-          { type: derivative.type },
-        ),
-      );
-      formData.append(
-        "metadata",
-        JSON.stringify({
-          placement,
-          spotId: placement === "spot" ? spotId : null,
-          cropX,
-          cropY,
-          zoom,
-          gpsLat: gpsState.state === "found" ? gpsState.lat : null,
-          gpsLng: gpsState.state === "found" ? gpsState.lng : null,
-          nearestSpotId:
-            gpsState.state === "found" ? gpsState.nearestSpotId : null,
-        }),
-      );
+      const metadata = {
+        placement,
+        spotId: placement === "spot" ? spotId : null,
+        cropX,
+        cropY,
+        zoom,
+        gpsLat: gpsState.state === "found" ? gpsState.lat : null,
+        gpsLng: gpsState.state === "found" ? gpsState.lng : null,
+        nearestSpotId:
+          gpsState.state === "found" ? gpsState.nearestSpotId : null,
+      };
 
-      const response = await fetch("/api/admin/media", {
-        method: "POST",
-        body: formData,
-      });
+      let response: Response;
+      if (localMode) {
+        response = await fetch("/api/admin/media", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-local-admin-token": localToken,
+          },
+          body: JSON.stringify({
+            derivativeBase64: await blobToBase64(derivative),
+            contentType: derivative.type,
+            metadata,
+          }),
+        });
+      } else {
+        const formData = new FormData();
+        formData.append("original", currentFile);
+        formData.append(
+          "derivative",
+          new File(
+            [derivative],
+            derivative.type === "image/webp" ? "public.webp" : "public.jpg",
+            { type: derivative.type },
+          ),
+        );
+        formData.append("metadata", JSON.stringify(metadata));
+        response = await fetch("/api/admin/media", {
+          method: "POST",
+          body: formData,
+        });
+      }
       const result = (await response.json()) as { asset?: AdminAsset; error?: string };
       if (!response.ok || !result.asset) {
         throw new Error(result.error ?? "画像を公開できませんでした。");
@@ -422,7 +560,11 @@ function PhotoManager({
 
       setAssets((current) => [result.asset!, ...current]);
       advanceQueue();
-      setMessage("公開しました。次の写真があれば続けて調整できます。");
+      setMessage(
+        localMode
+          ? "透かし済み画像をローカルファイルへ保存しました。GitHub Pagesへはまだ公開されていません。"
+          : "公開しました。次の写真があれば続けて調整できます。",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "画像を公開できませんでした。");
     } finally {
@@ -431,8 +573,15 @@ function PhotoManager({
   }
 
   async function deleteAsset(asset: AdminAsset) {
-    if (!window.confirm(`「${asset.originalName}」を公開一覧と非公開保管領域から削除しますか？`)) return;
-    const response = await fetch(`/api/admin/media/${asset.id}`, { method: "DELETE" });
+    if (!window.confirm(
+      localMode
+        ? `「${asset.originalName}」をローカルの公開用ファイルから削除しますか？`
+        : `「${asset.originalName}」を公開一覧と非公開保管領域から削除しますか？`,
+    )) return;
+    const response = await fetch(`/api/admin/media/${asset.id}`, {
+      method: "DELETE",
+      headers: localMode ? { "x-local-admin-token": localToken } : undefined,
+    });
     if (!response.ok) {
       const result = (await response.json().catch(() => ({}))) as { error?: string };
       setMessage(result.error ?? "画像を削除できませんでした。");
@@ -519,7 +668,11 @@ function PhotoManager({
               <button className="admin-publish" type="button" disabled={saving} onClick={publishCurrent}>
                 {saving ? "公開用画像を作成中…" : "この内容で公開する"}<span>→</span>
               </button>
-              <p className="privacy-note">公開用画像はWebP/JPEGへ再生成され、{watermarkText}の透かしを焼き込みます。GPS・端末名・ISO・撮影日時などのEXIFは含まれず、元写真は非公開で保管します。</p>
+              <p className="privacy-note">
+                公開用画像はWebP/JPEGへ再生成され、{watermarkText}の透かしを焼き込みます。
+                GPS・端末名・ISO・撮影日時などのEXIFは含まれず、
+                {localMode ? "選択した元写真はプロジェクト内へ保存しません。" : "元写真は非公開で保管します。"}
+              </p>
             </div>
           </>
         )}
@@ -554,12 +707,16 @@ function SpotManager({
   baseSpots,
   overrideIds,
   setOverrideIds,
+  localMode,
+  localToken,
 }: {
   spots: PilgrimageSpot[];
   setSpots: React.Dispatch<React.SetStateAction<PilgrimageSpot[]>>;
   baseSpots: PilgrimageSpot[];
   overrideIds: Set<string>;
   setOverrideIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  localMode: boolean;
+  localToken: string;
 }) {
   const [selectedId, setSelectedId] = useState(spots[0]?.id ?? "");
   const selected = spots.find((spot) => spot.id === selectedId) ?? spots[0];
@@ -584,14 +741,21 @@ function SpotManager({
     try {
       const response = await fetch(`/api/admin/spots/${draft.id}`, {
         method: "PUT",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(localMode ? { "x-local-admin-token": localToken } : {}),
+        },
         body: JSON.stringify(draft),
       });
       const result = (await response.json()) as { spot?: PilgrimageSpot; error?: string };
       if (!response.ok || !result.spot) throw new Error(result.error ?? "保存できませんでした。");
       setSpots((current) => current.map((spot) => spot.id === draft.id ? result.spot! : spot));
       setOverrideIds((current) => new Set(current).add(draft.id));
-      setMessage("保存しました。公開画面にも反映されています。");
+      setMessage(
+        localMode
+          ? "ローカルファイルへ保存しました。GitHub Pagesへはまだ公開されていません。"
+          : "保存しました。公開画面にも反映されています。",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存できませんでした。");
     } finally {
@@ -601,7 +765,10 @@ function SpotManager({
 
   async function reset() {
     if (!window.confirm("このスポットの修正を取り消し、登録時の情報へ戻しますか？")) return;
-    const response = await fetch(`/api/admin/spots/${draft.id}`, { method: "DELETE" });
+    const response = await fetch(`/api/admin/spots/${draft.id}`, {
+      method: "DELETE",
+      headers: localMode ? { "x-local-admin-token": localToken } : undefined,
+    });
     if (!response.ok) {
       const result = (await response.json().catch(() => ({}))) as { error?: string };
       setMessage(result.error ?? "元に戻せませんでした。");
@@ -617,7 +784,11 @@ function SpotManager({
       next.delete(draft.id);
       return next;
     });
-    setMessage("登録時の情報へ戻しました。");
+    setMessage(
+      localMode
+        ? "サーバー起動時の内容へ戻し、ローカルファイルへ保存しました。"
+        : "登録時の情報へ戻しました。",
+    );
   }
 
   return (

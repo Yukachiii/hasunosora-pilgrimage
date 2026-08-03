@@ -42,7 +42,10 @@ next-env.d.ts
 *.tsbuildinfo
 /dist/
 /pages-dist/
+/admin-dist/
 /.pages-publish/
+__pycache__/
+*.pyc
 /.wrangler/
 /outputs/
 /work/

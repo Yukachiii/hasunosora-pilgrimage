@@ -7,11 +7,13 @@
   },
   "scripts": {
     "dev": "vinext dev",
+    "admin": "npm run build:admin && node server.mjs",
     "build": "vinext build",
+    "build:admin": "vite build --config vite.admin.config.ts --mode admin",
     "build:pages": "vite build --config vite.pages.config.ts --mode pages",
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern pages-dist --ignore-pattern .pages-publish --ignore-pattern .next",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern pages-dist --ignore-pattern admin-dist --ignore-pattern .pages-publish --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
