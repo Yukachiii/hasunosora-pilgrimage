@@ -415,6 +415,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /当日用モード/);
   assert.match(app, /現在地からGoogle Mapsで向かう/);
   assert.match(app, /API不使用/);
+  assert.match(app, /スマートフォン用メニュー/);
+  assert.match(app, /href="#planner"/);
   assert.match(routePlanner, /openingHoursStatus/);
   assert.match(routePlanner, /営業時間は公式情報を確認/);
   assert.match(adminApp, /通常の休業曜日/);
@@ -423,4 +425,6 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(migration, /opening_hours_checked_at/);
   assert.match(css, /\.today-mode__dialog/);
   assert.match(css, /\.spot-card__hours/);
+  assert.match(css, /Public page: touch-first layout/);
+  assert.match(css, /\.mobile-nav/);
 });

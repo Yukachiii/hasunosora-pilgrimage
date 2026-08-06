@@ -708,6 +708,13 @@ export function PilgrimageApp({
         </a>
       </header>
 
+      <nav className="mobile-nav" aria-label="スマートフォン用メニュー">
+        <a href="#map"><span>地図</span><small>MAP</small></a>
+        <a href="#planner"><span>予定</span><small>PLAN</small></a>
+        <a href="#spots"><span>場所</span><small>SPOTS</small></a>
+        <a href="#card-models"><span>カード</span><small>CARDS</small></a>
+      </nav>
+
       <section
         className={`hero${heroImage ? " has-managed-image" : ""}`}
         id="top"
@@ -831,7 +838,7 @@ export function PilgrimageApp({
             </div>
           </div>
 
-          <aside className="route-planner" aria-label="一日の予定作成">
+          <aside className="route-planner" id="planner" aria-label="一日の予定作成">
             <div className="route-planner__heading">
               <div>
                 <p>DAY PLANNER</p>

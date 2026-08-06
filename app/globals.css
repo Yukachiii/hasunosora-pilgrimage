@@ -110,6 +110,10 @@ button {
   font-weight: 700;
 }
 
+.mobile-nav {
+  display: none;
+}
+
 .desktop-nav a {
   position: relative;
   padding: 12px 0;
@@ -3209,6 +3213,297 @@ footer > span {
     grid-template-columns: 1fr;
     gap: 24px;
     padding: 42px 24px;
+  }
+}
+
+/* Public page: touch-first layout */
+@media (max-width: 760px) {
+  html {
+    scroll-padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-nav {
+    position: fixed;
+    z-index: 70;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 10px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.46);
+    border-radius: 14px;
+    background: rgba(31, 43, 59, 0.93);
+    color: white;
+    box-shadow: 0 14px 38px rgba(18, 29, 43, 0.28);
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-nav a {
+    display: grid;
+    min-height: 54px;
+    place-items: center;
+    align-content: center;
+    gap: 2px;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .mobile-nav a:active,
+  .mobile-nav a:focus-visible {
+    background: rgba(125, 185, 196, 0.28);
+    outline: none;
+  }
+
+  .mobile-nav small {
+    color: var(--ice);
+    font-family: Georgia, serif;
+    font-size: 6px;
+    letter-spacing: 0.12em;
+  }
+
+  body:has(.visitor-notice) .mobile-nav,
+  body:has(.today-mode) .mobile-nav {
+    display: none;
+  }
+
+  .site-header {
+    width: calc(100% - 28px);
+  }
+
+  .header-cta {
+    min-height: 44px;
+    padding: 8px 10px;
+  }
+
+  .hero {
+    min-height: min(720px, 100svh);
+    align-content: center;
+    padding: 104px 18px 58px;
+  }
+
+  .hero h1 {
+    font-size: clamp(34px, 10.5vw, 45px);
+    line-height: 1.42;
+  }
+
+  .hero-lead {
+    max-width: 34em;
+    font-size: 12px;
+  }
+
+  .hero-visual {
+    display: none;
+  }
+
+  .primary-button,
+  .text-link {
+    min-height: 48px;
+  }
+
+  .map-section,
+  .collaborations-section,
+  .spots-section,
+  .card-models-section {
+    padding: 58px 14px;
+  }
+
+  .section-heading {
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .section-heading h2,
+  .guide-intro h2 {
+    font-size: 29px;
+  }
+
+  .map-shell {
+    height: min(62svh, 410px);
+    border-radius: 7px 7px 0 0;
+  }
+
+  .open-maps-links a {
+    min-height: 42px;
+  }
+
+  .selected-spot-bar {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px 12px;
+    padding: 14px;
+  }
+
+  .spot-index {
+    width: 44px;
+    height: 44px;
+  }
+
+  .selected-spot-bar button {
+    min-height: 46px;
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    padding: 0 13px;
+    border-radius: 5px;
+    background: var(--ink);
+    color: white;
+    font-size: 11px;
+  }
+
+  .selected-spot-bar button:disabled {
+    background: #edf0ed;
+    color: var(--ink-soft);
+  }
+
+  .route-planner {
+    scroll-margin-top: 12px;
+    padding: 20px 14px;
+    border-radius: 7px;
+  }
+
+  .route-planner__heading {
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .route-planner__heading h3 {
+    font-size: 21px;
+  }
+
+  .collaboration-route-fill,
+  .journey-start,
+  .itinerary-storage {
+    padding: 13px;
+  }
+
+  .collaboration-route-fill select,
+  .journey-start select,
+  .journey-start input,
+  .itinerary-storage select,
+  .itinerary-storage input,
+  .itinerary-add select,
+  .spot-filters input,
+  .spot-filters select,
+  .card-model-filter select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .itinerary-storage__actions button {
+    min-height: 44px;
+    flex: 1 1 132px;
+  }
+
+  .itinerary-editor li {
+    gap: 8px;
+    padding: 11px 9px;
+  }
+
+  .itinerary-editor li > div > strong {
+    font-size: 12px;
+  }
+
+  .itinerary-editor li input {
+    width: 64px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .itinerary-actions {
+    gap: 6px;
+  }
+
+  .itinerary-actions button {
+    width: 38px;
+    height: 38px;
+    font-size: 13px;
+  }
+
+  .itinerary-add button {
+    min-width: 58px;
+    min-height: 48px;
+  }
+
+  .travel-modes label {
+    min-height: 60px;
+    padding: 8px 4px;
+    font-size: 10px;
+  }
+
+  .route-optimize {
+    min-height: 58px;
+    padding: 13px;
+  }
+
+  .route-optimize input {
+    width: 20px;
+    height: 20px;
+  }
+
+  .route-search-button,
+  .today-mode-open {
+    min-height: 52px;
+  }
+
+  .day-schedule li {
+    grid-template-columns: 58px minmax(0, 1fr);
+    padding: 13px 12px;
+  }
+
+  .collaboration-card__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .collaboration-card__actions button,
+  .collaboration-card__actions a {
+    min-height: 46px;
+    justify-content: space-between;
+  }
+
+  .spot-filters {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .spot-grid,
+  .card-model-grid {
+    max-height: min(72dvh, 680px);
+    scroll-snap-type: y proximity;
+  }
+
+  .spot-card,
+  .card-model {
+    scroll-snap-align: start;
+  }
+
+  .spot-card > a {
+    min-height: 48px;
+    align-items: center;
+  }
+
+  .card-model-filter {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .card-model-filter > p {
+    padding: 0;
+    text-align: left;
+  }
+
+  .card-model {
+    padding: 18px;
+  }
+
+  .site-disclaimer__review {
+    min-height: 46px;
+  }
+
+  footer {
+    padding-bottom: calc(118px + env(safe-area-inset-bottom));
   }
 }
 
