@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ServerRoutePlanError, ServerRoutePlanResponse } from "./route-api";
 import type { PilgrimageSpot } from "./spots";
 import type { RouteLocation, TravelMode } from "./route-planner";
 
@@ -22,6 +23,8 @@ export type RouteResult = {
   accessDurationMinutes?: number;
   legDurationMinutes?: number[];
   orderedStopIds?: string[];
+  source?: "server" | "browser";
+  apiRequestCount?: number;
   message?: string;
 };
 
@@ -33,6 +36,7 @@ type Props = {
   onRouteResult: (result: RouteResult) => void;
   apiKey: string;
   mapId: string;
+  routeServiceUrl: string;
 };
 
 type GoogleWindow = Window & {
@@ -180,6 +184,31 @@ function legMinutes(route: ComputedRoute, count: number) {
   );
 }
 
+function decodeEncodedPolyline(encoded: string) {
+  const path: Array<{ lat: number; lng: number }> = [];
+  let index = 0;
+  let latitude = 0;
+  let longitude = 0;
+  while (index < encoded.length) {
+    const deltas = [0, 0];
+    for (let coordinate = 0; coordinate < 2; coordinate += 1) {
+      let result = 0;
+      let shift = 0;
+      let byte = 0;
+      do {
+        byte = encoded.charCodeAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20 && index <= encoded.length);
+      deltas[coordinate] = result & 1 ? ~(result >> 1) : result >> 1;
+    }
+    latitude += deltas[0];
+    longitude += deltas[1];
+    path.push({ lat: latitude / 1e5, lng: longitude / 1e5 });
+  }
+  return path;
+}
+
 export function GooglePilgrimageMap({
   spots,
   selectedId,
@@ -188,6 +217,7 @@ export function GooglePilgrimageMap({
   onRouteResult,
   apiKey,
   mapId,
+  routeServiceUrl,
 }: Props) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
@@ -292,7 +322,9 @@ export function GooglePilgrimageMap({
 
   useEffect(() => {
     if (!routeRequest) return;
-    if (!apiKey || mapState === "fallback" || mapState === "error") {
+    const serverEnabled = Boolean(routeServiceUrl);
+    if (mapState === "loading") return;
+    if (!serverEnabled && (!apiKey || mapState === "fallback" || mapState === "error")) {
       onRouteResult({
         state: "fallback",
         message: apiKey
@@ -301,17 +333,107 @@ export function GooglePilgrimageMap({
       });
       return;
     }
-    if (mapState !== "ready" || !mapRef.current) return;
 
     const requestedRoute = routeRequest;
     let cancelled = false;
+    const serverController = new AbortController();
 
     async function calculateRoute() {
       onRouteResult({ state: "loading" });
       clearRoute();
       try {
         const maps = (window as GoogleWindow).google?.maps;
-        if (!maps) throw new Error("maps-unavailable");
+
+        if (serverEnabled) {
+          let serverResponse: Response | null = null;
+          try {
+            serverResponse = await fetch(routeServiceUrl, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                stopIds: requestedRoute.stops.map((stop) => stop.id),
+                travelMode: requestedRoute.travelMode,
+                optimizeWaypointOrder: requestedRoute.optimizeWaypointOrder,
+                stayMinutes: Object.fromEntries(
+                  requestedRoute.stops.map((stop) => [
+                    stop.id,
+                    requestedRoute.stayMinutes[stop.id] ?? 0,
+                  ]),
+                ),
+                sourceStationId: requestedRoute.accessOrigin?.id,
+                departureTime: requestedRoute.departureTime,
+              }),
+              signal: serverController.signal,
+            });
+          } catch (error) {
+            if (error instanceof DOMException && error.name === "AbortError") return;
+            if (!apiKey || mapState !== "ready" || !mapRef.current) {
+              throw new Error("サーバーへ接続できませんでした。少し待ってから再度お試しください。");
+            }
+          }
+
+          if (serverResponse?.ok) {
+            const result = await serverResponse.json() as ServerRoutePlanResponse;
+            if (cancelled) return;
+            if (maps && mapRef.current && result.encodedPolylines.length) {
+              const [{ Polyline }, { LatLngBounds }] = await Promise.all([
+                maps.importLibrary("maps"),
+                maps.importLibrary("core"),
+              ]);
+              const PolylineConstructor = Polyline as new (options: Record<string, unknown>) => {
+                setMap: (map: unknown) => void;
+              };
+              const BoundsConstructor = LatLngBounds as new () => {
+                extend: (location: { lat: number; lng: number }) => void;
+              };
+              const bounds = new BoundsConstructor();
+              let hasPath = false;
+              result.encodedPolylines.forEach((encoded) => {
+                const path = decodeEncodedPolyline(encoded);
+                path.forEach((location) => bounds.extend(location));
+                hasPath ||= path.length > 0;
+                const polyline = new PolylineConstructor({
+                  map: mapRef.current,
+                  path,
+                  strokeColor: "#6f5b86",
+                  strokeOpacity: 0.9,
+                  strokeWeight: 5,
+                });
+                routePolylinesRef.current.push(polyline);
+              });
+              if (hasPath) {
+                (mapRef.current as { fitBounds: (value: unknown, padding?: number) => void })
+                  .fitBounds(bounds, 64);
+              }
+            }
+            onRouteResult({
+              state: "success",
+              distance: formatDistance(result.distanceMeters),
+              duration: formatTravelTime(result.travelDurationMinutes * 60_000),
+              travelDurationMinutes: result.travelDurationMinutes,
+              accessDurationMinutes: result.accessDurationMinutes,
+              legDurationMinutes: result.legDurationMinutes,
+              orderedStopIds: result.orderedStopIds,
+              source: "server",
+              apiRequestCount: result.apiRequestCount,
+            });
+            return;
+          }
+
+          if (serverResponse && ![404, 503].includes(serverResponse.status)) {
+            const result = await serverResponse.json().catch(() => ({})) as ServerRoutePlanError;
+            throw new Error(result.error || "サーバーでルートを計算できませんでした。");
+          }
+        }
+
+        if (!apiKey || !maps || mapState !== "ready" || !mapRef.current) {
+          onRouteResult({
+            state: "fallback",
+            message: "サーバー側のルート検索を準備中です。Google マップのリンクから経路を確認してください。",
+          });
+          return;
+        }
+
         const [{ Route }, { LatLngBounds }] = await Promise.all([
           maps.importLibrary("routes"),
           maps.importLibrary("core"),
@@ -429,13 +551,16 @@ export function GooglePilgrimageMap({
           accessDurationMinutes: Math.round(accessDurationMillis / 60_000),
           legDurationMinutes: localLegMinutes,
           orderedStopIds,
+          source: "browser",
+          apiRequestCount: computedRoutes.length,
         });
-      } catch {
+      } catch (error) {
         if (!cancelled) {
           onRouteResult({
             state: "error",
-            message:
-              "この条件ではルートを取得できませんでした。地点数・日付・移動手段を確認して、もう一度お試しください。",
+            message: error instanceof Error && error.message
+              ? error.message
+              : "この条件ではルートを取得できませんでした。地点数・日付・移動手段を確認して、もう一度お試しください。",
           });
         }
       }
@@ -444,8 +569,9 @@ export function GooglePilgrimageMap({
     void calculateRoute();
     return () => {
       cancelled = true;
+      serverController.abort();
     };
-  }, [apiKey, clearRoute, mapState, onRouteResult, routeRequest]);
+  }, [apiKey, clearRoute, mapState, onRouteResult, routeRequest, routeServiceUrl]);
 
   const fallbackMode = mapState === "fallback" || mapState === "error";
 

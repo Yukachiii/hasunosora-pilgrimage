@@ -94,6 +94,7 @@ type Props = {
     apiKey: string;
     mapId: string;
   };
+  routeServiceUrl?: string;
   spots: PilgrimageSpot[];
   spotImages: Record<string, string>;
   heroImage: string | null;
@@ -101,6 +102,7 @@ type Props = {
 
 export function PilgrimageApp({
   googleMapsConfig,
+  routeServiceUrl = "",
   spots,
   spotImages,
   heroImage,
@@ -478,6 +480,7 @@ export function PilgrimageApp({
               onRouteResult={handleRouteResult}
               apiKey={googleMapsConfig.apiKey}
               mapId={googleMapsConfig.mapId}
+              routeServiceUrl={routeServiceUrl}
             />
             <div className="selected-spot-bar">
               <span className="spot-index">
@@ -518,7 +521,9 @@ export function PilgrimageApp({
                 <p>DAY PLANNER</p>
                 <h3>一日の巡礼予定を作る</h3>
               </div>
-              <span className="route-badge">Google Maps</span>
+              <span className="route-badge">
+                Google Maps{routeServiceUrl ? " · SERVER" : ""}
+              </span>
             </div>
 
             <div className="journey-start">
@@ -658,7 +663,7 @@ export function PilgrimageApp({
               />
               <span>
                 <strong>訪問順を自動で最適化</strong>
-                <small>{travelMode === "TRANSIT" ? "公共交通は仮実装のため、上の指定順で区間検索します。" : "最初と最後を固定して、中間地点を並べ替えます。"}</small>
+                <small>{travelMode === "TRANSIT" ? "公共交通は指定順で、各スポットの滞在終了時刻に合わせて区間検索します。" : "最初と最後を固定して、中間地点を並べ替えます。"}</small>
               </span>
             </label>
 
@@ -672,7 +677,10 @@ export function PilgrimageApp({
               <span aria-hidden="true">→</span>
             </button>
 
-            <p className="route-api-note">地点の追加や並べ替えだけではAPIを使用しません。このボタンを押したときだけ検索します。</p>
+            <p className="route-api-note">
+              地点の追加や並べ替えだけではAPIを使用しません。このボタンを押したときだけ
+              {routeServiceUrl ? "サーバーから" : ""}検索します。
+            </p>
 
             <div
               className={`route-result route-result--${routeResult.state}`}
@@ -695,15 +703,25 @@ export function PilgrimageApp({
               {routeResult.state === "success" && (
                 <>
                   <span className="result-symbol">✓</span>
-                  <div className="result-metrics">
-                    <span>
-                      <small>距離</small>
-                      <strong>{routeResult.distance ?? "—"}</strong>
-                    </span>
-                    <span>
-                      <small>総移動時間</small>
-                      <strong>{routeResult.duration ?? "—"}</strong>
-                    </span>
+                  <div className="result-details">
+                    <div className="result-metrics">
+                      <span>
+                        <small>距離</small>
+                        <strong>{routeResult.distance ?? "—"}</strong>
+                      </span>
+                      <span>
+                        <small>総移動時間</small>
+                        <strong>{routeResult.duration ?? "—"}</strong>
+                      </span>
+                    </div>
+                    {routeResult.source ? (
+                      <small className="route-computation-source">
+                        {routeResult.source === "server" ? "サーバー計算" : "ブラウザ計算"}
+                        {routeResult.apiRequestCount
+                          ? ` · Google API ${routeResult.apiRequestCount}回`
+                          : ""}
+                      </small>
+                    ) : null}
                   </div>
                 </>
               )}

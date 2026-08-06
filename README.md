@@ -47,6 +47,25 @@ npm.cmd run build:pages
 
 Google MapsのブラウザAPIキーは、GitHub ActionsのSecret `GOOGLE_MAPS_BROWSER_API_KEY` からビルド時に設定します。キーはGitHub Pagesの公開元とMaps JavaScript API・Routes APIに制限してください。
 
+## サーバー側ルート検索
+
+サーバー版では `/api/routes/plan` がルート条件を検証し、専用の
+`GOOGLE_ROUTES_SERVER_API_KEY` を使ってGoogle Routes APIへ問い合わせます。
+APIキーはブラウザへ配信されません。短時間の重複検索をまとめ、1利用元あたり
+1分10回までに制限しています。
+
+- 徒歩・車・自転車: 最初と最後を固定し、中間地点を最適化可能
+- 公共交通: 指定順を維持し、各スポットの滞在終了時刻から次の区間を検索
+- 主要駅: 選択した駅から最初のスポットまでを公共交通で検索
+- 手動調整: 画面で並べ替えた順序をサーバーがそのまま使用
+
+GitHub Pagesだけではサーバー処理を実行できません。サーバー版を別途公開した後、
+GitHub ActionsのSecret `ROUTE_API_URL` に
+`https://サーバーのドメイン/api/routes/plan` を設定すると、Pages版もそのAPIを利用します。
+未設定時は従来のブラウザ内ルート検索へ自動的に戻ります。
+
+サーバー用キーはブラウザ用と分け、Google Cloud側でRoutes APIのみに制限してください。
+
 ## 開発用ビルド
 
 ```powershell

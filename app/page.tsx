@@ -45,6 +45,7 @@ export default async function Home() {
   return (
     <PilgrimageApp
       googleMapsConfig={googleMapsConfig}
+      routeServiceUrl="/api/routes/plan"
       spots={spots}
       spotImages={spotImages}
       heroImage={heroImage}

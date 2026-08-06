@@ -34,6 +34,7 @@ jobs:
         env:
           VITE_GOOGLE_MAPS_BROWSER_API_KEY: ${{ secrets.GOOGLE_MAPS_BROWSER_API_KEY }}
           VITE_GOOGLE_MAPS_MAP_ID: DEMO_MAP_ID
+          VITE_ROUTE_API_URL: ${{ secrets.ROUTE_API_URL }}
         run: npm run build:pages
 
       - name: Configure GitHub Pages

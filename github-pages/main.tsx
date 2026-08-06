@@ -28,6 +28,7 @@ createRoot(document.getElementById("root")!).render(
         mapId:
           import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim() || "DEMO_MAP_ID",
       }}
+      routeServiceUrl={import.meta.env.VITE_ROUTE_API_URL?.trim() ?? ""}
       spots={publicSpots}
       spotImages={{}}
       heroImage={resolvePhotoUrl(siteSettings.heroImage) ?? null}

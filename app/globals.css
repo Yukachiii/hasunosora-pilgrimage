@@ -1262,9 +1262,14 @@ button {
 
 .result-metrics {
   display: grid;
-  flex: 1;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.result-details {
+  display: grid;
+  flex: 1;
+  gap: 8px;
 }
 
 .result-metrics > span {
@@ -1280,6 +1285,13 @@ button {
 .result-metrics strong {
   font-family: Georgia, serif;
   font-size: 16px;
+}
+
+.route-computation-source {
+  color: var(--ice-deep);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .day-schedule {
