@@ -38,6 +38,10 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /期間限定のコラボを巡る/);
   assert.match(html, /おいでよ！石川大観光Ⅱ/);
   assert.match(html, /蓮ノ小四辺形の休日/);
+  assert.match(html, /巡礼へ出発する前に/);
+  assert.match(html, /内容に同意してサイトを見る/);
+  assert.match(html, /ご利用上の注意/);
+  assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);

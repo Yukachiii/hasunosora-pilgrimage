@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type CSSProperties,
@@ -25,6 +26,8 @@ import {
   type PilgrimageCollaboration,
   type PilgrimageSpot,
 } from "./spots";
+
+const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v1";
 
 const travelModes: Array<{
   value: TravelMode;
@@ -100,6 +103,7 @@ export function PilgrimageApp({
   spotImages,
   heroImage,
 }: Props) {
+  const [hasAcceptedVisitorNotice, setHasAcceptedVisitorNotice] = useState(false);
   const [selectedId, setSelectedId] = useState(spots[0].id);
   const [itineraryIds, setItineraryIds] = useState(() => spots.slice(0, 2).map((spot) => spot.id));
   const [addSpotId, setAddSpotId] = useState(spots[2]?.id ?? spots[0].id);
@@ -116,6 +120,38 @@ export function PilgrimageApp({
   const [spotQuery, setSpotQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("すべて");
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
+
+  useEffect(() => {
+    let wasAccepted = false;
+    try {
+      wasAccepted = window.localStorage.getItem(VISITOR_NOTICE_STORAGE_KEY) === "accepted";
+    } catch {
+      return undefined;
+    }
+    if (!wasAccepted) return undefined;
+    const restoreAcceptance = window.setTimeout(() => {
+      setHasAcceptedVisitorNotice(true);
+    }, 0);
+    return () => window.clearTimeout(restoreAcceptance);
+  }, []);
+
+  useEffect(() => {
+    if (hasAcceptedVisitorNotice) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [hasAcceptedVisitorNotice]);
+
+  function acceptVisitorNotice() {
+    try {
+      window.localStorage.setItem(VISITOR_NOTICE_STORAGE_KEY, "accepted");
+    } catch {
+      // 保存できない環境でも、この閲覧中はサイトを利用できるようにします。
+    }
+    setHasAcceptedVisitorNotice(true);
+  }
 
   const areas = useMemo(
     () => Array.from(new Set(spots.map((spot) => spot.area))),
@@ -256,7 +292,65 @@ export function PilgrimageApp({
   }
 
   return (
-    <main className={heroImage ? "has-managed-hero" : undefined}>
+    <>
+      {!hasAcceptedVisitorNotice ? (
+        <div className="visitor-notice" role="presentation">
+          <section
+            className="visitor-notice__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="visitor-notice-title"
+            aria-describedby="visitor-notice-description"
+          >
+            <div className="visitor-notice__mark" aria-hidden="true">蓮</div>
+            <p className="visitor-notice__eyebrow">BEFORE YOUR JOURNEY</p>
+            <h2 id="visitor-notice-title">巡礼へ出発する前に</h2>
+            <p id="visitor-notice-description" className="visitor-notice__lead">
+              このサイトをご利用になる前に、以下の注意事項をご確認ください。
+            </p>
+            <div className="visitor-notice__items">
+              <article>
+                <span>01</span>
+                <div>
+                  <h3>地域とスポットへの配慮</h3>
+                  <p>
+                    通行や営業、地域で暮らす方を優先してください。私有地への立入りや無断撮影、
+                    長時間の占有などはせず、各施設のルールと係員の案内を守りましょう。
+                  </p>
+                </div>
+              </article>
+              <article>
+                <span>02</span>
+                <div>
+                  <h3>最新情報と安全の確認</h3>
+                  <p>
+                    営業時間、休業日、交通機関、道路状況、天候は変わることがあります。
+                    出発前と移動中に公式情報を確認し、無理のない行動をしてください。
+                  </p>
+                </div>
+              </article>
+              <article>
+                <span>03</span>
+                <div>
+                  <h3>旅程とルートについて</h3>
+                  <p>
+                    本サイトの旅程、所要時間、ルートは参考情報であり、予定どおりの移動や到着を保証するものではありません。
+                    遅延、予定変更、費用その他の損害についてサイト運営者は責任を負いません。
+                    安全確認と最終的な判断は、ご自身でお願いいたします。
+                  </p>
+                </div>
+              </article>
+            </div>
+            <button type="button" className="visitor-notice__accept" onClick={acceptVisitorNotice} autoFocus>
+              内容に同意してサイトを見る
+              <span aria-hidden="true">→</span>
+            </button>
+            <small>同意しない場合は、このページを閉じてください。</small>
+          </section>
+        </div>
+      ) : null}
+
+      <main className={heroImage ? "has-managed-hero" : undefined}>
       <header className="site-header">
         <a className="brand" href="#top" aria-label="蓮ノ旅 ホーム">
           <span className="brand-mark" aria-hidden="true">
@@ -940,6 +1034,41 @@ export function PilgrimageApp({
         </div>
       </section>
 
+      <section className="site-disclaimer" id="site-notice" aria-labelledby="site-notice-title">
+        <div className="site-disclaimer__heading">
+          <p className="section-number">06 — SITE NOTICE</p>
+          <h2 id="site-notice-title">ご利用上の注意</h2>
+          <p>
+            本サイトを使って巡礼計画を立てる際は、次の内容をご確認ください。
+          </p>
+        </div>
+        <div className="site-disclaimer__content">
+          <ul>
+            <li>
+              通行・営業・地域の日常を優先し、私有地への立入りや無断撮影をせず、各施設のルールを守ってください。
+            </li>
+            <li>
+              営業時間、休業日、交通機関、道路状況、天候などは、出発前と移動中に公式情報をご確認ください。
+            </li>
+            <li>
+              掲載する旅程、所要時間、ルートは参考情報です。予定どおりの移動や到着を保証するものではありません。
+            </li>
+            <li>
+              本サイトの利用に伴う遅延、予定変更、費用その他の損害について、サイト運営者は責任を負いません。
+              安全確認と最終的な判断は利用者ご自身でお願いいたします。
+            </li>
+          </ul>
+          <button
+            type="button"
+            className="site-disclaimer__review"
+            onClick={() => setHasAcceptedVisitorNotice(false)}
+          >
+            同意画面をもう一度確認する
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+
       <footer>
         <div className="brand brand--footer">
           <span className="brand-mark" aria-hidden="true">
@@ -955,6 +1084,7 @@ export function PilgrimageApp({
         </p>
         <span>© 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
-    </main>
+      </main>
+    </>
   );
 }
