@@ -165,22 +165,49 @@ test("server route planner validates requests before using Google Routes", async
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /2～10か所/);
 
-  const [routeApi, map, page, pagesMain, workflow] = await Promise.all([
+  const [routeApi, map, page, pagesMain, workflow, usageStore] = await Promise.all([
     readFile(new URL("../app/api/routes/plan/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/GooglePilgrimageMap.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/deploy-pages.yml", import.meta.url), "utf8"),
+    readFile(new URL("../db/route-usage.ts", import.meta.url), "utf8"),
   ]);
   assert.match(routeApi, /GOOGLE_ROUTES_SERVER_API_KEY/);
   assert.match(routeApi, /routes\.googleapis\.com\/directions\/v2:computeRoutes/);
   assert.match(routeApi, /requestsPerWindow = 10/);
   assert.match(routeApi, /inFlightPlans/);
   assert.match(routeApi, /departureTime: cursor\.toISOString\(\)/);
+  assert.match(routeApi, /recordRouteApiUsage/);
+  assert.match(usageStore, /INSERT INTO route_api_usage/);
+  assert.doesNotMatch(usageStore, /connecting-ip|x-forwarded-for|spotIds|sourceStationId/);
   assert.match(map, /source: "server"/);
   assert.match(page, /routeServiceUrl="\/api\/routes\/plan"/);
   assert.match(pagesMain, /VITE_ROUTE_API_URL/);
   assert.match(workflow, /ROUTE_API_URL/);
+});
+
+test("Routes API usage is private and available in the admin dashboard", async () => {
+  const response = await requestApp(new Request("http://localhost/api/admin/route-usage"));
+  assert.equal(response.status, 403);
+
+  const [adminApp, adminApi, schema, migration, localServer] = await Promise.all([
+    readFile(new URL("../app/admin/AdminApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/admin/route-usage/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0001_bored_firelord.sql", import.meta.url), "utf8"),
+    readFile(new URL("../server.mjs", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(adminApp, /API使用状況/);
+  assert.match(adminApp, /Google Cloud側の請求確定値/);
+  assert.match(adminApp, /直近14日間のAPIリクエスト数/);
+  assert.match(adminApi, /hasRouteUsageAdminToken/);
+  assert.match(schema, /routeApiUsage/);
+  assert.match(migration, /CREATE TABLE `route_api_usage`/);
+  assert.match(migration, /route_api_usage_month_mode_idx/);
+  assert.match(localServer, /ROUTE_USAGE_ADMIN_TOKEN/);
+  assert.match(localServer, /authorization: `Bearer \$\{token\}`/);
 });
 
 test("server route planner optimizes stops and applies dwell time to transit departures", async () => {

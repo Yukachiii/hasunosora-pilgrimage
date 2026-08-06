@@ -4,6 +4,7 @@ import type {
   ServerRoutePlanResponse,
 } from "@/app/route-api";
 import { spots } from "@/app/spots";
+import { recordRouteApiUsage } from "@/db/route-usage";
 
 export const dynamic = "force-dynamic";
 
@@ -231,7 +232,11 @@ async function computeGoogleRoute(
   return route;
 }
 
-async function buildRoutePlan(plan: NormalizedPlan, apiKey: string) {
+async function buildRoutePlan(
+  plan: NormalizedPlan,
+  apiKey: string,
+  onGoogleRequest: () => void,
+) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 18_000);
   const routes: GoogleRoute[] = [];
@@ -243,6 +248,7 @@ async function buildRoutePlan(plan: NormalizedPlan, apiKey: string) {
 
   async function compute(body: Record<string, unknown>) {
     apiRequestCount += 1;
+    onGoogleRequest();
     const route = await computeGoogleRoute(apiKey, body, controller.signal);
     routes.push(route);
     return route;
@@ -382,7 +388,34 @@ export async function POST(request: Request) {
     });
     let pending = inFlightPlans.get(cacheKey);
     if (!pending) {
-      pending = buildRoutePlan(plan, apiKey);
+      const startedAt = Date.now();
+      let googleRequestCount = 0;
+      pending = (async () => {
+        try {
+          const result = await buildRoutePlan(
+            plan,
+            apiKey,
+            () => { googleRequestCount += 1; },
+          );
+          await recordRouteApiUsage({
+            travelMode: plan.travelMode,
+            status: "success",
+            googleRequestCount,
+            responseTimeMs: Date.now() - startedAt,
+          });
+          return result;
+        } catch (error) {
+          await recordRouteApiUsage({
+            travelMode: plan.travelMode,
+            status: "error",
+            googleRequestCount,
+            responseTimeMs: Date.now() - startedAt,
+            errorCode:
+              error instanceof RoutePlanError ? error.code : "INTERNAL_ERROR",
+          });
+          throw error;
+        }
+      })();
       inFlightPlans.set(cacheKey, pending);
       void pending.then(
         () => inFlightPlans.delete(cacheKey),

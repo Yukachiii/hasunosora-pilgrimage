@@ -66,6 +66,32 @@ GitHub ActionsのSecret `ROUTE_API_URL` に
 
 サーバー用キーはブラウザ用と分け、Google Cloud側でRoutes APIのみに制限してください。
 
+## API使用状況
+
+サーバー版のルート検索は、Google Routes APIへ実際に送ったリクエスト数を
+D1の`route_api_usage`へ記録します。管理画面の「API使用状況」では次を確認できます。
+
+- 今日・今月のGoogle APIリクエスト数
+- ルート計算回数、失敗回数、平均応答時間
+- 直近14日の日別推移
+- 今月の移動手段別内訳
+
+IPアドレス、出発駅、選択したスポットは記録しません。この数値はサイトの
+サーバーが記録した値であり、Google Cloudの請求確定値やクォータ画面とは
+集計時刻などにより差が出る場合があります。
+
+ローカル管理画面から本番サーバーの集計を見る場合は、`.env.local`へ次を設定します。
+
+```dotenv
+ROUTE_USAGE_API_URL=https://サーバーのドメイン/api/admin/route-usage
+ROUTE_USAGE_ADMIN_TOKEN=十分に長いランダムな共有トークン
+```
+
+`VITE_ROUTE_API_URL`が設定済みなら、`ROUTE_USAGE_API_URL`は同じサーバーから
+自動推測できます。`ROUTE_USAGE_ADMIN_TOKEN`はルートAPIサーバー側にも同じ値を
+秘密の環境変数として設定してください。トークンはGitへ追加せず、GitHub Pagesや
+ブラウザ用環境変数にも設定しません。
+
 ## 開発用ビルド
 
 ```powershell

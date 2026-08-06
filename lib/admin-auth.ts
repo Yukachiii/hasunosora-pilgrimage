@@ -35,6 +35,31 @@ export async function getAdminUser(): Promise<ChatGPTUser | null> {
   return user && isAdminUser(user) ? user : null;
 }
 
+async function secretDigest(value: string) {
+  return new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+  );
+}
+
+export async function hasRouteUsageAdminToken(request: Request) {
+  const expected = process.env.ROUTE_USAGE_ADMIN_TOKEN?.trim() ?? "";
+  const authorization = request.headers.get("authorization") ?? "";
+  const supplied = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : "";
+  if (!expected || !supplied) return false;
+
+  const [expectedDigest, suppliedDigest] = await Promise.all([
+    secretDigest(expected),
+    secretDigest(supplied),
+  ]);
+  let difference = 0;
+  for (let index = 0; index < expectedDigest.length; index += 1) {
+    difference |= expectedDigest[index] ^ suppliedDigest[index];
+  }
+  return difference === 0;
+}
+
 export async function requireAdminPage(returnTo: string) {
   const local = await localDevelopmentAdmin();
   if (local) return { user: local, allowed: true };

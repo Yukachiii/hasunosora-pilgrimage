@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const mediaAssets = sqliteTable("media_assets", {
   id: text("id").primaryKey(),
@@ -38,3 +38,25 @@ export const spotOverrides = sqliteTable("spot_overrides", {
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const routeApiUsage = sqliteTable(
+  "route_api_usage",
+  {
+    id: text("id").primaryKey(),
+    occurredAt: text("occurred_at").notNull(),
+    dayKey: text("day_key").notNull(),
+    monthKey: text("month_key").notNull(),
+    travelMode: text("travel_mode").notNull(),
+    status: text("status").notNull(),
+    googleRequestCount: integer("google_request_count").notNull(),
+    responseTimeMs: integer("response_time_ms").notNull(),
+    errorCode: text("error_code"),
+  },
+  (table) => [
+    index("route_api_usage_day_idx").on(table.dayKey),
+    index("route_api_usage_month_mode_idx").on(
+      table.monthKey,
+      table.travelMode,
+    ),
+  ],
+);

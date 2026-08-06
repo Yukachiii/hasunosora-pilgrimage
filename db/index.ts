@@ -45,12 +45,29 @@ async function ensureLocalSchema(database: D1Database) {
         created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
       )`),
+      database.prepare(`CREATE TABLE IF NOT EXISTS route_api_usage (
+        id text PRIMARY KEY NOT NULL,
+        occurred_at text NOT NULL,
+        day_key text NOT NULL,
+        month_key text NOT NULL,
+        travel_mode text NOT NULL,
+        status text NOT NULL,
+        google_request_count integer NOT NULL,
+        response_time_ms integer NOT NULL,
+        error_code text
+      )`),
+      database.prepare(
+        "CREATE INDEX IF NOT EXISTS route_api_usage_day_idx ON route_api_usage (day_key)"
+      ),
+      database.prepare(
+        "CREATE INDEX IF NOT EXISTS route_api_usage_month_mode_idx ON route_api_usage (month_key, travel_mode)"
+      ),
     ])
     .then(() => undefined);
   await localSchemaReady;
 }
 
-export async function getDb() {
+export async function getD1Database() {
   const { env } = await import("cloudflare:workers");
   if (!env.DB) {
     throw new Error(
@@ -59,5 +76,9 @@ export async function getDb() {
   }
 
   await ensureLocalSchema(env.DB);
-  return drizzle(env.DB, { schema });
+  return env.DB;
+}
+
+export async function getDb() {
+  return drizzle(await getD1Database(), { schema });
 }

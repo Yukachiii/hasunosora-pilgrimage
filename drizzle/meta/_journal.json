@@ -8,6 +8,13 @@
       "when": 1785676312214,
       "tag": "0000_shallow_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786005298090,
+      "tag": "0001_bored_firelord",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectDirectory = path.dirname(fileURLToPath(import.meta.url));
+try {
+  process.loadEnvFile(path.join(projectDirectory, ".env.local"));
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
 const adminDirectory = path.join(projectDirectory, "admin-dist");
 const contentDirectory = path.join(projectDirectory, "content");
 const spotsPath = path.join(contentDirectory, "spots.json");
@@ -508,6 +513,55 @@ function requireWriteAccess(request, response) {
   return false;
 }
 
+function configuredRouteUsageUrl() {
+  const explicit = String(process.env.ROUTE_USAGE_API_URL ?? "").trim();
+  if (explicit) return explicit;
+  const routeApiUrl = String(process.env.VITE_ROUTE_API_URL ?? "").trim();
+  return routeApiUrl.replace(/\/api\/routes\/plan\/?$/, "/api/admin/route-usage");
+}
+
+async function proxyRouteUsage(response) {
+  const endpoint = configuredRouteUsageUrl();
+  const token = String(process.env.ROUTE_USAGE_ADMIN_TOKEN ?? "").trim();
+  if (!endpoint || !token) {
+    sendJson(response, {
+      available: false,
+      message:
+        ".env.localへROUTE_USAGE_API_URLとROUTE_USAGE_ADMIN_TOKENを設定すると、本番サーバーの集計を表示できます。",
+    });
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(endpoint);
+  } catch {
+    sendJson(response, { error: "API使用状況の取得先URLが正しくありません。" }, 500);
+    return;
+  }
+  if (parsed.protocol !== "https:" && !isLoopback(parsed.hostname)) {
+    sendJson(response, { error: "API使用状況の取得先にはHTTPSを指定してください。" }, 500);
+    return;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const upstream = await fetch(parsed, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+    const result = await upstream.json().catch(() => ({}));
+    sendJson(
+      response,
+      upstream.ok ? result : { error: result.error || "本番サーバーから使用状況を取得できませんでした。" },
+      upstream.status,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function requestHandler(request, response, initialSpots) {
   const requestUrl = new URL(request.url || "/", "http://localhost");
   const pathname = decodeURIComponent(requestUrl.pathname);
@@ -526,6 +580,10 @@ async function requestHandler(request, response, initialSpots) {
         }
         if (pathname === "/api/admin/publish-status") {
           sendJson(response, { ...gitStatus(), publishToken: writeToken });
+          return;
+        }
+        if (pathname === "/api/admin/route-usage") {
+          await proxyRouteUsage(response);
           return;
         }
       }

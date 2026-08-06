@@ -10,6 +10,8 @@ import {
   type FormEvent,
 } from "react";
 import type { PilgrimageSpot } from "@/app/spots";
+import type { TravelMode } from "@/app/route-planner";
+import type { RouteUsageResponse } from "./route-usage-types";
 
 export type AdminAsset = {
   id: string;
@@ -39,6 +41,13 @@ type PublishStatus = {
   publishToken: string;
   hasLocalChanges: boolean;
   error?: string;
+};
+
+const travelModeLabels: Record<TravelMode, string> = {
+  WALKING: "徒歩",
+  DRIVING: "車",
+  TRANSIT: "公共交通",
+  BICYCLING: "自転車",
 };
 
 async function loadPublishStatus(): Promise<PublishStatus> {
@@ -237,7 +246,7 @@ export function AdminApp({
   localMode = false,
   localToken = "",
 }: Props) {
-  const [tab, setTab] = useState<"photos" | "spots">("photos");
+  const [tab, setTab] = useState<"photos" | "spots" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
   const [overrideIds, setOverrideIds] = useState(new Set(overriddenSpotIds));
   const [assets, setAssets] = useState(initialAssets);
@@ -389,6 +398,13 @@ export function AdminApp({
         >
           <span>02</span>スポットを編集
         </button>
+        <button
+          type="button"
+          className={tab === "usage" ? "is-active" : ""}
+          onClick={() => setTab("usage")}
+        >
+          <span>03</span>API使用状況
+        </button>
       </nav>
 
       {tab === "photos" ? (
@@ -399,7 +415,7 @@ export function AdminApp({
           localMode={localMode}
           localToken={localToken}
         />
-      ) : (
+      ) : tab === "spots" ? (
         <SpotManager
           spots={managedSpots}
           setSpots={setManagedSpots}
@@ -409,8 +425,195 @@ export function AdminApp({
           localMode={localMode}
           localToken={localToken}
         />
+      ) : (
+        <ApiUsageDashboard localMode={localMode} />
       )}
     </main>
+  );
+}
+
+function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
+  const [usage, setUsage] = useState<RouteUsageResponse | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  function refreshUsage() {
+    setLoading(true);
+    setError("");
+    setRefreshKey((value) => value + 1);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/route-usage", { cache: "no-store" })
+      .then(async (response) => {
+        const result = (await response.json()) as RouteUsageResponse & { error?: string };
+        if (!response.ok) {
+          throw new Error(result.error ?? "API使用状況を読み込めませんでした。");
+        }
+        if (!cancelled) setUsage(result);
+      })
+      .catch((reason) => {
+        if (!cancelled) {
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "API使用状況を読み込めませんでした。",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  if (loading && !usage) {
+    return (
+      <section className="admin-usage admin-panel">
+        <p className="admin-loading">API使用状況を集計しています…</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="admin-usage admin-panel">
+        <div className="admin-panel__heading">
+          <div><span>ROUTES API</span><h2>使用状況を読み込めませんでした</h2></div>
+          <button type="button" className="usage-refresh" onClick={refreshUsage}>再読み込み</button>
+        </div>
+        <p className="admin-message" role="alert">{error}</p>
+      </section>
+    );
+  }
+
+  if (!usage?.available) {
+    return (
+      <section className="admin-usage admin-panel">
+        <div className="admin-panel__heading">
+          <div><span>ROUTES API</span><h2>使用状況の接続設定</h2></div>
+        </div>
+        <p className="usage-unavailable">{usage?.message}</p>
+        {localMode && (
+          <p className="usage-note">
+            ローカル管理画面は公開サーバーのデータベースを直接読めないため、共有トークンを使って集計APIだけを取得します。トークンはブラウザやGitHub Pagesへ配信されません。
+          </p>
+        )}
+      </section>
+    );
+  }
+
+  const maximumDailyRequests = Math.max(
+    1,
+    ...usage.daily.map((day) => day.apiRequests),
+  );
+  const generatedAt = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: usage.timeZone,
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(usage.generatedAt));
+
+  return (
+    <section className="admin-usage">
+      <div className="admin-panel usage-overview">
+        <div className="admin-panel__heading usage-heading">
+          <div><span>ROUTES API</span><h2>サーバーから送ったリクエスト</h2></div>
+          <div className="usage-heading__actions">
+            <small>{generatedAt} 更新</small>
+            <button
+              type="button"
+              className="usage-refresh"
+              disabled={loading}
+              onClick={refreshUsage}
+            >
+              {loading ? "更新中…" : "更新"}
+            </button>
+          </div>
+        </div>
+        <p className="usage-note">
+          このサイトのサーバーがGoogle Routes APIへ実際に送った回数です。Google Cloud側の請求確定値やクォータ表示とは、集計時刻などにより差が出る場合があります。
+        </p>
+
+        <div className="usage-periods">
+          <UsagePeriod title="今日" totals={usage.today} />
+          <UsagePeriod title="今月" totals={usage.currentMonth} />
+        </div>
+      </div>
+
+      <div className="usage-grid">
+        <div className="admin-panel">
+          <div className="admin-panel__heading">
+            <div><span>LAST 14 DAYS</span><h2>日別リクエスト数</h2></div>
+          </div>
+          <div className="usage-chart" aria-label="直近14日間のAPIリクエスト数">
+            {usage.daily.map((day) => (
+              <div className="usage-chart__day" key={day.date}>
+                <span>{day.apiRequests}</span>
+                <div className="usage-chart__track">
+                  <i
+                    className={day.failed ? "has-error" : ""}
+                    style={{ height: `${Math.max(3, (day.apiRequests / maximumDailyRequests) * 100)}%` }}
+                  />
+                </div>
+                <small>{day.date.slice(5).replace("-", "/")}</small>
+              </div>
+            ))}
+          </div>
+          <p className="usage-chart__caption">赤い棒は、その日に失敗したルート計算が含まれることを示します。</p>
+        </div>
+
+        <div className="admin-panel">
+          <div className="admin-panel__heading">
+            <div><span>THIS MONTH</span><h2>移動手段別</h2></div>
+          </div>
+          {usage.byMode.length ? (
+            <div className="usage-mode-list">
+              {usage.byMode.map((mode) => (
+                <div key={mode.travelMode}>
+                  <strong>{travelModeLabels[mode.travelMode] ?? mode.travelMode}</strong>
+                  <span>{mode.apiRequests.toLocaleString("ja-JP")} リクエスト</span>
+                  <small>計算 {mode.calculations.toLocaleString("ja-JP")}回・失敗 {mode.failed.toLocaleString("ja-JP")}回</small>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-note">今月のサーバー経由ルート検索はまだありません。</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function UsagePeriod({
+  title,
+  totals,
+}: {
+  title: string;
+  totals: {
+    calculations: number;
+    apiRequests: number;
+    failed: number;
+    averageResponseTimeMs: number;
+  };
+}) {
+  return (
+    <article className="usage-period">
+      <span>{title}</span>
+      <strong>{totals.apiRequests.toLocaleString("ja-JP")}</strong>
+      <small>Google APIリクエスト</small>
+      <dl>
+        <div><dt>ルート計算</dt><dd>{totals.calculations.toLocaleString("ja-JP")}回</dd></div>
+        <div><dt>失敗</dt><dd className={totals.failed ? "has-error" : ""}>{totals.failed.toLocaleString("ja-JP")}回</dd></div>
+        <div><dt>平均応答</dt><dd>{(totals.averageResponseTimeMs / 1000).toFixed(1)}秒</dd></div>
+      </dl>
+    </article>
   );
 }
 
