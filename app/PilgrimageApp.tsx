@@ -443,9 +443,8 @@ export function PilgrimageApp({
           </div>
           <p className="hero-kicker">蓮ノ空女学院スクールアイドルクラブ</p>
           <h1>
-            好きな物語と、
-            <br />
-            <em>同じ景色</em>を歩こう。
+            <span className="hero-title-line">好きな物語と、</span>
+            <span className="hero-title-line"><em>同じ景色</em>を歩こう。</span>
           </h1>
           <p className="hero-lead">
             金沢から能登・加賀まで、作品にまつわる場所をひとつの地図に。

@@ -264,10 +264,15 @@ button {
 .hero h1 {
   margin: 0;
   font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-  font-size: clamp(52px, 6vw, 92px);
+  font-size: clamp(52px, 5.2vw, 80px);
   font-weight: 500;
   letter-spacing: -0.06em;
   line-height: 1.17;
+}
+
+.hero-title-line {
+  display: block;
+  white-space: nowrap;
 }
 
 .hero h1 em,
@@ -2455,6 +2460,10 @@ footer > span {
     padding-right: 30px;
   }
 
+  .hero h1 {
+    font-size: clamp(40px, 5vw, 54px);
+  }
+
   .hero-visual {
     min-height: 420px;
   }
@@ -2516,7 +2525,7 @@ footer > span {
   }
 
   .hero h1 {
-    font-size: clamp(45px, 14vw, 64px);
+    font-size: clamp(30px, 10vw, 44px);
     letter-spacing: -0.08em;
   }
 
