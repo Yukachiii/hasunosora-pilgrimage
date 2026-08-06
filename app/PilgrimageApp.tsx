@@ -845,7 +845,7 @@ export function PilgrimageApp({
                 <h3>一日の巡礼予定を作る</h3>
               </div>
               <span className="route-badge">
-                Google Maps{routeServiceUrl ? " · SERVER" : ""}
+                Google Maps
               </span>
             </div>
 
@@ -872,13 +872,8 @@ export function PilgrimageApp({
                   順番・滞在時間・不要な地点は下で調整できます。
                 </p>
               ) : (
-                <p>選択すると対象地点をまとめて補完します。この操作だけではAPIを使用しません。</p>
+                <p>選択すると対象地点をまとめて予定へ追加します。</p>
               )}
-              {itineraryIds.length >= 13 && itineraryCollaborationId ? (
-                <small>
-                  13地点以上の一括ルートは、Google Mapsで通常より高い料金区分になる場合があります。
-                </small>
-              ) : null}
             </div>
 
             <div className="journey-start">
@@ -935,7 +930,7 @@ export function PilgrimageApp({
                   <small>LOCAL SAVE</small>
                   <strong>旅程をこの端末に保存</strong>
                 </div>
-                <span>API不使用</span>
+                <span>この端末に保存</span>
               </div>
               <label>
                 <span>保存済みの旅程</span>
@@ -1082,8 +1077,7 @@ export function PilgrimageApp({
             </button>
 
             <p className="route-api-note">
-              地点の追加や並べ替えだけではAPIを使用しません。このボタンを押したときだけ
-              {routeServiceUrl ? "サーバーから" : ""}検索します。
+              移動時間と訪問順を計算し、一日の予定として表示します。
             </p>
 
             <div
@@ -1118,14 +1112,6 @@ export function PilgrimageApp({
                         <strong>{routeResult.duration ?? "—"}</strong>
                       </span>
                     </div>
-                    {routeResult.source ? (
-                      <small className="route-computation-source">
-                        {routeResult.source === "server" ? "サーバー計算" : "ブラウザ計算"}
-                        {routeResult.apiRequestCount
-                          ? ` · Google API ${routeResult.apiRequestCount}回`
-                          : ""}
-                      </small>
-                    ) : null}
                   </div>
                 </>
               )}

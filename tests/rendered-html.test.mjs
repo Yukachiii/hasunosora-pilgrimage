@@ -145,7 +145,7 @@ test("day planner supports multiple stops without a server dependency", async ()
 
   assert.match(app, /訪問するスポット/);
   assert.match(app, /推奨順/);
-  assert.match(app, /このボタンを押したときだけ[\s\S]*検索/);
+  assert.match(app, /移動時間と訪問順を計算し、一日の予定として表示します/);
   assert.match(app, /cardCharacterFilter/);
   assert.match(planner, /東京駅/);
   assert.match(planner, /大阪駅/);
@@ -201,8 +201,8 @@ test("collaboration locations can fill a route plan without an API request", asy
   assert.match(app, /コラボから自動入力/);
   assert.match(app, /fillItineraryFromCollaboration/);
   assert.match(app, /このコラボで予定を作る/);
-  assert.match(app, /この操作だけではAPIを使用しません/);
-  assert.match(app, /通常より高い料金区分/);
+  assert.match(app, /対象地点をまとめて予定へ追加します/);
+  assert.doesNotMatch(app, /料金区分|API不使用|Google API|サーバー計算|ブラウザ計算/);
   assert.match(planner, /maximumItineraryStops = 27/);
   assert.equal(
     collaborations.find((item) => item.id === "ishikawa-dai-kanko-2").locations.length,
@@ -414,7 +414,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /この内容は計算済みです/);
   assert.match(app, /当日用モード/);
   assert.match(app, /現在地からGoogle Mapsで向かう/);
-  assert.match(app, /API不使用/);
+  assert.match(app, /この端末に保存/);
   assert.match(app, /スマートフォン用メニュー/);
   assert.match(app, /href="#planner"/);
   assert.match(routePlanner, /openingHoursStatus/);

@@ -1482,13 +1482,6 @@ button {
   font-size: 16px;
 }
 
-.route-computation-source {
-  color: var(--ice-deep);
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-
 .day-schedule {
   margin-top: 16px;
   overflow: hidden;
