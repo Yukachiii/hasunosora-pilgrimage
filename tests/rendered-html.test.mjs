@@ -35,6 +35,9 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /蓮ノ旅/);
   assert.match(html, /好きな物語と/);
   assert.match(html, /一日の巡礼予定を作る/);
+  assert.match(html, /期間限定のコラボを巡る/);
+  assert.match(html, /おいでよ！石川大観光Ⅱ/);
+  assert.match(html, /蓮ノ小四辺形の休日/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);
@@ -44,13 +47,14 @@ test("server-renders the pilgrimage MVP", async () => {
 });
 
 test("publishes the complete reviewed location lists", async () => {
-  const [spots, cardModels] = await Promise.all([
+  const [spots, cardModels, collaborations] = await Promise.all([
     readFile(new URL("../content/spots.json", import.meta.url), "utf8").then(JSON.parse),
     readFile(new URL("../content/card-models.json", import.meta.url), "utf8").then(JSON.parse),
+    readFile(new URL("../content/collaborations.json", import.meta.url), "utf8").then(JSON.parse),
   ]);
 
-  assert.equal(spots.length, 83);
-  assert.equal(new Set(spots.map((spot) => spot.id)).size, 83);
+  assert.equal(spots.length, 94);
+  assert.equal(new Set(spots.map((spot) => spot.id)).size, 94);
   assert.ok(spots.every((spot) => Number.isFinite(spot.lat) && Number.isFinite(spot.lng)));
   assert.equal(
     spots.filter((spot) => spot.activityRecords?.length || spot.sehasEpisodes?.length).length,
@@ -69,6 +73,15 @@ test("publishes the complete reviewed location lists", async () => {
   assert.equal(cardModels.length, 31);
   assert.equal(cardModels.filter((card) => card.spotId).length, 20);
   assert.equal(cardModels.filter((card) => !card.spotId).length, 11);
+  assert.equal(collaborations.length, 2);
+  assert.equal(spots.filter((spot) => spot.collaborationIds?.length).length, 21);
+  assert.ok(
+    collaborations.every((collaboration) =>
+      collaboration.locations.every((location) =>
+        spots.some((spot) => spot.id === location.spotId),
+      ),
+    ),
+  );
 });
 
 test("starter preview is fully replaced", async () => {

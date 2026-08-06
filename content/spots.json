@@ -20,6 +20,9 @@
   },
   {
     "id": "kanazawa-forus",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "金沢フォーラス",
     "shortName": "金沢フォーラス",
     "area": "金沢駅周辺",
@@ -36,6 +39,9 @@
   },
   {
     "id": "ohmicho-market",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "近江町市場",
     "shortName": "近江町市場",
     "area": "近江町・尾張町",
@@ -122,6 +128,9 @@
   },
   {
     "id": "kanazawa-katani",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "かなざわカタニ",
     "shortName": "かなざわカタニ",
     "area": "近江町・尾張町",
@@ -138,6 +147,9 @@
   },
   {
     "id": "kanazawa-phonograph-museum",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "金沢蓄音器館",
     "shortName": "金沢蓄音器館",
     "area": "近江町・尾張町",
@@ -151,6 +163,9 @@
   },
   {
     "id": "kanazawa-tourist-info",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "金沢中央観光案内所",
     "shortName": "金沢中央観光案内所",
     "area": "近江町・尾張町",
@@ -260,6 +275,9 @@
   },
   {
     "id": "kaga-yuzen-kaikan",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "加賀友禅会館",
     "shortName": "加賀友禅会館",
     "area": "金沢城・兼六園",
@@ -279,6 +297,9 @@
   },
   {
     "id": "ishikawa-traditional-crafts",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "いしかわ生活工芸ミュージアム",
     "shortName": "いしかわ生活工芸ミュージアム",
     "area": "金沢城・兼六園",
@@ -292,6 +313,9 @@
   },
   {
     "id": "shiinoki-cultural-complex",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "石川県政記念しいのき迎賓館",
     "shortName": "石川県政記念しいのき迎賓館",
     "area": "金沢城・兼六園",
@@ -582,6 +606,9 @@
   },
   {
     "id": "ishikawa-library",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "石川県立図書館",
     "shortName": "石川県立図書館",
     "area": "東山・卯辰山",
@@ -890,6 +917,9 @@
   },
   {
     "id": "moromigura",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
     "name": "もろみ蔵",
     "shortName": "もろみ蔵",
     "area": "金沢西・港",
@@ -1342,5 +1372,193 @@
     "description": "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。",
     "accessNote": "訪問前に営業時間・利用案内を確認",
     "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E5%8F%A3%E6%B0%B4%E7%94%A3%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E4%B8%8A%E8%BF%91%E6%B1%9F%E7%94%BA38"
+  },
+  {
+    "id": "ishikawa-tourism-products",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
+    "name": "石川県観光物産館",
+    "shortName": "石川県観光物産館",
+    "area": "金沢城・兼六園",
+    "category": "買い物",
+    "address": "石川県金沢市兼六町2-20",
+    "lat": 36.565006,
+    "lng": 136.663217,
+    "description": "石川県コラボ第5弾『おいでよ！石川大観光Ⅱ』のメインスタンプスポットです。村野さやか・桂城泉の等身パネルが設置されます。",
+    "accessNote": "営業時間・休館日とスタンプ対応日を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=石川県観光物産館%20石川県金沢市兼六町2-20",
+    "recommendedStayMinutes": 30
+  },
+  {
+    "id": "kaga-travel-center",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2",
+      "kaga-onsen-2026"
+    ],
+    "name": "加賀市観光情報センター KAGA旅・まちネット",
+    "shortName": "KAGA旅・まちネット",
+    "area": "加賀・小松",
+    "category": "交通",
+    "address": "石川県加賀市作見町ヲ6-2 JR加賀温泉駅構内",
+    "lat": 36.318193,
+    "lng": 136.351132,
+    "description": "両コラボの案内拠点です。第5弾では台紙配布・エクストラスポット、加賀温泉郷コラボでは台紙配布・エクストラパネル設置場所になります。",
+    "accessNote": "JR加賀温泉駅構内・配布時間を事前確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=加賀市観光情報センター%20KAGA旅・まちネット%20石川県加賀市作見町ヲ6-2",
+    "recommendedStayMinutes": 20
+  },
+  {
+    "id": "cosmo-isle-hakui",
+    "collaborationIds": [
+      "ishikawa-dai-kanko-2"
+    ],
+    "name": "コスモアイル羽咋",
+    "shortName": "コスモアイル羽咋",
+    "area": "能登",
+    "category": "文化",
+    "address": "石川県羽咋市鶴多町免田25",
+    "lat": 36.898217,
+    "lng": 136.788366,
+    "description": "石川県コラボ第5弾の台紙配布・エクストラスポットです。村野さやか・大沢瑠璃乃の等身パネルが設置されます。",
+    "accessNote": "開館日・入館案内とスタンプ対応日を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=コスモアイル羽咋%20石川県羽咋市鶴多町免田25",
+    "recommendedStayMinutes": 90
+  },
+  {
+    "id": "yamanaka-onsen-soyu",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "山中温泉総湯（菊の湯）",
+    "shortName": "山中温泉総湯",
+    "area": "加賀・小松",
+    "category": "レジャー",
+    "address": "石川県加賀市山中温泉湯の出町1",
+    "lat": 36.246831,
+    "lng": 136.373203,
+    "description": "加賀温泉郷コラボ『蓮ノ小四辺形の休日』のスタンプスポットです。入浴する場合は営業時間や利用案内も確認しましょう。",
+    "accessNote": "営業時間・休業日・入浴案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=山中温泉総湯%20菊の湯%20石川県加賀市山中温泉湯の出町1",
+    "recommendedStayMinutes": 60
+  },
+  {
+    "id": "katayamazu-onsen-soyu",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "片山津温泉総湯",
+    "shortName": "片山津温泉総湯",
+    "area": "加賀・小松",
+    "category": "レジャー",
+    "address": "石川県加賀市片山津温泉65-2",
+    "lat": 36.345328,
+    "lng": 136.368947,
+    "description": "加賀温泉郷コラボ『蓮ノ小四辺形の休日』のスタンプスポットです。柴山潟に面した温泉街も含めて余裕を持った予定がおすすめです。",
+    "accessNote": "営業時間・休業日・入浴案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=片山津温泉総湯%20石川県加賀市片山津温泉65-2",
+    "recommendedStayMinutes": 60
+  },
+  {
+    "id": "yamashiro-onsen-soyu",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "山代温泉総湯",
+    "shortName": "山代温泉総湯",
+    "area": "加賀・小松",
+    "category": "レジャー",
+    "address": "石川県加賀市山代温泉万松園通2-1",
+    "lat": 36.288592,
+    "lng": 136.361351,
+    "description": "加賀温泉郷コラボ『蓮ノ小四辺形の休日』のスタンプスポットです。周辺の温泉街を歩く時間も見込んでおきましょう。",
+    "accessNote": "営業時間・休業日・入浴案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=山代温泉総湯%20石川県加賀市山代温泉万松園通2-1",
+    "recommendedStayMinutes": 60
+  },
+  {
+    "id": "awazu-onsen-soyu",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "粟津温泉総湯",
+    "shortName": "粟津温泉総湯",
+    "area": "加賀・小松",
+    "category": "レジャー",
+    "address": "石川県小松市粟津町イ79-1",
+    "lat": 36.331482,
+    "lng": 136.44652,
+    "description": "加賀温泉郷コラボ『蓮ノ小四辺形の休日』のスタンプスポットです。温泉を利用する場合は定休日と受付時間を確認してください。",
+    "accessNote": "営業時間・休業日・入浴案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=粟津温泉総湯%20石川県小松市粟津町イ79-1",
+    "recommendedStayMinutes": 60
+  },
+  {
+    "id": "nonoichi-kamino",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "1の1 NONOICHI",
+    "shortName": "1の1 NONOICHI",
+    "area": "白山・野々市・能美",
+    "category": "飲食",
+    "address": "石川県野々市市本町2-1-21 にぎわいの里ののいち カミーノ内",
+    "lat": 36.532779,
+    "lng": 136.618512,
+    "description": "加賀温泉郷コラボのエクストラパネル設置場所です。オリジナルグッズの販売場所にもなっています。",
+    "accessNote": "営業時間・休業日・商品在庫を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=1の1%20NONOICHI%20石川県野々市市本町2-1-21",
+    "recommendedStayMinutes": 45
+  },
+  {
+    "id": "kawakita-fureai-no-yu",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "川北温泉「ふれあいの湯」",
+    "shortName": "川北温泉 ふれあいの湯",
+    "area": "白山・野々市・能美",
+    "category": "レジャー",
+    "address": "石川県能美郡川北町壱ツ屋100",
+    "lat": 36.46986,
+    "lng": 136.54142,
+    "description": "加賀温泉郷コラボのエクストラパネル設置場所です。温泉を利用する場合は受付時間も確認してください。",
+    "accessNote": "営業時間・休業日・入浴案内を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=川北温泉%20ふれあいの湯%20石川県能美郡川北町壱ツ屋100",
+    "recommendedStayMinutes": 60
+  },
+  {
+    "id": "nomi-furusato-museum",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "能美ふるさとミュージアム",
+    "shortName": "能美ふるさとミュージアム",
+    "area": "白山・野々市・能美",
+    "category": "文化",
+    "address": "石川県能美市寺井町を1-1",
+    "lat": 36.442972,
+    "lng": 136.505974,
+    "description": "加賀温泉郷コラボのエクストラパネル設置場所です。展示も見る場合は見学時間を十分に確保しましょう。",
+    "accessNote": "開館時間・休館日を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=能美ふるさとミュージアム%20石川県能美市寺井町を1-1",
+    "recommendedStayMinutes": 60
+  },
+  {
+    "id": "ishikawa-aviation-plaza",
+    "collaborationIds": [
+      "kaga-onsen-2026"
+    ],
+    "name": "石川県立航空プラザ",
+    "shortName": "石川県立航空プラザ",
+    "area": "加賀・小松",
+    "category": "文化",
+    "address": "石川県小松市安宅新町丙92",
+    "lat": 36.404371,
+    "lng": 136.410844,
+    "description": "加賀温泉郷コラボのエクストラパネル設置場所です。館内見学も含める場合は余裕のある滞在時間がおすすめです。",
+    "accessNote": "開館時間・休館日を確認",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=石川県立航空プラザ%20石川県小松市安宅新町丙92",
+    "recommendedStayMinutes": 90
   }
 ]

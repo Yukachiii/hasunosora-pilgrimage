@@ -1,0 +1,46 @@
+[
+  {
+    "id": "ishikawa-dai-kanko-2",
+    "name": "石川県コラボ第5弾",
+    "subtitle": "おいでよ！石川大観光Ⅱ",
+    "startDate": "2026-08-10",
+    "endDate": "2026-12-06",
+    "description": "金沢市内を中心に、加賀・能登まで巡る書き下ろしシナリオ付きスタンプラリー。メイン8地点とエクストラ4地点で構成されています。",
+    "sourceUrl": "https://www.lovelive-anime.jp/hasunosora/news/detail.php?p=01_6404",
+    "locations": [
+      { "spotId": "kanazawa-forus", "role": "台紙・特典・グッズ配布（金沢ゲーマーズ）" },
+      { "spotId": "kanazawa-tourist-info", "role": "メインスポット" },
+      { "spotId": "shiinoki-cultural-complex", "role": "メインスポット" },
+      { "spotId": "kanazawa-phonograph-museum", "role": "メインスポット" },
+      { "spotId": "kaga-yuzen-kaikan", "role": "メインスポット" },
+      { "spotId": "ishikawa-traditional-crafts", "role": "メインスポット" },
+      { "spotId": "ohmicho-market", "role": "メインスポット" },
+      { "spotId": "kanazawa-katani", "role": "メインスポット" },
+      { "spotId": "ishikawa-tourism-products", "role": "メインスポット" },
+      { "spotId": "moromigura", "role": "エクストラスポット" },
+      { "spotId": "ishikawa-library", "role": "エクストラスポット" },
+      { "spotId": "kaga-travel-center", "role": "台紙配布・エクストラスポット" },
+      { "spotId": "cosmo-isle-hakui", "role": "台紙配布・エクストラスポット" }
+    ]
+  },
+  {
+    "id": "kaga-onsen-2026",
+    "name": "加賀温泉郷コラボ",
+    "subtitle": "蓮ノ小四辺形の休日",
+    "startDate": "2026-08-10",
+    "endDate": "2026-11-30",
+    "description": "山中・片山津・山代・粟津の4温泉を巡るスタンプラリーと、加賀地域各所の描き下ろしエクストラパネルを楽しめる期間限定企画です。",
+    "sourceUrl": "https://www.lovelive-anime.jp/hasunosora/news/detail.php?p=01_6468",
+    "locations": [
+      { "spotId": "kaga-travel-center", "role": "台紙配布・エクストラパネル" },
+      { "spotId": "yamanaka-onsen-soyu", "role": "スタンプスポット" },
+      { "spotId": "katayamazu-onsen-soyu", "role": "スタンプスポット" },
+      { "spotId": "yamashiro-onsen-soyu", "role": "スタンプスポット" },
+      { "spotId": "awazu-onsen-soyu", "role": "スタンプスポット" },
+      { "spotId": "nonoichi-kamino", "role": "エクストラパネル" },
+      { "spotId": "kawakita-fureai-no-yu", "role": "エクストラパネル" },
+      { "spotId": "nomi-furusato-museum", "role": "エクストラパネル" },
+      { "spotId": "ishikawa-aviation-plaza", "role": "エクストラパネル" }
+    ]
+  }
+]

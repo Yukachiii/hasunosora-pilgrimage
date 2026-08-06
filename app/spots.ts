@@ -1,5 +1,10 @@
 import spotData from "../content/spots.json";
 import cardModelData from "../content/card-models.json";
+import collaborationData from "../content/collaborations.json";
+
+export type CollaborationId =
+  | "ishikawa-dai-kanko-2"
+  | "kaga-onsen-2026";
 
 export type SpotCategory =
   | "交通"
@@ -30,8 +35,23 @@ export type PilgrimageSpot = {
   sourceUrl: string;
   recommendedStayMinutes?: number;
   appearances?: string[];
+  collaborationIds?: CollaborationId[];
   imageUrl?: string;
   imagePosition?: string;
+};
+
+export type PilgrimageCollaboration = {
+  id: CollaborationId;
+  name: string;
+  subtitle: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  sourceUrl: string;
+  locations: Array<{
+    spotId: string;
+    role: string;
+  }>;
 };
 
 export type CardModelLocation = {
@@ -47,5 +67,8 @@ export type CardModelLocation = {
 
 export const spots = spotData as PilgrimageSpot[];
 export const cardModels = cardModelData as CardModelLocation[];
+export const collaborations = collaborationData as PilgrimageCollaboration[];
 
 export const spotById = (id: string) => spots.find((spot) => spot.id === id);
+export const collaborationById = (id: CollaborationId) =>
+  collaborations.find((collaboration) => collaboration.id === id);

@@ -497,6 +497,7 @@ button {
 }
 
 .map-section,
+.collaborations-section,
 .spots-section,
 .card-models-section {
   padding: 120px max(32px, calc((100vw - 1360px) / 2));
@@ -674,6 +675,18 @@ button {
   transform: translate(-50%, -50%) rotate(-45deg) scale(1.18);
 }
 
+.fallback-pin--collaboration,
+.map-marker--collaboration {
+  background: var(--lavender-deep);
+  box-shadow:
+    0 0 0 4px rgba(230, 224, 240, 0.8),
+    0 7px 20px rgba(71, 53, 90, 0.3);
+}
+
+.fallback-pin--collaboration.is-active {
+  background: #7f6084;
+}
+
 .map-marker {
   transform: rotate(-45deg);
 }
@@ -772,6 +785,16 @@ button {
   overflow: hidden;
   font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
   font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-spot-collaboration {
+  overflow: hidden;
+  color: var(--lavender-deep);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1373,13 +1396,165 @@ button {
   color: var(--ink);
 }
 
+.collaborations-section {
+  background:
+    radial-gradient(circle at 10% 20%, rgba(230, 224, 240, 0.72), transparent 30%),
+    linear-gradient(145deg, #f8f7f2 0%, #eef4f3 100%);
+}
+
+.collaboration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.collaboration-card {
+  position: relative;
+  overflow: hidden;
+  padding: 32px;
+  border: 1px solid rgba(158, 142, 182, 0.34);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 20px 50px rgba(60, 69, 82, 0.08);
+}
+
+.collaboration-card::after {
+  position: absolute;
+  right: -54px;
+  bottom: -72px;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(158, 142, 182, 0.2);
+  border-radius: 50%;
+  content: "";
+}
+
+.collaboration-card__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.collaboration-label,
+.collaboration-status {
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.collaboration-label {
+  background: var(--lavender-deep);
+  color: white;
+}
+
+.collaboration-status {
+  border: 1px solid rgba(125, 185, 196, 0.42);
+  color: var(--ice-deep);
+}
+
+.collaboration-status.is-active {
+  border-color: transparent;
+  background: #dceee5;
+  color: #39745a;
+}
+
+.collaboration-status.is-ended {
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
+.collaboration-card > small {
+  color: var(--lavender-deep);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.collaboration-card h3 {
+  margin: 8px 0 14px;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: clamp(24px, 2.8vw, 34px);
+  font-weight: 500;
+}
+
+.collaboration-card > p {
+  min-height: 70px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.85;
+}
+
+.collaboration-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.collaboration-card dl > div {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 12px;
+}
+
+.collaboration-card dt,
+.collaboration-card dd {
+  margin: 0;
+  font-size: 10px;
+}
+
+.collaboration-card dt {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.collaboration-card dd {
+  font-weight: 800;
+}
+
+.collaboration-card__actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.collaboration-card__actions button,
+.collaboration-card__actions a {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.collaboration-card__actions button {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: white;
+}
+
 .spots-section {
   background: #eef2ef;
 }
 
 .spot-filters {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(190px, 0.45fr) auto;
+  grid-template-columns: minmax(230px, 1fr) minmax(150px, 0.4fr) minmax(210px, 0.55fr) auto;
   gap: 12px;
   align-items: end;
   margin: -16px 0 28px;
@@ -1480,6 +1655,8 @@ button {
 .spot-card.has-image .spot-card__episodes dt,
 .spot-card.has-image .spot-card__episodes dd,
 .spot-card.has-image .spot-card__appearances span,
+.spot-card.has-image .spot-card__collaborations span,
+.spot-card.has-image .spot-card__collaborations small,
 .spot-card.has-image > a {
   color: rgba(255, 255, 255, 0.86);
 }
@@ -1525,6 +1702,51 @@ button {
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.12em;
+}
+
+.spot-card__collaborations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -15px 0 16px;
+}
+
+.spot-card__collaborations > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(158, 142, 182, 0.38);
+  border-radius: 4px;
+  background: rgba(230, 224, 240, 0.28);
+  color: #766687;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.spot-card__collaborations b {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--lavender-deep);
+  color: white;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.spot-card__collaborations small {
+  width: 100%;
+  color: var(--ink-soft);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.spot-card.has-image .spot-card__collaborations > span {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(25, 25, 42, 0.35);
+  backdrop-filter: blur(8px);
 }
 
 .spot-card h3 {
@@ -1959,6 +2181,7 @@ footer > span {
   }
 
   .map-section,
+  .collaborations-section,
   .spots-section,
   .card-models-section {
     padding: 76px 18px;
@@ -2024,6 +2247,18 @@ footer > span {
 
   .travel-modes > div {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .collaboration-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .collaboration-card {
+    padding: 24px 20px;
+  }
+
+  .collaboration-card > p {
+    min-height: 0;
   }
 
   .spot-grid {

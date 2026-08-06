@@ -247,7 +247,7 @@ export function GooglePilgrimageMap({
         mapRef.current = map;
         markersRef.current = spots.map((spot, index) => {
           const content = document.createElement("div");
-          content.className = "map-marker";
+          content.className = `map-marker${spot.collaborationIds?.length ? " map-marker--collaboration" : ""}`;
           const label = document.createElement("span");
           label.textContent = String(index + 1).padStart(2, "0");
           content.appendChild(label);
@@ -469,7 +469,7 @@ export function GooglePilgrimageMap({
               <button
                 type="button"
                 key={spot.id}
-                className={`fallback-pin ${selectedId === spot.id ? "is-active" : ""}`}
+                className={`fallback-pin${spot.collaborationIds?.length ? " fallback-pin--collaboration" : ""}${selectedId === spot.id ? " is-active" : ""}`}
                 style={{
                   left: `${Math.max(8, Math.min(90, x))}%`,
                   top: `${Math.max(10, Math.min(86, y))}%`,

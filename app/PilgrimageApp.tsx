@@ -17,7 +17,14 @@ import {
   recommendedStayMinutes,
   type TravelMode,
 } from "./route-planner";
-import { cardModels, type PilgrimageSpot } from "./spots";
+import {
+  cardModels,
+  collaborationById,
+  collaborations,
+  type CollaborationId,
+  type PilgrimageCollaboration,
+  type PilgrimageSpot,
+} from "./spots";
 
 const travelModes: Array<{
   value: TravelMode;
@@ -57,6 +64,26 @@ function displayClock(totalMinutes: number) {
   return `${day > 0 ? `翌${day > 1 ? day : ""}日 ` : ""}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+function collaborationStatus(collaboration: PilgrimageCollaboration) {
+  const today = japanDate();
+  if (today < collaboration.startDate) return "開催前";
+  if (today > collaboration.endDate) return "終了";
+  return "開催中";
+}
+
+function formatCollaborationDate(value: string) {
+  return value.replaceAll("-", ".");
+}
+
+function collaborationsForSpot(spot: PilgrimageSpot) {
+  return (spot.collaborationIds ?? []).flatMap((id) => {
+    const collaboration = collaborationById(id);
+    if (!collaboration) return [];
+    const role = collaboration.locations.find((location) => location.spotId === spot.id)?.role;
+    return [{ collaboration, role }];
+  });
+}
+
 type Props = {
   googleMapsConfig: {
     apiKey: string;
@@ -88,6 +115,7 @@ export function PilgrimageApp({
   const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
   const [spotQuery, setSpotQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("すべて");
+  const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
 
   const areas = useMemo(
     () => Array.from(new Set(spots.map((spot) => spot.area))),
@@ -97,6 +125,10 @@ export function PilgrimageApp({
     const normalizedQuery = spotQuery.trim().toLocaleLowerCase("ja");
     return spots.filter((spot) => {
       if (areaFilter !== "すべて" && spot.area !== areaFilter) return false;
+      if (
+        collaborationFilter !== "すべて" &&
+        !spot.collaborationIds?.includes(collaborationFilter)
+      ) return false;
       if (!normalizedQuery) return true;
       return [
         spot.name,
@@ -106,12 +138,18 @@ export function PilgrimageApp({
         ...(spot.activityRecords ?? []),
         ...(spot.sehasEpisodes ?? []),
         ...(spot.appearances ?? []),
+        ...collaborationsForSpot(spot).flatMap(({ collaboration, role }) => [
+          collaboration.name,
+          collaboration.subtitle,
+          role ?? "",
+        ]),
       ].some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
     });
-  }, [areaFilter, spotQuery, spots]);
+  }, [areaFilter, collaborationFilter, spotQuery, spots]);
 
   const spotById = (id: string) => spots.find((spot) => spot.id === id);
   const selectedSpot = spotById(selectedId) ?? spots[0];
+  const selectedCollaborations = collaborationsForSpot(selectedSpot);
   const itinerarySpots = useMemo(
     () => itineraryIds.map((id) => spots.find((spot) => spot.id === id)).filter((spot): spot is PilgrimageSpot => Boolean(spot)),
     [itineraryIds, spots],
@@ -231,6 +269,7 @@ export function PilgrimageApp({
         </a>
         <nav className="desktop-nav" aria-label="メインナビゲーション">
           <a href="#map">巡礼マップ</a>
+          <a href="#collaborations">コラボ</a>
           <a href="#spots">スポット</a>
           <a href="#card-models">カードモデル地</a>
           <a href="#guide">巡礼のしおり</a>
@@ -347,6 +386,11 @@ export function PilgrimageApp({
                   {selectedSpot.area} · {selectedSpot.category}
                 </small>
                 <strong>{selectedSpot.name}</strong>
+                {selectedCollaborations.length ? (
+                  <span className="selected-spot-collaboration">
+                    コラボ · {selectedCollaborations.map(({ collaboration }) => collaboration.name).join(" / ")}
+                  </span>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -608,10 +652,74 @@ export function PilgrimageApp({
         </div>
       </section>
 
+      <section className="collaborations-section" id="collaborations">
+        <div className="section-heading">
+          <div>
+            <p className="section-number">02 — LIMITED COLLABORATIONS</p>
+            <h2>期間限定のコラボを巡る</h2>
+          </div>
+          <p>
+            公式発表済みの企画から、加賀温泉郷コラボと石川県コラボ第5弾だけを掲載しています。
+            開催期間や各施設の休業日は、出発前に公式案内も確認してください。
+          </p>
+        </div>
+        <div className="collaboration-grid">
+          {collaborations.map((collaboration) => {
+            const status = collaborationStatus(collaboration);
+            const routeableSpots = collaboration.locations.filter((location) =>
+              spots.some((spot) => spot.id === location.spotId),
+            );
+            return (
+              <article className="collaboration-card" key={collaboration.id}>
+                <div className="collaboration-card__topline">
+                  <span className="collaboration-label">コラボ</span>
+                  <span className={`collaboration-status${status === "開催中" ? " is-active" : status === "開催前" ? " is-upcoming" : " is-ended"}`}>
+                    {status}
+                  </span>
+                </div>
+                <small>{collaboration.subtitle}</small>
+                <h3>{collaboration.name}</h3>
+                <p>{collaboration.description}</p>
+                <dl>
+                  <div>
+                    <dt>開催期間</dt>
+                    <dd>
+                      {formatCollaborationDate(collaboration.startDate)} — {formatCollaborationDate(collaboration.endDate)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>登録地点</dt>
+                    <dd>{routeableSpots.length}か所</dd>
+                  </div>
+                </dl>
+                <div className="collaboration-card__actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCollaborationFilter(collaboration.id);
+                      setAreaFilter("すべて");
+                      setSpotQuery("");
+                      const firstSpot = spots.find((spot) => spot.id === routeableSpots[0]?.spotId);
+                      if (firstSpot) setSelectedId(firstSpot.id);
+                      document.querySelector("#spots")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                  >
+                    対象スポットを見る <span aria-hidden="true">↓</span>
+                  </button>
+                  <a href={collaboration.sourceUrl} target="_blank" rel="noreferrer">
+                    公式情報 <span aria-hidden="true">↗</span>
+                  </a>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="spots-section" id="spots">
         <div className="section-heading">
           <div>
-            <p className="section-number">02 — SPOT LIST</p>
+            <p className="section-number">03 — SPOT LIST</p>
             <h2>物語をたどる、{spots.length}か所</h2>
           </div>
           <p>
@@ -637,6 +745,18 @@ export function PilgrimageApp({
               {areas.map((area) => <option key={area}>{area}</option>)}
             </select>
           </label>
+          <label>
+            <span>コラボ</span>
+            <select
+              value={collaborationFilter}
+              onChange={(event) => setCollaborationFilter(event.target.value as CollaborationId | "すべて")}
+            >
+              <option value="すべて">すべて</option>
+              {collaborations.map((collaboration) => (
+                <option value={collaboration.id} key={collaboration.id}>{collaboration.name}</option>
+              ))}
+            </select>
+          </label>
           <p><strong>{filteredSpots.length}</strong> / {spots.length} SPOTS</p>
         </div>
 
@@ -644,6 +764,7 @@ export function PilgrimageApp({
           {filteredSpots.map((spot) => {
             const index = spots.findIndex((item) => item.id === spot.id);
             const imageUrl = spotImages[spot.id] ?? spot.imageUrl;
+            const spotCollaborations = collaborationsForSpot(spot);
             return (
             <article
               className={`spot-card${imageUrl ? " has-image" : ""}${
@@ -678,6 +799,17 @@ export function PilgrimageApp({
                     {spot.area} · {spot.category}
                   </small>
                 </div>
+                {spotCollaborations.length ? (
+                  <div className="spot-card__collaborations">
+                    {spotCollaborations.map(({ collaboration, role }) => (
+                      <span key={collaboration.id}>
+                        <b>コラボ</b>
+                        {collaboration.name}
+                        {role ? <small>{role}</small> : null}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 <h3>{spot.name}</h3>
                 <p>{spot.description}</p>
                 {spot.activityRecords?.length || spot.sehasEpisodes?.length ? (
@@ -723,7 +855,7 @@ export function PilgrimageApp({
       <section className="card-models-section" id="card-models">
         <div className="section-heading">
           <div>
-            <p className="section-number">03 — CARD MODEL LOCATIONS</p>
+            <p className="section-number">04 — CARD MODEL LOCATIONS</p>
             <h2>カードに描かれた、31の景色</h2>
           </div>
           <p>
@@ -766,7 +898,7 @@ export function PilgrimageApp({
 
       <section className="guide-section" id="guide">
         <div className="guide-intro">
-          <p className="section-number">04 — PILGRIMAGE NOTES</p>
+          <p className="section-number">05 — PILGRIMAGE NOTES</p>
           <h2>
             好きな場所を、
             <br />
