@@ -15,6 +15,7 @@ import {
 import {
   formatDuration,
   majorStations,
+  maximumItineraryStops,
   recommendedStayMinutes,
   type TravelMode,
 } from "./route-planner";
@@ -124,6 +125,7 @@ export function PilgrimageApp({
   const [spotQuery, setSpotQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("すべて");
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
+  const [itineraryCollaborationId, setItineraryCollaborationId] = useState<CollaborationId | "">("");
   const [cardCharacterFilter, setCardCharacterFilter] = useState<CardCharacter | "すべて">("すべて");
 
   useEffect(() => {
@@ -274,10 +276,42 @@ export function PilgrimageApp({
         ? spots.find((spot) => !itineraryIds.includes(spot.id))?.id
         : addSpotId
     );
-    if (!id || itineraryIds.includes(id) || itineraryIds.length >= 10) return;
+    if (!id || itineraryIds.includes(id) || itineraryIds.length >= maximumItineraryStops) return;
     setItineraryIds((current) => [...current, id]);
     const next = spots.find((spot) => !itineraryIds.includes(spot.id) && spot.id !== id);
     if (next) setAddSpotId(next.id);
+    invalidateRoute();
+  }
+
+  function fillItineraryFromCollaboration(id: CollaborationId | "") {
+    setItineraryCollaborationId(id);
+    if (!id) return;
+
+    const collaboration = collaborationById(id);
+    if (!collaboration) return;
+    const knownSpotIds = new Set(spots.map((spot) => spot.id));
+    const collaborationSpotIds = Array.from(
+      new Set(
+        collaboration.locations
+          .map((location) => location.spotId)
+          .filter((spotId) => knownSpotIds.has(spotId)),
+      ),
+    ).slice(0, maximumItineraryStops);
+    if (collaborationSpotIds.length < 2) {
+      setRouteResult({
+        state: "error",
+        message: "このコラボはルート検索できる登録地点が不足しています。",
+      });
+      return;
+    }
+
+    setItineraryIds(collaborationSpotIds);
+    setSelectedId(collaborationSpotIds[0]);
+    setCollaborationFilter(id);
+    setAreaFilter("すべて");
+    setSpotQuery("");
+    const nextAvailable = spots.find((spot) => !collaborationSpotIds.includes(spot.id));
+    if (nextAvailable) setAddSpotId(nextAvailable.id);
     invalidateRoute();
   }
 
@@ -501,7 +535,7 @@ export function PilgrimageApp({
               </div>
               <button
                 type="button"
-                disabled={itineraryIds.includes(selectedSpot.id) || itineraryIds.length >= 10}
+                disabled={itineraryIds.includes(selectedSpot.id) || itineraryIds.length >= maximumItineraryStops}
                 onClick={() => {
                   addSpot(selectedSpot.id);
                   document
@@ -524,6 +558,38 @@ export function PilgrimageApp({
               <span className="route-badge">
                 Google Maps{routeServiceUrl ? " · SERVER" : ""}
               </span>
+            </div>
+
+            <div className="collaboration-route-fill">
+              <label>
+                <span>コラボから自動入力</span>
+                <select
+                  value={itineraryCollaborationId}
+                  onChange={(event) =>
+                    fillItineraryFromCollaboration(event.target.value as CollaborationId | "")
+                  }
+                >
+                  <option value="">コラボを選択してください</option>
+                  {collaborations.map((collaboration) => (
+                    <option key={collaboration.id} value={collaboration.id}>
+                      {collaboration.name}（{collaboration.locations.length}か所）
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {itineraryCollaborationId ? (
+                <p>
+                  <strong>{collaborationById(itineraryCollaborationId)?.name}</strong>の登録地点を予定へ自動入力しました。
+                  順番・滞在時間・不要な地点は下で調整できます。
+                </p>
+              ) : (
+                <p>選択すると対象地点をまとめて補完します。この操作だけではAPIを使用しません。</p>
+              )}
+              {itineraryIds.length >= 13 && itineraryCollaborationId ? (
+                <small>
+                  13地点以上の一括ルートは、Google Mapsで通常より高い料金区分になる場合があります。
+                </small>
+              ) : null}
             </div>
 
             <div className="journey-start">
@@ -577,7 +643,7 @@ export function PilgrimageApp({
             <div className="itinerary-editor">
               <div className="itinerary-editor__heading">
                 <strong>訪問するスポット</strong>
-                <span>{itineraryIds.length} / 10</span>
+                <span>{itineraryIds.length} / {maximumItineraryStops}</span>
               </div>
               <ol>
                 {itinerarySpots.map((spot, index) => (
@@ -612,7 +678,7 @@ export function PilgrimageApp({
                 <select
                   value={availableSpots.some((spot) => spot.id === addSpotId) ? addSpotId : availableSpots[0]?.id ?? ""}
                   onChange={(event) => setAddSpotId(event.target.value)}
-                  disabled={!availableSpots.length || itineraryIds.length >= 10}
+                  disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}
                   aria-label="追加するスポット"
                 >
                   {areas.map((area) => {
@@ -624,7 +690,7 @@ export function PilgrimageApp({
                     ) : null;
                   })}
                 </select>
-                <button type="button" onClick={() => addSpot()} disabled={!availableSpots.length || itineraryIds.length >= 10}>追加</button>
+                <button type="button" onClick={() => addSpot()} disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}>追加</button>
               </div>
             </div>
 
@@ -817,6 +883,18 @@ export function PilgrimageApp({
                 <div className="collaboration-card__actions">
                   <button
                     type="button"
+                    onClick={() => {
+                      fillItineraryFromCollaboration(collaboration.id);
+                      document
+                        .querySelector(".route-planner")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                  >
+                    このコラボで予定を作る <span aria-hidden="true">→</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="is-secondary"
                     onClick={() => {
                       setCollaborationFilter(collaboration.id);
                       setAreaFilter("すべて");

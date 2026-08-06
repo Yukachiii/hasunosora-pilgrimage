@@ -163,7 +163,7 @@ test("server route planner validates requests before using Google Routes", async
     }),
   }));
   assert.equal(response.status, 400);
-  assert.match((await response.json()).error, /2～10か所/);
+  assert.match((await response.json()).error, /2～27か所/);
 
   const [routeApi, map, page, pagesMain, workflow, usageStore] = await Promise.all([
     readFile(new URL("../app/api/routes/plan/route.ts", import.meta.url), "utf8"),
@@ -178,6 +178,7 @@ test("server route planner validates requests before using Google Routes", async
   assert.match(routeApi, /requestsPerWindow = 10/);
   assert.match(routeApi, /inFlightPlans/);
   assert.match(routeApi, /departureTime: cursor\.toISOString\(\)/);
+  assert.match(routeApi, /maximumItineraryStops/);
   assert.match(routeApi, /recordRouteApiUsage/);
   assert.match(usageStore, /INSERT INTO route_api_usage/);
   assert.doesNotMatch(usageStore, /connecting-ip|x-forwarded-for|spotIds|sourceStationId/);
@@ -185,6 +186,84 @@ test("server route planner validates requests before using Google Routes", async
   assert.match(page, /routeServiceUrl="\/api\/routes\/plan"/);
   assert.match(pagesMain, /VITE_ROUTE_API_URL/);
   assert.match(workflow, /ROUTE_API_URL/);
+});
+
+test("collaboration locations can fill a route plan without an API request", async () => {
+  const [app, planner, collaborations] = await Promise.all([
+    readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
+    readFile(new URL("../content/collaborations.json", import.meta.url), "utf8").then(JSON.parse),
+  ]);
+
+  assert.match(app, /コラボから自動入力/);
+  assert.match(app, /fillItineraryFromCollaboration/);
+  assert.match(app, /このコラボで予定を作る/);
+  assert.match(app, /この操作だけではAPIを使用しません/);
+  assert.match(app, /通常より高い料金区分/);
+  assert.match(planner, /maximumItineraryStops = 27/);
+  assert.equal(
+    collaborations.find((item) => item.id === "ishikawa-dai-kanko-2").locations.length,
+    13,
+  );
+  assert.equal(
+    collaborations.find((item) => item.id === "kaga-onsen-2026").locations.length,
+    9,
+  );
+});
+
+test("the 13-location Ishikawa collaboration fits in one non-transit route request", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GOOGLE_ROUTES_SERVER_API_KEY;
+  const collaborations = JSON.parse(
+    await readFile(new URL("../content/collaborations.json", import.meta.url), "utf8"),
+  );
+  const collaboration = collaborations.find((item) => item.id === "ishikawa-dai-kanko-2");
+  const stopIds = collaboration.locations.map((location) => location.spotId);
+  const googleRequests = [];
+  process.env.GOOGLE_ROUTES_SERVER_API_KEY = "test-only";
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (!url.startsWith("https://routes.googleapis.com/")) {
+      return originalFetch(input, init);
+    }
+    googleRequests.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({
+      routes: [{
+        distanceMeters: 125000,
+        duration: "14400s",
+        legs: Array.from({ length: stopIds.length - 1 }, () => ({ duration: "1200s" })),
+        optimizedIntermediateWaypointIndex: Array.from(
+          { length: stopIds.length - 2 },
+          (_, index) => index,
+        ),
+        polyline: { encodedPolyline: "_p~iF~ps|U" },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  try {
+    const response = await requestApp(new Request("http://localhost/api/routes/plan", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        stopIds,
+        travelMode: "DRIVING",
+        optimizeWaypointOrder: true,
+        stayMinutes: Object.fromEntries(stopIds.map((id) => [id, 30])),
+        departureTime: new Date(Date.now() + 86_400_000).toISOString(),
+      }),
+    }));
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.orderedStopIds.length, 13);
+    assert.equal(result.apiRequestCount, 1);
+    assert.equal(googleRequests.length, 1);
+    assert.equal(googleRequests[0].intermediates.length, 11);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GOOGLE_ROUTES_SERVER_API_KEY;
+    else process.env.GOOGLE_ROUTES_SERVER_API_KEY = originalKey;
+  }
 });
 
 test("Routes API usage is private and available in the admin dashboard", async () => {

@@ -1,4 +1,9 @@
-import { majorStations, type RouteLocation, type TravelMode } from "@/app/route-planner";
+import {
+  majorStations,
+  maximumItineraryStops,
+  type RouteLocation,
+  type TravelMode,
+} from "@/app/route-planner";
 import type {
   ServerRoutePlanRequest,
   ServerRoutePlanResponse,
@@ -18,7 +23,7 @@ const fieldMask = [
 ].join(",");
 const allowedModes = new Set<TravelMode>(["WALKING", "DRIVING", "TRANSIT", "BICYCLING"]);
 const maximumRequestBytes = 16 * 1024;
-const maximumStops = 10;
+const maximumStops = maximumItineraryStops;
 const requestWindowMs = 60_000;
 const requestsPerWindow = 10;
 const inFlightPlans = new Map<string, Promise<ServerRoutePlanResponse>>();
@@ -238,7 +243,7 @@ async function buildRoutePlan(
   onGoogleRequest: () => void,
 ) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 18_000);
+  const timeout = setTimeout(() => controller.abort(), 45_000);
   const routes: GoogleRoute[] = [];
   let apiRequestCount = 0;
   let cursor = new Date(plan.departureTime);
