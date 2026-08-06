@@ -1743,6 +1743,13 @@ button {
   letter-spacing: 0.02em;
 }
 
+.spot-card__collaborations .spot-card__panel-members {
+  padding-top: 5px;
+  border-top: 1px solid rgba(158, 142, 182, 0.22);
+  color: #675474;
+  font-size: 8px;
+}
+
 .spot-card.has-image .spot-card__collaborations > span {
   border-color: rgba(255, 255, 255, 0.28);
   background: rgba(25, 25, 42, 0.35);
@@ -1862,6 +1869,60 @@ button {
   background: #f7f5f1;
 }
 
+.card-model-filter {
+  display: flex;
+  gap: 20px;
+  margin: -52px 0 38px auto;
+  align-items: end;
+  justify-content: flex-end;
+}
+
+.card-model-filter label {
+  display: grid;
+  width: min(310px, 100%);
+  gap: 7px;
+}
+
+.card-model-filter label > span {
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.card-model-filter select {
+  min-height: 44px;
+  padding: 0 40px 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.card-model-filter select:focus {
+  border-color: var(--ice-deep);
+  box-shadow: 0 0 0 3px rgba(125, 185, 196, 0.15);
+  outline: none;
+}
+
+.card-model-filter > p {
+  min-width: 112px;
+  margin: 0;
+  padding-bottom: 12px;
+  color: var(--ink-soft);
+  font-family: Georgia, serif;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-align: right;
+}
+
+.card-model-filter > p strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
 .card-model-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1911,10 +1972,27 @@ button {
 }
 
 .card-model h3,
+.card-model__characters,
 .card-model strong,
 .card-model p,
 .card-model__note {
   grid-column: 1 / -1;
+}
+
+.card-model__characters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.card-model__characters span {
+  padding: 4px 8px;
+  border: 1px solid rgba(75, 151, 166, 0.24);
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.08);
+  color: #3e7e8c;
+  font-size: 8px;
+  font-weight: 700;
 }
 
 .card-model h3 {
@@ -2471,6 +2549,17 @@ footer > span {
 
   .card-model-grid {
     grid-template-columns: 1fr;
+  }
+
+  .card-model-filter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin: 0 0 28px;
+    align-items: end;
+  }
+
+  .card-model-filter label {
+    width: 100%;
   }
 
   .spot-filters {

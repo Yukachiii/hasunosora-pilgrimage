@@ -45,7 +45,9 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);
-  assert.match(html, /カードに描かれた、31の景色/);
+  assert.match(html, /カードに描かれた、.*31.*の景色/);
+  assert.match(html, /すべてのキャラクター/);
+  assert.match(html, /等身パネル：.*百生吟子、安養寺姫芽/);
   assert.match(html, /蓮ノ空歌留多/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
@@ -77,7 +79,15 @@ test("publishes the complete reviewed location lists", async () => {
   assert.equal(cardModels.length, 31);
   assert.equal(cardModels.filter((card) => card.spotId).length, 20);
   assert.equal(cardModels.filter((card) => !card.spotId).length, 11);
+  assert.ok(cardModels.every((card) => /］.+/.test(card.card)));
   assert.equal(collaborations.length, 2);
+  const fifthCollaboration = collaborations.find((item) => item.id === "ishikawa-dai-kanko-2");
+  assert.equal(fifthCollaboration.locations.filter((location) => location.members?.length).length, 12);
+  assert.ok(
+    fifthCollaboration.locations
+      .filter((location) => location.members)
+      .every((location) => location.role.includes("等身パネル設置")),
+  );
   assert.equal(spots.filter((spot) => spot.collaborationIds?.length).length, 21);
   assert.ok(
     collaborations.every((collaboration) =>
@@ -129,6 +139,7 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(app, /訪問するスポット/);
   assert.match(app, /推奨順/);
   assert.match(app, /このボタンを押したときだけ検索/);
+  assert.match(app, /cardCharacterFilter/);
   assert.match(planner, /東京駅/);
   assert.match(planner, /大阪駅/);
   assert.match(planner, /recommendedStayMinutes/);

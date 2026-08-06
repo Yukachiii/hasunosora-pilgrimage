@@ -19,10 +19,12 @@ import {
   type TravelMode,
 } from "./route-planner";
 import {
+  cardCharacters,
   cardModels,
   collaborationById,
   collaborations,
   type CollaborationId,
+  type CardCharacter,
   type PilgrimageCollaboration,
   type PilgrimageSpot,
 } from "./spots";
@@ -82,8 +84,8 @@ function collaborationsForSpot(spot: PilgrimageSpot) {
   return (spot.collaborationIds ?? []).flatMap((id) => {
     const collaboration = collaborationById(id);
     if (!collaboration) return [];
-    const role = collaboration.locations.find((location) => location.spotId === spot.id)?.role;
-    return [{ collaboration, role }];
+    const location = collaboration.locations.find((item) => item.spotId === spot.id);
+    return [{ collaboration, role: location?.role, members: location?.members }];
   });
 }
 
@@ -120,6 +122,7 @@ export function PilgrimageApp({
   const [spotQuery, setSpotQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("すべて");
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
+  const [cardCharacterFilter, setCardCharacterFilter] = useState<CardCharacter | "すべて">("すべて");
 
   useEffect(() => {
     let wasAccepted = false;
@@ -174,14 +177,21 @@ export function PilgrimageApp({
         ...(spot.activityRecords ?? []),
         ...(spot.sehasEpisodes ?? []),
         ...(spot.appearances ?? []),
-        ...collaborationsForSpot(spot).flatMap(({ collaboration, role }) => [
+        ...collaborationsForSpot(spot).flatMap(({ collaboration, role, members }) => [
           collaboration.name,
           collaboration.subtitle,
           role ?? "",
+          ...(members ?? []),
         ]),
       ].some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
     });
   }, [areaFilter, collaborationFilter, spotQuery, spots]);
+  const filteredCardModels = useMemo(
+    () => cardModels.filter((card) =>
+      cardCharacterFilter === "すべて" || card.characters.includes(cardCharacterFilter),
+    ),
+    [cardCharacterFilter],
+  );
 
   const spotById = (id: string) => spots.find((spot) => spot.id === id);
   const selectedSpot = spotById(selectedId) ?? spots[0];
@@ -895,11 +905,16 @@ export function PilgrimageApp({
                 </div>
                 {spotCollaborations.length ? (
                   <div className="spot-card__collaborations">
-                    {spotCollaborations.map(({ collaboration, role }) => (
+                    {spotCollaborations.map(({ collaboration, role, members }) => (
                       <span key={collaboration.id}>
                         <b>コラボ</b>
                         {collaboration.name}
                         {role ? <small>{role}</small> : null}
+                        {members?.length ? (
+                          <small className="spot-card__panel-members">
+                            等身パネル：{members.join("、")}
+                          </small>
+                        ) : null}
                       </span>
                     ))}
                   </div>
@@ -950,15 +965,32 @@ export function PilgrimageApp({
         <div className="section-heading">
           <div>
             <p className="section-number">04 — CARD MODEL LOCATIONS</p>
-            <h2>カードに描かれた、31の景色</h2>
+            <h2>カードに描かれた、{cardModels.length}の景色</h2>
           </div>
           <p>
             現実の地点まで特定できたカードイラストを整理しています。
             B判定は公式明記を確認できていない候補地です。
           </p>
         </div>
+        <div className="card-model-filter" aria-label="カードイラストのキャラクター絞り込み">
+          <label>
+            <span>キャラクター</span>
+            <select
+              value={cardCharacterFilter}
+              onChange={(event) => setCardCharacterFilter(event.target.value as CardCharacter | "すべて")}
+            >
+              <option value="すべて">すべてのキャラクター</option>
+              {cardCharacters.map((character) => (
+                <option value={character} key={character}>{character}</option>
+              ))}
+            </select>
+          </label>
+          <p><strong>{filteredCardModels.length}</strong> / {cardModels.length} CARDS</p>
+        </div>
         <div className="card-model-grid">
-          {cardModels.map((card, index) => (
+          {filteredCardModels.map((card) => {
+            const index = cardModels.findIndex((item) => item.id === card.id);
+            return (
             <article className="card-model" key={card.id}>
               <div className="card-model__topline">
                 <span>C{String(index + 1).padStart(2, "0")}</span>
@@ -967,6 +999,9 @@ export function PilgrimageApp({
                 </small>
               </div>
               <h3>{card.card}</h3>
+              <div className="card-model__characters" aria-label="登場キャラクター">
+                {card.characters.map((character) => <span key={character}>{character}</span>)}
+              </div>
               <strong>{card.model}</strong>
               <p>{card.address}</p>
               {card.note && <small className="card-model__note">{card.note}</small>}
@@ -986,7 +1021,7 @@ export function PilgrimageApp({
                 </a>
               )}
             </article>
-          ))}
+          )})}
         </div>
       </section>
 
