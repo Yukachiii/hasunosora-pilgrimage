@@ -3372,6 +3372,71 @@ footer > span {
   line-height: 1.9;
 }
 
+.admin-lan-access {
+  display: grid;
+  max-width: 760px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px 20px;
+  margin-top: 28px;
+  padding: 18px 20px;
+  border: 1px solid rgba(125, 185, 196, 0.42);
+  border-radius: 8px;
+  background: rgba(210, 235, 239, 0.2);
+}
+
+.admin-lan-access > div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-lan-access small {
+  color: var(--ice-deep);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.admin-lan-access strong {
+  font-size: 12px;
+}
+
+.admin-lan-access a,
+.admin-lan-access > div > span {
+  overflow-wrap: anywhere;
+  color: var(--ice-deep);
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-lan-access > button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--ink);
+  border-radius: 5px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-lan-access > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 8px;
+  line-height: 1.7;
+}
+
+.admin-lan-access > p b {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--ice-deep);
+}
+
 .admin-tabs {
   display: flex;
   width: min(100% - 48px, 1180px);
@@ -4230,6 +4295,19 @@ footer > span {
 
   .admin-intro h1 {
     font-size: 38px;
+  }
+
+  .admin-lan-access {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .admin-lan-access > button {
+    width: 100%;
+  }
+
+  .admin-lan-access > p {
+    grid-column: auto;
   }
 
   .admin-tabs button {

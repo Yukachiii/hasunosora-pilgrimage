@@ -3,10 +3,18 @@ param(
     [string]$Mode = "admin"
 )
 
+$BindHost = "0.0.0.0"
 $HostName = "127.0.0.1"
 $Port = 8765
 $AdminUrl = "http://${HostName}:${Port}/admin/"
 $OpenBrowser = $Mode -ne "no-open"
+
+$LanAddress = Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+    Where-Object { $_.NetAdapter.Status -eq "Up" -and $_.IPv4DefaultGateway } |
+    ForEach-Object { $_.IPv4Address.IPAddress } |
+    Where-Object { $_ -match '^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)' } |
+    Select-Object -First 1
+$LanUrl = if ($LanAddress) { "http://${LanAddress}:${Port}/admin/" } else { $null }
 
 Set-Location -LiteralPath $PSScriptRoot
 $Host.UI.RawUI.WindowTitle = "Hasunosora Pilgrimage Local Admin"
@@ -45,7 +53,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Admin page: $AdminUrl"
+Write-Host "Admin page (PC): $AdminUrl"
+if ($LanUrl) {
+    Write-Host "Admin page (same Wi-Fi): $LanUrl" -ForegroundColor Cyan
+    Write-Host "Use only on a trusted private Wi-Fi network."
+}
 Write-Host "Press Ctrl+C or close this window to stop the server."
 Write-Host ""
 
@@ -58,7 +70,7 @@ if ($OpenBrowser) {
     )
 }
 
-& node.exe "server.mjs" "--bind" $HostName "--port" $Port
+& node.exe "server.mjs" "--bind" $BindHost "--port" $Port
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
     Write-Host "Failed to start the local admin server." -ForegroundColor Red

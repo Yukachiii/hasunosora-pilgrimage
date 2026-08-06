@@ -8,6 +8,7 @@ type AdminState = {
   spots: PilgrimageSpot[];
   assets: AdminAsset[];
   writeToken: string;
+  lanUrl: string;
 };
 
 function LocalAdminRoot() {
@@ -63,6 +64,7 @@ function LocalAdminRoot() {
       initialAssets={state.assets}
       localMode
       localToken={state.writeToken}
+      localNetworkUrl={state.lanUrl}
     />
   );
 }

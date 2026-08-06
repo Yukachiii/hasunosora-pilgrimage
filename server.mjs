@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile, rename, rm, mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { networkInterfaces } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -84,8 +85,34 @@ function isLoopback(value = "") {
   return normalized === "127.0.0.1" || normalized === "::1" || normalized === "localhost";
 }
 
+function isPrivateIpv4(value = "") {
+  const normalized = value.replace(/^::ffff:/, "");
+  const parts = normalized.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  return parts[0] === 10 ||
+    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+    (parts[0] === 192 && parts[1] === 168);
+}
+
+function isTrustedLanAddress(value = "") {
+  return isLoopback(value) || isPrivateIpv4(value);
+}
+
+function findLanAddress() {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === "IPv4" && !address.internal && isPrivateIpv4(address.address)) {
+        return address.address;
+      }
+    }
+  }
+  return "";
+}
+
 function isLocalRequest(request) {
-  if (!isLoopback(request.socket.remoteAddress)) return false;
+  if (!isTrustedLanAddress(request.socket.remoteAddress)) return false;
   const host = String(request.headers.host ?? "");
   let hostname = "";
   try {
@@ -93,12 +120,12 @@ function isLocalRequest(request) {
   } catch {
     return false;
   }
-  if (!isLoopback(hostname)) return false;
+  if (!isTrustedLanAddress(hostname)) return false;
   const origin = String(request.headers.origin ?? "");
   if (!origin) return true;
   try {
     const parsed = new URL(origin);
-    return parsed.protocol === "http:" && isLoopback(parsed.hostname);
+    return parsed.protocol === "http:" && parsed.host === host && isTrustedLanAddress(parsed.hostname);
   } catch {
     return false;
   }
@@ -548,7 +575,7 @@ async function deleteMedia(assetId) {
 
 function requireLocal(request, response) {
   if (isLocalRequest(request)) return true;
-  sendJson(response, { error: "ローカル端末からのみ利用できます。" }, 403);
+  sendJson(response, { error: "この管理画面はPC本体または同じプライベートネットワークからのみ利用できます。" }, 403);
   return false;
 }
 
@@ -621,7 +648,12 @@ async function requestHandler(request, response, initialSpots) {
             readJson(spotsPath, []),
             readJson(mediaPath, []),
           ]);
-          sendJson(response, { spots, assets: media.map(serializeAsset), writeToken });
+          sendJson(response, {
+            spots,
+            assets: media.map(serializeAsset),
+            writeToken,
+            lanUrl: lanAdminUrl,
+          });
           return;
         }
         if (pathname === "/api/admin/publish-status") {
@@ -729,12 +761,17 @@ function parseArguments() {
 }
 
 const options = parseArguments();
-if (!isLoopback(options.bind)) throw new Error("管理サーバーはlocalhost以外へ公開できません。");
+if (!isLoopback(options.bind) && options.bind !== "0.0.0.0") {
+  throw new Error("管理サーバーの待受アドレスが正しくありません。");
+}
+const lanAddress = findLanAddress();
+const lanAdminUrl = lanAddress ? `http://${lanAddress}:${options.port}/admin/` : "";
 const initialSpots = await readJson(spotsPath, []);
 await readFile(path.join(adminDirectory, "index.html"));
 const server = createServer((request, response) => {
   void requestHandler(request, response, initialSpots);
 });
 server.listen(options.port, options.bind, () => {
-  console.log(`Hasunosora Admin: http://${options.bind}:${options.port}/admin/`);
+  console.log(`Hasunosora Admin (PC): http://127.0.0.1:${options.port}/admin/`);
+  if (lanAdminUrl) console.log(`Hasunosora Admin (same Wi-Fi): ${lanAdminUrl}`);
 });

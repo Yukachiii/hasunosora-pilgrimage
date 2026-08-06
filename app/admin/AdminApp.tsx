@@ -31,6 +31,7 @@ type Props = {
   initialAssets: AdminAsset[];
   localMode?: boolean;
   localToken?: string;
+  localNetworkUrl?: string;
 };
 
 type PublishStatus = {
@@ -245,6 +246,7 @@ export function AdminApp({
   initialAssets,
   localMode = false,
   localToken = "",
+  localNetworkUrl = "",
 }: Props) {
   const [tab, setTab] = useState<"photos" | "spots" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
@@ -255,6 +257,7 @@ export function AdminApp({
   const [publishMessage, setPublishMessage] = useState("");
   const [shuttingDown, setShuttingDown] = useState(false);
   const [serverStopped, setServerStopped] = useState(false);
+  const [networkCopyMessage, setNetworkCopyMessage] = useState("");
 
   useEffect(() => {
     if (!localMode) return;
@@ -319,6 +322,16 @@ export function AdminApp({
     }
   }
 
+  async function copyNetworkUrl() {
+    if (!localNetworkUrl) return;
+    try {
+      await navigator.clipboard.writeText(localNetworkUrl);
+      setNetworkCopyMessage("コピーしました");
+    } catch {
+      setNetworkCopyMessage("URLを長押ししてコピーしてください");
+    }
+  }
+
   return (
     <main className="admin-shell">
       <header className="admin-header">
@@ -379,6 +392,26 @@ export function AdminApp({
             ? "変更はこのPC内の公開用ファイルへ保存されます。GitHub Pagesへ反映するまでは外部公開されません。"
             : "元写真は非公開で保管し、公開用画像からはEXIFを除去して透かしを入れます。スポット名などの修正は公開画面へすぐ反映されます。"}
         </p>
+        {localMode ? (
+          <div className="admin-lan-access">
+            <div>
+              <small>SAME WI-FI ACCESS</small>
+              <strong>スマホから管理画面を開く</strong>
+              {localNetworkUrl ? (
+                <a href={localNetworkUrl}>{localNetworkUrl}</a>
+              ) : (
+                <span>接続用のローカルIPを取得できませんでした。</span>
+              )}
+            </div>
+            {localNetworkUrl ? (
+              <button type="button" onClick={copyNetworkUrl}>URLをコピー</button>
+            ) : null}
+            <p>
+              PCとスマホを同じ信頼できるWi-Fiへ接続してください。作業後はサーバーを終了してください。
+              {networkCopyMessage ? <b>{networkCopyMessage}</b> : null}
+            </p>
+          </div>
+        ) : null}
         {localMode && publishMessage && <p className="admin-message" role="status">{publishMessage}</p>}
         {localMode && publishStatus?.error && <p className="admin-message" role="status">{publishStatus.error}</p>}
       </section>

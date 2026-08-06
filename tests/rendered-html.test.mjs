@@ -384,10 +384,15 @@ test("local admin writes publishable files before an explicit GitHub push", asyn
   assert.match(adminApp, /スポットを編集/);
   assert.match(localMain, /localMode/);
   assert.match(localServer, /127\.0\.0\.1/);
+  assert.match(localServer, /isPrivateIpv4/);
+  assert.match(localServer, /lanAdminUrl/);
+  assert.match(localMain, /localNetworkUrl/);
+  assert.match(adminApp, /スマホから管理画面を開く/);
   assert.match(localServer, /writeJsonIfChanged/);
   assert.match(localServer, /writeToken/);
   assert.match(localServer, /"add", "--", "content", "public\/photos"/);
   assert.match(startScript, /build:admin/);
+  assert.match(startScript, /\$BindHost = "0\.0\.0\.0"/);
   assert.match(pagesMain, /content\/site\.json/);
   assert.match(pagesMain, /import\.meta\.glob/);
 });
