@@ -43,10 +43,7 @@ async function secretDigest(value: string) {
 
 export async function hasRouteUsageAdminToken(request: Request) {
   const expected = process.env.ROUTE_USAGE_ADMIN_TOKEN?.trim() ?? "";
-  const authorization = request.headers.get("authorization") ?? "";
-  const supplied = authorization.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length).trim()
-    : "";
+  const supplied = request.headers.get("x-route-usage-admin-token")?.trim() ?? "";
   if (!expected || !supplied) return false;
 
   const [expectedDigest, suppliedDigest] = await Promise.all([

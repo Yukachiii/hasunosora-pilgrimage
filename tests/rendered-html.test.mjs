@@ -286,7 +286,7 @@ test("Routes API usage is private and available in the admin dashboard", async (
   assert.match(migration, /CREATE TABLE `route_api_usage`/);
   assert.match(migration, /route_api_usage_month_mode_idx/);
   assert.match(localServer, /ROUTE_USAGE_ADMIN_TOKEN/);
-  assert.match(localServer, /authorization: `Bearer \$\{token\}`/);
+  assert.match(localServer, /"x-route-usage-admin-token": token/);
 });
 
 test("server route planner optimizes stops and applies dwell time to transit departures", async () => {

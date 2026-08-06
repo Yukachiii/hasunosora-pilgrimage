@@ -548,7 +548,7 @@ async function proxyRouteUsage(response) {
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const upstream = await fetch(parsed, {
-      headers: { authorization: `Bearer ${token}` },
+      headers: { "x-route-usage-admin-token": token },
       signal: controller.signal,
     });
     const result = await upstream.json().catch(() => ({}));
