@@ -137,6 +137,15 @@ function coordinate(value, label, minimum, maximum) {
   return number;
 }
 
+function optionalStayMinutes(value, current) {
+  if (value === undefined || value === null || value === "") return current;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0 || number > 480) {
+    throw new AdminError("推奨滞在時間は0～480分で入力してください。");
+  }
+  return number;
+}
+
 function officialUrl(value) {
   const text = requiredText(value, "参照URL", 500);
   let parsed;
@@ -183,6 +192,10 @@ function validateSpot(value, spotId, current) {
     lat: coordinate(value.lat, "緯度", -90, 90),
     lng: coordinate(value.lng, "経度", -180, 180),
     description: requiredText(value.description, "説明", 500),
+    recommendedStayMinutes: optionalStayMinutes(
+      value.recommendedStayMinutes,
+      current.recommendedStayMinutes,
+    ),
     activityRecords,
     sehasEpisodes,
     accessNote: requiredText(value.accessNote, "アクセス案内", 160),

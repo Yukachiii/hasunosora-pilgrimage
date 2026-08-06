@@ -21,6 +21,15 @@ function coordinate(value: unknown, label: string, min: number, max: number) {
   return number;
 }
 
+function optionalStayMinutes(value: unknown, current?: number) {
+  if (value === undefined || value === null || value === "") return current;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0 || number > 480) {
+    throw new Error("推奨滞在時間は0～480分で入力してください。");
+  }
+  return number;
+}
+
 function officialUrl(value: unknown) {
   const text = requiredText(value, "公式URL", 500);
   const url = new URL(text);
@@ -61,6 +70,10 @@ export async function PUT(
       lat: coordinate(payload.lat, "緯度", -90, 90),
       lng: coordinate(payload.lng, "経度", -180, 180),
       description: requiredText(payload.description, "説明", 500),
+      recommendedStayMinutes: optionalStayMinutes(
+        payload.recommendedStayMinutes,
+        base.recommendedStayMinutes,
+      ),
       accessNote: requiredText(payload.accessNote, "アクセス案内", 160),
       sourceUrl: officialUrl(payload.sourceUrl),
     };

@@ -706,15 +706,22 @@ button {
   box-shadow: 0 0 0 3px rgba(199, 169, 107, 0.18);
 }
 
-.open-maps-link {
+.open-maps-links {
   position: absolute;
   z-index: 4;
   right: 18px;
   bottom: 18px;
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.open-maps-links a {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 10px 13px;
   border-radius: 3px;
   background: var(--ink);
   color: white;
@@ -780,6 +787,12 @@ button {
   font-weight: 700;
 }
 
+.selected-spot-bar button:disabled {
+  color: var(--ink-soft);
+  cursor: default;
+  opacity: 0.65;
+}
+
 .route-planner {
   align-self: stretch;
   padding: 28px;
@@ -820,6 +833,164 @@ button {
   font-size: 8px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.journey-start {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fafaf7;
+}
+
+.journey-start > label,
+.journey-start > div > label {
+  display: grid;
+  gap: 6px;
+}
+
+.journey-start > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.journey-start span,
+.itinerary-editor__heading,
+.itinerary-editor li label {
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.journey-start select,
+.journey-start input,
+.itinerary-add select {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  outline: none;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
+
+.itinerary-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.itinerary-editor__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.itinerary-editor__heading strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.itinerary-editor ol,
+.day-schedule ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itinerary-editor li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fafaf7;
+}
+
+.itinerary-editor li > div:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.itinerary-editor li > div > strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itinerary-editor li label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.itinerary-editor li input {
+  width: 56px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+}
+
+.itinerary-actions {
+  display: flex;
+  gap: 3px;
+}
+
+.itinerary-actions button {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.itinerary-actions button:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.itinerary-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.itinerary-add button {
+  padding: 0 13px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--ice-deep);
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.itinerary-add button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .route-fields {
@@ -960,6 +1131,43 @@ button {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.route-optimize {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(125, 185, 196, 0.36);
+  border-radius: 5px;
+  background: rgba(125, 185, 196, 0.08);
+  cursor: pointer;
+}
+
+.route-optimize.is-disabled {
+  cursor: default;
+  opacity: 0.66;
+}
+
+.route-optimize input {
+  margin-top: 3px;
+  accent-color: var(--ice-deep);
+}
+
+.route-optimize span {
+  display: grid;
+  gap: 3px;
+}
+
+.route-optimize strong {
+  font-size: 10px;
+}
+
+.route-optimize small {
+  color: var(--ink-soft);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
 .route-search-button {
   display: flex;
   width: 100%;
@@ -974,6 +1182,18 @@ button {
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
+}
+
+.route-search-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.route-api-note {
+  margin: 8px 2px 0;
+  color: var(--ink-soft);
+  font-size: 8px;
+  line-height: 1.6;
 }
 
 .route-result {
@@ -1037,6 +1257,120 @@ button {
 .result-metrics strong {
   font-family: Georgia, serif;
   font-size: 16px;
+}
+
+.day-schedule {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+}
+
+.day-schedule__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  background: var(--ink);
+  color: white;
+}
+
+.day-schedule__heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.day-schedule__heading small {
+  color: var(--ice);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.day-schedule__heading strong {
+  font-family: Georgia, serif;
+  font-size: 13px;
+}
+
+.day-schedule__heading > span {
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.access-schedule,
+.day-schedule li {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.access-schedule {
+  border-bottom: 1px dashed var(--line);
+  background: rgba(125, 185, 196, 0.09);
+}
+
+.access-schedule time,
+.day-schedule li time {
+  color: var(--ice-deep);
+  font-family: Georgia, serif;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.access-schedule p {
+  margin: 0;
+  color: var(--ink);
+}
+
+.access-schedule small {
+  grid-column: 2;
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.day-schedule ol {
+  gap: 0;
+}
+
+.day-schedule li {
+  position: relative;
+  border-bottom: 1px solid #edf0ec;
+}
+
+.day-schedule li > div {
+  display: grid;
+  gap: 3px;
+}
+
+.day-schedule li strong {
+  font-size: 10px;
+}
+
+.day-schedule li small,
+.day-schedule li span {
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.day-schedule li span {
+  margin-top: 4px;
+  color: var(--lavender-deep);
+}
+
+.day-schedule > p {
+  margin: 0;
+  padding: 11px 14px;
+  background: #f8faf8;
+  color: var(--ink-soft);
+  font-size: 9px;
+  text-align: right;
+}
+
+.day-schedule > p strong {
+  color: var(--ink);
 }
 
 .spots-section {
@@ -1516,14 +1850,7 @@ footer > span {
   }
 
   .route-planner {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 24px;
-  }
-
-  .route-planner__heading,
-  .route-result {
-    grid-column: 1 / -1;
+    display: block;
   }
 
   .spot-grid {
@@ -1672,9 +1999,27 @@ footer > span {
     font-size: 9px;
   }
 
+  .open-maps-links {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .open-maps-links a {
+    padding: 9px 10px;
+    font-size: 9px;
+  }
+
   .route-planner {
     display: block;
     padding: 22px 18px;
+  }
+
+  .itinerary-editor li {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .itinerary-actions {
+    grid-column: 2;
   }
 
   .travel-modes > div {

@@ -34,7 +34,7 @@ test("server-renders the pilgrimage MVP", async () => {
   const html = await response.text();
   assert.match(html, /蓮ノ旅/);
   assert.match(html, /好きな物語と/);
-  assert.match(html, /巡礼ルートを検索/);
+  assert.match(html, /一日の巡礼予定を作る/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);
@@ -98,6 +98,24 @@ test("Google Maps and Routes integration stays guarded", async () => {
   assert.match(map, /gm_authFailure/);
   assert.match(map, /importLibrary\("routes"\)/);
   assert.match(map, /computeRoutes/);
+  assert.match(map, /routeComputationCache/);
+  assert.match(map, /optimizeWaypointOrder/);
+});
+
+test("day planner supports multiple stops without a server dependency", async () => {
+  const [app, planner, map] = await Promise.all([
+    readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/GooglePilgrimageMap.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(app, /訪問するスポット/);
+  assert.match(app, /推奨順/);
+  assert.match(app, /このボタンを押したときだけ検索/);
+  assert.match(planner, /東京駅/);
+  assert.match(planner, /大阪駅/);
+  assert.match(planner, /recommendedStayMinutes/);
+  assert.match(map, /requestedRoute\.travelMode === "TRANSIT"/);
 });
 
 test("spot photos can be used as readable card backgrounds", async () => {

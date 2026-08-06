@@ -28,6 +28,7 @@ export type PilgrimageSpot = {
   sehasEpisodes?: string[];
   accessNote: string;
   sourceUrl: string;
+  recommendedStayMinutes?: number;
   appearances?: string[];
   imageUrl?: string;
   imagePosition?: string;

@@ -8,11 +8,16 @@ import {
 } from "react";
 import {
   GooglePilgrimageMap,
+  type RouteRequest,
   type RouteResult,
 } from "./GooglePilgrimageMap";
+import {
+  formatDuration,
+  majorStations,
+  recommendedStayMinutes,
+  type TravelMode,
+} from "./route-planner";
 import { cardModels, type PilgrimageSpot } from "./spots";
-
-type TravelMode = "WALKING" | "DRIVING" | "TRANSIT" | "BICYCLING";
 
 const travelModes: Array<{
   value: TravelMode;
@@ -24,6 +29,33 @@ const travelModes: Array<{
   { value: "TRANSIT", label: "公共交通", icon: "交" },
   { value: "BICYCLING", label: "自転車", icon: "自" },
 ];
+
+function japanDate(daysFromToday = 0) {
+  const date = new Date(Date.now() + daysFromToday * 86_400_000);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function departureIso(date: string, time: string) {
+  return new Date(`${date}T${time}:00+09:00`).toISOString();
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return (Number.isFinite(hours) ? hours : 9) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+}
+
+function displayClock(totalMinutes: number) {
+  const day = Math.floor(totalMinutes / 1440);
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${day > 0 ? `翌${day > 1 ? day : ""}日 ` : ""}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
 
 type Props = {
   googleMapsConfig: {
@@ -42,11 +74,17 @@ export function PilgrimageApp({
   heroImage,
 }: Props) {
   const [selectedId, setSelectedId] = useState(spots[0].id);
-  const [originId, setOriginId] = useState(spots[0].id);
-  const [destinationId, setDestinationId] = useState(spots[1].id);
+  const [itineraryIds, setItineraryIds] = useState(() => spots.slice(0, 2).map((spot) => spot.id));
+  const [addSpotId, setAddSpotId] = useState(spots[2]?.id ?? spots[0].id);
+  const [stayMinutes, setStayMinutes] = useState<Record<string, number>>(() =>
+    Object.fromEntries(spots.map((spot) => [spot.id, recommendedStayMinutes(spot)])),
+  );
   const [travelMode, setTravelMode] = useState<TravelMode>("WALKING");
-  const [routeRequestId, setRouteRequestId] = useState(0);
-  const [hasRequestedRoute, setHasRequestedRoute] = useState(false);
+  const [optimizeOrder, setOptimizeOrder] = useState(true);
+  const [sourceStationId, setSourceStationId] = useState("");
+  const [visitDate, setVisitDate] = useState(() => japanDate());
+  const [startTime, setStartTime] = useState("09:00");
+  const [routeRequest, setRouteRequest] = useState<RouteRequest | null>(null);
   const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
   const [spotQuery, setSpotQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("すべて");
@@ -74,50 +112,109 @@ export function PilgrimageApp({
 
   const spotById = (id: string) => spots.find((spot) => spot.id === id);
   const selectedSpot = spotById(selectedId) ?? spots[0];
-  const origin = spotById(originId) ?? spots[0];
-  const destination = spotById(destinationId) ?? spots[1];
-
-  const routeRequest = useMemo(
-    () =>
-      hasRequestedRoute
-        ? {
-            requestId: routeRequestId,
-            origin,
-            destination,
-            travelMode,
-          }
-        : null,
-    [
-      destination,
-      hasRequestedRoute,
-      origin,
-      routeRequestId,
-      travelMode,
-    ],
+  const itinerarySpots = useMemo(
+    () => itineraryIds.map((id) => spots.find((spot) => spot.id === id)).filter((spot): spot is PilgrimageSpot => Boolean(spot)),
+    [itineraryIds, spots],
   );
+  const availableSpots = spots.filter((spot) => !itineraryIds.includes(spot.id));
+  const stationRegions = Array.from(new Set(majorStations.map((station) => station.region)));
+
+  const plannedSpots = useMemo(() => {
+    if (routeResult.state !== "success" || !routeResult.orderedStopIds?.length || !routeRequest) {
+      return routeRequest?.stops ?? itinerarySpots;
+    }
+    const byId = new Map(routeRequest.stops.map((spot) => [spot.id, spot]));
+    return routeResult.orderedStopIds.map((id) => byId.get(id)).filter((spot): spot is PilgrimageSpot => Boolean(spot));
+  }, [itinerarySpots, routeRequest, routeResult]);
+
+  const schedule = useMemo(() => {
+    if (routeResult.state !== "success" || !routeRequest || !routeResult.legDurationMinutes) return null;
+    const start = timeToMinutes(startTime);
+    const accessDuration = routeResult.accessDurationMinutes ?? 0;
+    const calculated = plannedSpots.reduce<{
+      entries: Array<{ spot: PilgrimageSpot; arrival: number; departure: number; stay: number }>;
+      cursor: number;
+    }>((current, spot, index) => {
+      const arrival = current.cursor;
+      const stay = stayMinutes[spot.id] ?? recommendedStayMinutes(spot);
+      const departure = arrival + stay;
+      return {
+        entries: [...current.entries, { spot, arrival, departure, stay }],
+        cursor: departure + (routeResult.legDurationMinutes?.[index] ?? 0),
+      };
+    }, { entries: [], cursor: start + accessDuration });
+    const entries = calculated.entries;
+    return {
+      entries,
+      start,
+      finish: entries.at(-1)?.departure ?? start,
+      accessDuration,
+    };
+  }, [plannedSpots, routeRequest, routeResult, startTime, stayMinutes]);
+
+  function invalidateRoute() {
+    setRouteRequest(null);
+    setRouteResult({ state: "idle" });
+  }
 
   const handleRouteResult = useCallback((result: RouteResult) => {
     setRouteResult(result);
   }, []);
 
   function searchRoute() {
-    if (originId === destinationId) {
+    if (itinerarySpots.length < 2) {
       setRouteResult({
         state: "error",
-        message: "出発地と目的地には、別のスポットを選んでください。",
+        message: "予定には2か所以上のスポットを追加してください。",
       });
       return;
     }
-    setHasRequestedRoute(true);
-    setRouteRequestId((current) => current + 1);
-    setSelectedId(destinationId);
+    const accessOrigin = majorStations.find((station) => station.id === sourceStationId);
+    setRouteRequest({
+      requestId: Date.now(),
+      stops: itinerarySpots,
+      travelMode,
+      optimizeWaypointOrder: travelMode !== "TRANSIT" && optimizeOrder,
+      stayMinutes: { ...stayMinutes },
+      accessOrigin,
+      departureTime: departureIso(visitDate, startTime),
+    });
+    setSelectedId(itinerarySpots.at(-1)!.id);
   }
 
-  function swapRoute() {
-    setOriginId(destinationId);
-    setDestinationId(originId);
-    setRouteResult({ state: "idle" });
-    setHasRequestedRoute(false);
+  function addSpot(requestedId?: string) {
+    const id = requestedId ?? (
+      itineraryIds.includes(addSpotId)
+        ? spots.find((spot) => !itineraryIds.includes(spot.id))?.id
+        : addSpotId
+    );
+    if (!id || itineraryIds.includes(id) || itineraryIds.length >= 10) return;
+    setItineraryIds((current) => [...current, id]);
+    const next = spots.find((spot) => !itineraryIds.includes(spot.id) && spot.id !== id);
+    if (next) setAddSpotId(next.id);
+    invalidateRoute();
+  }
+
+  function removeSpot(index: number) {
+    if (itineraryIds.length <= 2) return;
+    setItineraryIds((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    invalidateRoute();
+  }
+
+  function moveSpot(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= itineraryIds.length) return;
+    setItineraryIds((current) => {
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+    invalidateRoute();
+  }
+
+  function changeStayMinutes(id: string, value: number) {
+    setStayMinutes((current) => ({ ...current, [id]: Math.max(0, Math.min(480, value || 0)) }));
+    if (travelMode === "TRANSIT" && routeRequest) invalidateRoute();
   }
 
   return (
@@ -224,7 +321,7 @@ export function PilgrimageApp({
           </div>
           <p>
             ピンまたは一覧からスポットを選択してください。
-            出発地と目的地を指定すると、移動ルートを確認できます。
+            行きたい場所を予定へ追加すると、訪問順と一日の時刻表を作れます。
           </p>
         </div>
 
@@ -253,81 +350,129 @@ export function PilgrimageApp({
               </div>
               <button
                 type="button"
+                disabled={itineraryIds.includes(selectedSpot.id) || itineraryIds.length >= 10}
                 onClick={() => {
-                  setDestinationId(selectedSpot.id);
+                  addSpot(selectedSpot.id);
                   document
                     .querySelector(".route-planner")
                     ?.scrollIntoView({ behavior: "smooth", block: "center" });
                 }}
               >
-                目的地にする
+                {itineraryIds.includes(selectedSpot.id) ? "予定に追加済み" : "予定に追加する"}
                 <span aria-hidden="true">→</span>
               </button>
             </div>
           </div>
 
-          <aside className="route-planner" aria-label="ルート検索">
+          <aside className="route-planner" aria-label="一日の予定作成">
             <div className="route-planner__heading">
               <div>
-                <p>ROUTE PLANNER</p>
-                <h3>巡礼ルートを検索</h3>
+                <p>DAY PLANNER</p>
+                <h3>一日の巡礼予定を作る</h3>
               </div>
               <span className="route-badge">Google Maps</span>
             </div>
 
-            <div className="route-fields">
+            <div className="journey-start">
               <label>
-                <span className="route-point route-point--start">S</span>
-                <span className="field-copy">
-                  <small>出発地</small>
-                  <select
-                    value={originId}
-                    onChange={(event) => {
-                      setOriginId(event.target.value);
-                      setHasRequestedRoute(false);
-                      setRouteResult({ state: "idle" });
-                    }}
-                  >
-                    {areas.map((area) => (
-                      <optgroup label={area} key={area}>
-                        {spots.filter((spot) => spot.area === area).map((spot) => (
-                          <option key={spot.id} value={spot.id}>{spot.shortName}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </span>
+                <span>出発駅（任意）</span>
+                <select
+                  value={sourceStationId}
+                  onChange={(event) => {
+                    setSourceStationId(event.target.value);
+                    invalidateRoute();
+                  }}
+                >
+                  <option value="">現地の最初のスポットから開始</option>
+                  {stationRegions.map((region) => (
+                    <optgroup label={region} key={region}>
+                      {majorStations.filter((station) => station.region === region).map((station) => (
+                        <option key={station.id} value={station.id}>{station.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </label>
-              <button
-                className="swap-button"
-                type="button"
-                onClick={swapRoute}
-                aria-label="出発地と目的地を入れ替える"
-              >
-                ⇅
-              </button>
-              <label>
-                <span className="route-point route-point--goal">G</span>
-                <span className="field-copy">
-                  <small>目的地</small>
-                  <select
-                    value={destinationId}
+              <div>
+                <label>
+                  <span>訪問日</span>
+                  <input
+                    type="date"
+                    min={japanDate()}
+                    max={japanDate(99)}
+                    value={visitDate}
                     onChange={(event) => {
-                      setDestinationId(event.target.value);
-                      setHasRequestedRoute(false);
-                      setRouteResult({ state: "idle" });
+                      setVisitDate(event.target.value);
+                      if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
                     }}
-                  >
-                    {areas.map((area) => (
+                  />
+                </label>
+                <label>
+                  <span>出発時刻</span>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(event) => {
+                      setStartTime(event.target.value);
+                      if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="itinerary-editor">
+              <div className="itinerary-editor__heading">
+                <strong>訪問するスポット</strong>
+                <span>{itineraryIds.length} / 10</span>
+              </div>
+              <ol>
+                {itinerarySpots.map((spot, index) => (
+                  <li key={spot.id}>
+                    <span className={`route-point ${index === 0 ? "route-point--start" : index === itinerarySpots.length - 1 ? "route-point--goal" : ""}`}>
+                      {index === 0 ? "S" : index === itinerarySpots.length - 1 ? "G" : index + 1}
+                    </span>
+                    <div>
+                      <strong>{spot.shortName}</strong>
+                      <label>
+                        滞在
+                        <input
+                          type="number"
+                          min="0"
+                          max="480"
+                          step="5"
+                          value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}
+                          onChange={(event) => changeStayMinutes(spot.id, Number(event.target.value))}
+                        />
+                        分
+                      </label>
+                    </div>
+                    <div className="itinerary-actions">
+                      <button type="button" disabled={index === 0} onClick={() => moveSpot(index, -1)} aria-label={`${spot.name}を一つ前へ`}>↑</button>
+                      <button type="button" disabled={index === itinerarySpots.length - 1} onClick={() => moveSpot(index, 1)} aria-label={`${spot.name}を一つ後ろへ`}>↓</button>
+                      <button type="button" disabled={itinerarySpots.length <= 2} onClick={() => removeSpot(index)} aria-label={`${spot.name}を予定から外す`}>×</button>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="itinerary-add">
+                <select
+                  value={availableSpots.some((spot) => spot.id === addSpotId) ? addSpotId : availableSpots[0]?.id ?? ""}
+                  onChange={(event) => setAddSpotId(event.target.value)}
+                  disabled={!availableSpots.length || itineraryIds.length >= 10}
+                  aria-label="追加するスポット"
+                >
+                  {areas.map((area) => {
+                    const areaSpots = availableSpots.filter((spot) => spot.area === area);
+                    return areaSpots.length ? (
                       <optgroup label={area} key={area}>
-                        {spots.filter((spot) => spot.area === area).map((spot) => (
-                          <option key={spot.id} value={spot.id}>{spot.shortName}</option>
-                        ))}
+                        {areaSpots.map((spot) => <option key={spot.id} value={spot.id}>{spot.shortName}</option>)}
                       </optgroup>
-                    ))}
-                  </select>
-                </span>
-              </label>
+                    ) : null;
+                  })}
+                </select>
+                <button type="button" onClick={() => addSpot()} disabled={!availableSpots.length || itineraryIds.length >= 10}>追加</button>
+              </div>
             </div>
 
             <fieldset className="travel-modes">
@@ -342,8 +487,8 @@ export function PilgrimageApp({
                       checked={travelMode === mode.value}
                       onChange={() => {
                         setTravelMode(mode.value);
-                        setHasRequestedRoute(false);
-                        setRouteResult({ state: "idle" });
+                        if (mode.value === "TRANSIT") setOptimizeOrder(false);
+                        invalidateRoute();
                       }}
                     />
                     <span className="mode-icon">{mode.icon}</span>
@@ -353,14 +498,33 @@ export function PilgrimageApp({
               </div>
             </fieldset>
 
+            <label className={`route-optimize ${travelMode === "TRANSIT" ? "is-disabled" : ""}`}>
+              <input
+                type="checkbox"
+                checked={travelMode !== "TRANSIT" && optimizeOrder}
+                disabled={travelMode === "TRANSIT"}
+                onChange={(event) => {
+                  setOptimizeOrder(event.target.checked);
+                  invalidateRoute();
+                }}
+              />
+              <span>
+                <strong>訪問順を自動で最適化</strong>
+                <small>{travelMode === "TRANSIT" ? "公共交通は仮実装のため、上の指定順で区間検索します。" : "最初と最後を固定して、中間地点を並べ替えます。"}</small>
+              </span>
+            </label>
+
             <button
               className="route-search-button"
               type="button"
               onClick={searchRoute}
+              disabled={routeResult.state === "loading"}
             >
-              ルートを検索する
+              {routeResult.state === "loading" ? "計算しています…" : "この内容で予定を計算する"}
               <span aria-hidden="true">→</span>
             </button>
+
+            <p className="route-api-note">地点の追加や並べ替えだけではAPIを使用しません。このボタンを押したときだけ検索します。</p>
 
             <div
               className={`route-result route-result--${routeResult.state}`}
@@ -370,14 +534,14 @@ export function PilgrimageApp({
                 <>
                   <span className="result-symbol">＋</span>
                   <p>
-                    2つのスポットを選ぶと、距離と所要時間を表示します。
+                    2か所以上を選び、滞在時間と訪問順を決めてください。
                   </p>
                 </>
               )}
               {routeResult.state === "loading" && (
                 <>
                   <span className="result-symbol is-loading">◌</span>
-                  <p>最適なルートを探しています…</p>
+                  <p>移動ルートと一日の予定を計算しています…</p>
                 </>
               )}
               {routeResult.state === "success" && (
@@ -389,7 +553,7 @@ export function PilgrimageApp({
                       <strong>{routeResult.distance ?? "—"}</strong>
                     </span>
                     <span>
-                      <small>所要時間</small>
+                      <small>総移動時間</small>
                       <strong>{routeResult.duration ?? "—"}</strong>
                     </span>
                   </div>
@@ -403,6 +567,43 @@ export function PilgrimageApp({
                 </>
               )}
             </div>
+
+            {schedule && routeResult.state === "success" && (
+              <section className="day-schedule" aria-label="作成した一日予定">
+                <div className="day-schedule__heading">
+                  <div>
+                    <small>YOUR DAY</small>
+                    <strong>{visitDate.replaceAll("-", ".")}</strong>
+                  </div>
+                  <span>{displayClock(schedule.finish)} 終了予定</span>
+                </div>
+                {routeRequest?.accessOrigin && (
+                  <div className="access-schedule">
+                    <time>{displayClock(schedule.start)}</time>
+                    <p><strong>{routeRequest.accessOrigin.name}</strong>を出発</p>
+                    <small>公共交通 約{formatDuration(schedule.accessDuration)}</small>
+                  </div>
+                )}
+                <ol>
+                  {schedule.entries.map((entry, index) => (
+                    <li key={entry.spot.id}>
+                      <time>{displayClock(entry.arrival)}</time>
+                      <div>
+                        <strong>{entry.spot.shortName}</strong>
+                        <small>{entry.stay}分滞在 · {displayClock(entry.departure)}出発</small>
+                        {routeResult.legDurationMinutes?.[index] ? (
+                          <span>次へ 約{formatDuration(routeResult.legDurationMinutes[index])}</span>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <p>
+                  滞在込み <strong>{formatDuration(schedule.finish - schedule.start)}</strong>
+                  {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · Google推奨順で表示" : ""}
+                </p>
+              </section>
+            )}
           </aside>
         </div>
       </section>
