@@ -2225,15 +2225,37 @@ button {
   border-top: 1px solid rgba(31, 43, 59, 0.14);
 }
 
-.visitor-notice__items article {
+.visitor-notice__items label {
   display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 16px;
-  padding: 18px 0;
+  grid-template-columns: 22px 38px 1fr;
+  gap: 14px;
+  align-items: start;
+  margin: 0 -12px;
+  padding: 18px 12px;
   border-bottom: 1px solid rgba(31, 43, 59, 0.14);
+  cursor: pointer;
+  transition: background 160ms ease;
 }
 
-.visitor-notice__items article > span {
+.visitor-notice__items label:hover,
+.visitor-notice__items label:has(input:checked) {
+  background: rgba(125, 185, 196, 0.1);
+}
+
+.visitor-notice__items label:has(input:focus-visible) {
+  outline: 3px solid rgba(75, 151, 166, 0.28);
+  outline-offset: -3px;
+}
+
+.visitor-notice__items input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--ice-deep);
+  cursor: pointer;
+}
+
+.visitor-notice__number {
   padding-top: 3px;
   color: var(--ice-deep);
   font-family: Georgia, serif;
@@ -2250,6 +2272,26 @@ button {
   color: var(--ink-muted);
   font-size: 11px;
   line-height: 1.8;
+}
+
+.visitor-notice__progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 20px 0 0;
+  color: var(--ink-muted);
+  font-size: 10px;
+}
+
+.visitor-notice__progress span {
+  font-family: Georgia, serif;
+  letter-spacing: 0.08em;
+}
+
+.visitor-notice__progress strong {
+  color: var(--ink);
+  font-size: 10px;
 }
 
 .visitor-notice__accept {
@@ -2271,9 +2313,16 @@ button {
   transition: background 160ms ease, border-color 160ms ease;
 }
 
-.visitor-notice__accept:hover {
+.visitor-notice__accept:hover:not(:disabled) {
   border-color: var(--ice-deep);
   background: var(--ice-deep);
+}
+
+.visitor-notice__accept:disabled {
+  border-color: rgba(31, 43, 59, 0.18);
+  background: rgba(31, 43, 59, 0.12);
+  color: rgba(31, 43, 59, 0.42);
+  cursor: not-allowed;
 }
 
 .visitor-notice__accept:focus-visible,
@@ -2731,10 +2780,16 @@ footer > span {
     margin-bottom: 18px;
   }
 
-  .visitor-notice__items article {
-    grid-template-columns: 30px 1fr;
-    gap: 10px;
-    padding: 14px 0;
+  .visitor-notice__items label {
+    grid-template-columns: 20px 28px 1fr;
+    gap: 9px;
+    padding: 14px 10px;
+  }
+
+  .visitor-notice__progress {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .visitor-notice__accept {

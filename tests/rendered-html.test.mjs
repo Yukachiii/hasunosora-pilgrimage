@@ -44,6 +44,9 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /蓮ノ小四辺形の休日/);
   assert.match(html, /巡礼へ出発する前に/);
   assert.match(html, /内容に同意してサイトを見る/);
+  assert.match(html, /type="checkbox"/);
+  assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
+  assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
   assert.match(html, /金沢駅/);

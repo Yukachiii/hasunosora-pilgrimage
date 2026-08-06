@@ -30,7 +30,7 @@ import {
   type PilgrimageSpot,
 } from "./spots";
 
-const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v1";
+const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v2";
 
 const travelModes: Array<{
   value: TravelMode;
@@ -109,6 +109,7 @@ export function PilgrimageApp({
   heroImage,
 }: Props) {
   const [hasAcceptedVisitorNotice, setHasAcceptedVisitorNotice] = useState(false);
+  const [visitorNoticeChecks, setVisitorNoticeChecks] = useState([false, false, false]);
   const [selectedId, setSelectedId] = useState(spots[0].id);
   const [itineraryIds, setItineraryIds] = useState(() => spots.slice(0, 2).map((spot) => spot.id));
   const [addSpotId, setAddSpotId] = useState(spots[2]?.id ?? spots[0].id);
@@ -151,13 +152,33 @@ export function PilgrimageApp({
     };
   }, [hasAcceptedVisitorNotice]);
 
+  const confirmedVisitorNoticeCount = visitorNoticeChecks.filter(Boolean).length;
+  const hasConfirmedAllVisitorNotices = confirmedVisitorNoticeCount === visitorNoticeChecks.length;
+
+  function changeVisitorNoticeCheck(index: number, checked: boolean) {
+    setVisitorNoticeChecks((current) =>
+      current.map((value, currentIndex) => currentIndex === index ? checked : value),
+    );
+  }
+
   function acceptVisitorNotice() {
+    if (!hasConfirmedAllVisitorNotices) return;
     try {
       window.localStorage.setItem(VISITOR_NOTICE_STORAGE_KEY, "accepted");
     } catch {
       // 保存できない環境でも、この閲覧中はサイトを利用できるようにします。
     }
     setHasAcceptedVisitorNotice(true);
+  }
+
+  function reviewVisitorNotice() {
+    try {
+      window.localStorage.removeItem(VISITOR_NOTICE_STORAGE_KEY);
+    } catch {
+      // 保存領域を利用できない環境でも、同意画面は再表示します。
+    }
+    setVisitorNoticeChecks([false, false, false]);
+    setHasAcceptedVisitorNotice(false);
   }
 
   const areas = useMemo(
@@ -355,8 +376,14 @@ export function PilgrimageApp({
               このサイトをご利用になる前に、以下の注意事項をご確認ください。
             </p>
             <div className="visitor-notice__items">
-              <article>
-                <span>01</span>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={visitorNoticeChecks[0]}
+                  onChange={(event) => changeVisitorNoticeCheck(0, event.target.checked)}
+                  autoFocus
+                />
+                <span className="visitor-notice__number">01</span>
                 <div>
                   <h3>地域とスポットへの配慮</h3>
                   <p>
@@ -364,9 +391,14 @@ export function PilgrimageApp({
                     長時間の占有などはせず、各施設のルールと係員の案内を守りましょう。
                   </p>
                 </div>
-              </article>
-              <article>
-                <span>02</span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={visitorNoticeChecks[1]}
+                  onChange={(event) => changeVisitorNoticeCheck(1, event.target.checked)}
+                />
+                <span className="visitor-notice__number">02</span>
                 <div>
                   <h3>最新情報と安全の確認</h3>
                   <p>
@@ -374,9 +406,14 @@ export function PilgrimageApp({
                     出発前と移動中に公式情報を確認し、無理のない行動をしてください。
                   </p>
                 </div>
-              </article>
-              <article>
-                <span>03</span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={visitorNoticeChecks[2]}
+                  onChange={(event) => changeVisitorNoticeCheck(2, event.target.checked)}
+                />
+                <span className="visitor-notice__number">03</span>
                 <div>
                   <h3>旅程とルートについて</h3>
                   <p>
@@ -385,9 +422,19 @@ export function PilgrimageApp({
                     安全確認と最終的な判断は、ご自身でお願いいたします。
                   </p>
                 </div>
-              </article>
+              </label>
             </div>
-            <button type="button" className="visitor-notice__accept" onClick={acceptVisitorNotice} autoFocus>
+            <p className="visitor-notice__progress" id="visitor-notice-progress" aria-live="polite">
+              <span>確認済み {confirmedVisitorNoticeCount} / {visitorNoticeChecks.length}</span>
+              <strong>{hasConfirmedAllVisitorNotices ? "すべて確認済みです" : "各項目にチェックしてください"}</strong>
+            </p>
+            <button
+              type="button"
+              className="visitor-notice__accept"
+              onClick={acceptVisitorNotice}
+              disabled={!hasConfirmedAllVisitorNotices}
+              aria-describedby="visitor-notice-progress"
+            >
               内容に同意してサイトを見る
               <span aria-hidden="true">→</span>
             </button>
@@ -1191,7 +1238,7 @@ export function PilgrimageApp({
           <button
             type="button"
             className="site-disclaimer__review"
-            onClick={() => setHasAcceptedVisitorNotice(false)}
+            onClick={reviewVisitorNotice}
           >
             同意画面をもう一度確認する
             <span aria-hidden="true">→</span>
