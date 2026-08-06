@@ -391,3 +391,31 @@ test("local admin writes publishable files before an explicit GitHub push", asyn
   assert.match(pagesMain, /content\/site\.json/);
   assert.match(pagesMain, /import\.meta\.glob/);
 });
+
+test("planner persistence, opening hours, and today mode avoid extra route requests", async () => {
+  const [app, storage, routePlanner, adminApp, schema, migration, css] = await Promise.all([
+    readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/planner-storage.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/AdminApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0002_lucky_the_hood.sql", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(storage, /PLANNER_DRAFT_STORAGE_KEY/);
+  assert.match(storage, /SAVED_ITINERARIES_STORAGE_KEY/);
+  assert.match(app, /前回の編集中旅程を復元しました/);
+  assert.match(app, /この内容は計算済みです/);
+  assert.match(app, /当日用モード/);
+  assert.match(app, /現在地からGoogle Mapsで向かう/);
+  assert.match(app, /API不使用/);
+  assert.match(routePlanner, /openingHoursStatus/);
+  assert.match(routePlanner, /営業時間は公式情報を確認/);
+  assert.match(adminApp, /通常の休業曜日/);
+  assert.match(adminApp, /営業時間の確認日/);
+  assert.match(schema, /openingHoursCheckedAt/);
+  assert.match(migration, /opening_hours_checked_at/);
+  assert.match(css, /\.today-mode__dialog/);
+  assert.match(css, /\.spot-card__hours/);
+});

@@ -34,6 +34,11 @@ export type PilgrimageSpot = {
   accessNote: string;
   sourceUrl: string;
   recommendedStayMinutes?: number;
+  openingTime?: string;
+  closingTime?: string;
+  closedWeekdays?: number[];
+  openingHoursNote?: string;
+  openingHoursCheckedAt?: string;
   appearances?: string[];
   collaborationIds?: CollaborationId[];
   imageUrl?: string;

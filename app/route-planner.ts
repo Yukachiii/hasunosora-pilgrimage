@@ -61,3 +61,54 @@ export function formatDuration(minutes: number) {
   if (!remainder) return `${hours}時間`;
   return `${hours}時間${remainder}分`;
 }
+
+const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
+
+export type OpeningHoursStatus = {
+  kind: "open" | "warning" | "unknown";
+  label: string;
+};
+
+export function formatOpeningHours(spot: PilgrimageSpot) {
+  const hours = spot.openingTime && spot.closingTime
+    ? `${spot.openingTime}–${spot.closingTime}`
+    : "営業時間 要公式確認";
+  const closed = spot.closedWeekdays?.length
+    ? `休：${spot.closedWeekdays.map((day) => weekdayLabels[day]).filter(Boolean).join("・")}`
+    : "";
+  return [hours, closed].filter(Boolean).join(" / ");
+}
+
+export function openingHoursStatus(
+  spot: PilgrimageSpot,
+  visitDate: string,
+  arrivalMinutes: number,
+): OpeningHoursStatus {
+  const [year, month, day] = visitDate.split("-").map(Number);
+  const dayOffset = Math.floor(arrivalMinutes / 1440);
+  const arrivalDate = new Date(Date.UTC(year, month - 1, day + dayOffset));
+  const weekday = arrivalDate.getUTCDay();
+
+  if (spot.closedWeekdays?.includes(weekday)) {
+    return { kind: "warning", label: "設定上の休業日です" };
+  }
+  if (!spot.openingTime || !spot.closingTime) {
+    return { kind: "unknown", label: "営業時間は公式情報を確認" };
+  }
+
+  const normalizedArrival = ((arrivalMinutes % 1440) + 1440) % 1440;
+  const opening = timeValueToMinutes(spot.openingTime);
+  const closing = timeValueToMinutes(spot.closingTime);
+  if (normalizedArrival < opening) {
+    return { kind: "warning", label: `${spot.openingTime}の営業開始前です` };
+  }
+  if (normalizedArrival >= closing) {
+    return { kind: "warning", label: `${spot.closingTime}の営業終了後です` };
+  }
+  return { kind: "open", label: "営業時間内の予定です" };
+}
+
+function timeValueToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}

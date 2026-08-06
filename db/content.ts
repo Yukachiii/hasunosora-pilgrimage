@@ -65,6 +65,12 @@ export async function upsertSpotOverride(
     lat: spot.lat,
     lng: spot.lng,
     description: spot.description,
+    recommendedStayMinutes: spot.recommendedStayMinutes ?? null,
+    openingTime: spot.openingTime ?? null,
+    closingTime: spot.closingTime ?? null,
+    closedWeekdays: JSON.stringify(spot.closedWeekdays ?? []),
+    openingHoursNote: spot.openingHoursNote ?? null,
+    openingHoursCheckedAt: spot.openingHoursCheckedAt ?? null,
     accessNote: spot.accessNote,
     sourceUrl: spot.sourceUrl,
     updatedBy,
@@ -110,8 +116,25 @@ export function applySpotOverrides(
       lat: override.lat,
       lng: override.lng,
       description: override.description,
+      recommendedStayMinutes: override.recommendedStayMinutes ?? undefined,
+      openingTime: override.openingTime ?? undefined,
+      closingTime: override.closingTime ?? undefined,
+      closedWeekdays: parseClosedWeekdays(override.closedWeekdays),
+      openingHoursNote: override.openingHoursNote ?? undefined,
+      openingHoursCheckedAt: override.openingHoursCheckedAt ?? undefined,
       accessNote: override.accessNote,
       sourceUrl: override.sourceUrl,
     };
   });
+}
+
+function parseClosedWeekdays(value: string | null) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6);
+  } catch {
+    return [];
+  }
 }

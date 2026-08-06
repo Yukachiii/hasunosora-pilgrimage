@@ -13,12 +13,22 @@ import {
   type RouteResult,
 } from "./GooglePilgrimageMap";
 import {
+  formatOpeningHours,
   formatDuration,
   majorStations,
   maximumItineraryStops,
+  openingHoursStatus,
   recommendedStayMinutes,
   type TravelMode,
 } from "./route-planner";
+import {
+  parseSavedItineraries,
+  PLANNER_DRAFT_STORAGE_KEY,
+  SAVED_ITINERARIES_STORAGE_KEY,
+  sanitizePlannerSnapshot,
+  type PlannerSnapshot,
+  type SavedItinerary,
+} from "./planner-storage";
 import {
   cardCharacters,
   cardModels,
@@ -68,6 +78,25 @@ function displayClock(totalMinutes: number) {
   const hours = Math.floor(normalized / 60);
   const minutes = normalized % 60;
   return `${day > 0 ? `翌${day > 1 ? day : ""}日 ` : ""}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function japanClockMinutes() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Tokyo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const hours = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+  const minutes = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
+  return hours * 60 + minutes;
+}
+
+function navigationTravelMode(mode: TravelMode) {
+  if (mode === "DRIVING") return "driving";
+  if (mode === "TRANSIT") return "transit";
+  if (mode === "BICYCLING") return "bicycling";
+  return "walking";
 }
 
 function collaborationStatus(collaboration: PilgrimageCollaboration) {
@@ -128,6 +157,15 @@ export function PilgrimageApp({
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
   const [itineraryCollaborationId, setItineraryCollaborationId] = useState<CollaborationId | "">("");
   const [cardCharacterFilter, setCardCharacterFilter] = useState<CardCharacter | "すべて">("すべて");
+  const [savedItineraries, setSavedItineraries] = useState<SavedItinerary[]>([]);
+  const [activeSavedItineraryId, setActiveSavedItineraryId] = useState("");
+  const [itineraryName, setItineraryName] = useState("");
+  const [hasRestoredPlannerStorage, setHasRestoredPlannerStorage] = useState(false);
+  const [plannerStorageMessage, setPlannerStorageMessage] = useState("端末内へ自動保存します");
+  const [completedSpotIds, setCompletedSpotIds] = useState<string[]>([]);
+  const [todayOffsetMinutes, setTodayOffsetMinutes] = useState(0);
+  const [isTodayModeOpen, setIsTodayModeOpen] = useState(false);
+  const [currentJapanMinutes, setCurrentJapanMinutes] = useState(() => japanClockMinutes());
 
   useEffect(() => {
     let wasAccepted = false;
@@ -151,6 +189,78 @@ export function PilgrimageApp({
       document.body.style.overflow = previousOverflow;
     };
   }, [hasAcceptedVisitorNotice]);
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      const validSpotIds = new Set(spots.map((spot) => spot.id));
+      try {
+        const draftRaw = window.localStorage.getItem(PLANNER_DRAFT_STORAGE_KEY);
+        const draft = draftRaw
+          ? sanitizePlannerSnapshot(JSON.parse(draftRaw) as unknown, validSpotIds)
+          : null;
+        if (draft) {
+          setItineraryIds(draft.itineraryIds);
+          setStayMinutes((current) => ({ ...current, ...draft.stayMinutes }));
+          setTravelMode(draft.travelMode);
+          setOptimizeOrder(draft.optimizeOrder);
+          setSourceStationId(draft.sourceStationId);
+          setVisitDate(draft.visitDate || japanDate());
+          setStartTime(draft.startTime);
+          setItineraryCollaborationId(draft.itineraryCollaborationId as CollaborationId | "");
+          setCompletedSpotIds(draft.completedSpotIds);
+          setTodayOffsetMinutes(draft.todayOffsetMinutes);
+          setSelectedId(draft.itineraryIds[0]);
+          setPlannerStorageMessage("前回の編集中旅程を復元しました");
+        }
+        setSavedItineraries(parseSavedItineraries(
+          window.localStorage.getItem(SAVED_ITINERARIES_STORAGE_KEY),
+          validSpotIds,
+        ));
+      } catch {
+        setPlannerStorageMessage("端末の保存領域を利用できません");
+      }
+      setHasRestoredPlannerStorage(true);
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, [spots]);
+
+  useEffect(() => {
+    if (!hasRestoredPlannerStorage) return;
+    const snapshot: PlannerSnapshot = {
+      itineraryIds,
+      stayMinutes,
+      travelMode,
+      optimizeOrder,
+      sourceStationId,
+      visitDate,
+      startTime,
+      itineraryCollaborationId,
+      completedSpotIds,
+      todayOffsetMinutes,
+    };
+    let message: string;
+    try {
+      window.localStorage.setItem(PLANNER_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+      message = "編集中の旅程をこの端末へ自動保存しました";
+    } catch {
+      message = "端末への自動保存に失敗しました";
+    }
+    const messageTimer = window.setTimeout(() => setPlannerStorageMessage(message), 0);
+    return () => window.clearTimeout(messageTimer);
+  }, [completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, travelMode, visitDate]);
+
+  useEffect(() => {
+    if (!isTodayModeOpen) return undefined;
+    const initialTimer = window.setTimeout(() => setCurrentJapanMinutes(japanClockMinutes()), 0);
+    const timer = window.setInterval(() => setCurrentJapanMinutes(japanClockMinutes()), 60_000);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isTodayModeOpen]);
 
   const confirmedVisitorNoticeCount = visitorNoticeChecks.filter(Boolean).length;
   const hasConfirmedAllVisitorNotices = confirmedVisitorNoticeCount === visitorNoticeChecks.length;
@@ -261,9 +371,134 @@ export function PilgrimageApp({
     };
   }, [plannedSpots, routeRequest, routeResult, startTime, stayMinutes]);
 
+  const currentRouteSignature = useMemo(() => JSON.stringify({
+    stops: itineraryIds,
+    stay: travelMode === "TRANSIT" ? itineraryIds.map((id) => {
+      const spot = spots.find((item) => item.id === id);
+      return stayMinutes[id] ?? (spot ? recommendedStayMinutes(spot) : 0);
+    }) : [],
+    travelMode,
+    optimizeWaypointOrder: travelMode !== "TRANSIT" && optimizeOrder,
+    accessOriginId: sourceStationId,
+    departureTime: travelMode === "TRANSIT" || sourceStationId
+      ? departureIso(visitDate, startTime)
+      : "",
+  }), [itineraryIds, optimizeOrder, sourceStationId, spots, startTime, stayMinutes, travelMode, visitDate]);
+  const requestedRouteSignature = useMemo(() => routeRequest ? JSON.stringify({
+    stops: routeRequest.stops.map((spot) => spot.id),
+    stay: routeRequest.travelMode === "TRANSIT"
+      ? routeRequest.stops.map((spot) => routeRequest.stayMinutes[spot.id] ?? recommendedStayMinutes(spot))
+      : [],
+    travelMode: routeRequest.travelMode,
+    optimizeWaypointOrder: routeRequest.optimizeWaypointOrder,
+    accessOriginId: routeRequest.accessOrigin?.id ?? "",
+    departureTime: routeRequest.travelMode === "TRANSIT" || routeRequest.accessOrigin
+      ? routeRequest.departureTime
+      : "",
+  }) : "", [routeRequest]);
+  const routeIsCurrent = routeResult.state === "success" && currentRouteSignature === requestedRouteSignature;
+
+  const completedScheduledSpotIds = schedule
+    ? schedule.entries.filter((entry) => completedSpotIds.includes(entry.spot.id)).map((entry) => entry.spot.id)
+    : [];
+  const nextTodayEntry = schedule?.entries.find((entry) => !completedSpotIds.includes(entry.spot.id));
+
+  function createPlannerSnapshot(): PlannerSnapshot {
+    return {
+      itineraryIds,
+      stayMinutes,
+      travelMode,
+      optimizeOrder,
+      sourceStationId,
+      visitDate,
+      startTime,
+      itineraryCollaborationId,
+      completedSpotIds,
+      todayOffsetMinutes,
+    };
+  }
+
+  function persistSavedItineraries(next: SavedItinerary[]) {
+    setSavedItineraries(next);
+    try {
+      window.localStorage.setItem(SAVED_ITINERARIES_STORAGE_KEY, JSON.stringify(next));
+      setPlannerStorageMessage("名前付き旅程をこの端末へ保存しました");
+    } catch {
+      setPlannerStorageMessage("名前付き旅程の保存に失敗しました");
+    }
+  }
+
+  function saveNamedItinerary() {
+    const name = itineraryName.trim() || `${visitDate} 巡礼予定`;
+    const savedAt = new Date().toISOString();
+    if (activeSavedItineraryId) {
+      persistSavedItineraries(savedItineraries.map((item) => item.id === activeSavedItineraryId
+        ? { ...item, name, savedAt, snapshot: createPlannerSnapshot() }
+        : item));
+      setItineraryName(name);
+      return;
+    }
+    const id = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `itinerary-${Date.now()}`;
+    persistSavedItineraries([
+      { id, name, savedAt, snapshot: createPlannerSnapshot() },
+      ...savedItineraries,
+    ].slice(0, 30));
+    setActiveSavedItineraryId(id);
+    setItineraryName(name);
+  }
+
+  function loadSavedItinerary(id: string) {
+    setActiveSavedItineraryId(id);
+    if (!id) {
+      setItineraryName("");
+      return;
+    }
+    const saved = savedItineraries.find((item) => item.id === id);
+    if (!saved) return;
+    const snapshot = saved.snapshot;
+    setItineraryIds(snapshot.itineraryIds);
+    setStayMinutes((current) => ({ ...current, ...snapshot.stayMinutes }));
+    setTravelMode(snapshot.travelMode);
+    setOptimizeOrder(snapshot.optimizeOrder);
+    setSourceStationId(snapshot.sourceStationId);
+    setVisitDate(snapshot.visitDate || japanDate());
+    setStartTime(snapshot.startTime);
+    setItineraryCollaborationId(snapshot.itineraryCollaborationId as CollaborationId | "");
+    setCompletedSpotIds(snapshot.completedSpotIds);
+    setTodayOffsetMinutes(snapshot.todayOffsetMinutes);
+    setSelectedId(snapshot.itineraryIds[0]);
+    setItineraryName(saved.name);
+    setIsTodayModeOpen(false);
+    invalidateRoute();
+    setPlannerStorageMessage(`「${saved.name}」を読み込みました`);
+  }
+
+  function deleteSavedItinerary() {
+    if (!activeSavedItineraryId) return;
+    persistSavedItineraries(savedItineraries.filter((item) => item.id !== activeSavedItineraryId));
+    setActiveSavedItineraryId("");
+    setItineraryName("");
+    setPlannerStorageMessage("名前付き旅程を削除しました。編集中の内容は残っています");
+  }
+
+  function toggleCompletedSpot(spotId: string) {
+    setCompletedSpotIds((current) => current.includes(spotId)
+      ? current.filter((id) => id !== spotId)
+      : [...current, spotId]);
+  }
+
+  function alignRemainingScheduleToNow() {
+    if (!nextTodayEntry || visitDate !== japanDate()) return;
+    setTodayOffsetMinutes(currentJapanMinutes - nextTodayEntry.arrival);
+  }
+
   function invalidateRoute() {
     setRouteRequest(null);
     setRouteResult({ state: "idle" });
+    setIsTodayModeOpen(false);
+    setTodayOffsetMinutes(0);
   }
 
   const handleRouteResult = useCallback((result: RouteResult) => {
@@ -278,6 +513,7 @@ export function PilgrimageApp({
       });
       return;
     }
+    if (routeIsCurrent) return;
     const accessOrigin = majorStations.find((station) => station.id === sourceStationId);
     setRouteRequest({
       requestId: Date.now(),
@@ -686,6 +922,51 @@ export function PilgrimageApp({
               </div>
             </div>
 
+            <section className="itinerary-storage" aria-label="旅程の保存">
+              <div className="itinerary-storage__heading">
+                <div>
+                  <small>LOCAL SAVE</small>
+                  <strong>旅程をこの端末に保存</strong>
+                </div>
+                <span>API不使用</span>
+              </div>
+              <label>
+                <span>保存済みの旅程</span>
+                <select
+                  value={activeSavedItineraryId}
+                  onChange={(event) => loadSavedItinerary(event.target.value)}
+                >
+                  <option value="">編集中の旅程</option>
+                  {savedItineraries.map((item) => (
+                    <option value={item.id} key={item.id}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>旅程名</span>
+                <input
+                  type="text"
+                  maxLength={60}
+                  placeholder={`${visitDate} 巡礼予定`}
+                  value={itineraryName}
+                  onChange={(event) => setItineraryName(event.target.value)}
+                />
+              </label>
+              <div className="itinerary-storage__actions">
+                <button type="button" onClick={saveNamedItinerary}>
+                  {activeSavedItineraryId ? "変更を上書き保存" : "名前を付けて保存"}
+                </button>
+                {activeSavedItineraryId ? (
+                  <>
+                    <button type="button" onClick={() => loadSavedItinerary("")}>別の旅程として保存</button>
+                    <button type="button" className="is-danger" onClick={deleteSavedItinerary}>削除</button>
+                  </>
+                ) : null}
+              </div>
+              <small className="itinerary-storage__message" aria-live="polite">{plannerStorageMessage}</small>
+              <p>ログインや通信は不要です。別の端末・別のブラウザには共有されません。</p>
+            </section>
+
             <div className="itinerary-editor">
               <div className="itinerary-editor__heading">
                 <strong>訪問するスポット</strong>
@@ -783,9 +1064,13 @@ export function PilgrimageApp({
               className="route-search-button"
               type="button"
               onClick={searchRoute}
-              disabled={routeResult.state === "loading"}
+              disabled={routeResult.state === "loading" || routeIsCurrent}
             >
-              {routeResult.state === "loading" ? "計算しています…" : "この内容で予定を計算する"}
+              {routeResult.state === "loading"
+                ? "計算しています…"
+                : routeIsCurrent
+                  ? "この内容は計算済みです"
+                  : "この内容で予定を計算する"}
               <span aria-hidden="true">→</span>
             </button>
 
@@ -863,23 +1148,37 @@ export function PilgrimageApp({
                   </div>
                 )}
                 <ol>
-                  {schedule.entries.map((entry, index) => (
-                    <li key={entry.spot.id}>
-                      <time>{displayClock(entry.arrival)}</time>
-                      <div>
-                        <strong>{entry.spot.shortName}</strong>
-                        <small>{entry.stay}分滞在 · {displayClock(entry.departure)}出発</small>
-                        {routeResult.legDurationMinutes?.[index] ? (
-                          <span>次へ 約{formatDuration(routeResult.legDurationMinutes[index])}</span>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
+                  {schedule.entries.map((entry, index) => {
+                    const hoursStatus = openingHoursStatus(entry.spot, visitDate, entry.arrival);
+                    return (
+                      <li key={entry.spot.id}>
+                        <time>{displayClock(entry.arrival)}</time>
+                        <div>
+                          <strong>{entry.spot.shortName}</strong>
+                          <small>{entry.stay}分滞在 · {displayClock(entry.departure)}出発</small>
+                          <small className={`opening-status opening-status--${hoursStatus.kind}`}>
+                            {hoursStatus.label}
+                          </small>
+                          {routeResult.legDurationMinutes?.[index] ? (
+                            <span>次へ 約{formatDuration(routeResult.legDurationMinutes[index])}</span>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ol>
                 <p>
                   滞在込み <strong>{formatDuration(schedule.finish - schedule.start)}</strong>
                   {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · Google推奨順で表示" : ""}
                 </p>
+                <button
+                  type="button"
+                  className="today-mode-open"
+                  onClick={() => setIsTodayModeOpen(true)}
+                >
+                  当日用モードを開く
+                  <span aria-hidden="true">→</span>
+                </button>
               </section>
             )}
           </aside>
@@ -1063,6 +1362,13 @@ export function PilgrimageApp({
                 ) : null}
                 <h3>{spot.name}</h3>
                 <p>{spot.description}</p>
+                <div className={`spot-card__hours${spot.openingTime && spot.closingTime ? " is-known" : ""}`}>
+                  <strong>{formatOpeningHours(spot)}</strong>
+                  {spot.openingHoursNote ? <span>{spot.openingHoursNote}</span> : null}
+                  {spot.openingHoursCheckedAt ? (
+                    <small>{spot.openingHoursCheckedAt.replaceAll("-", ".")} 確認</small>
+                  ) : null}
+                </div>
                 {spot.activityRecords?.length || spot.sehasEpisodes?.length ? (
                   <dl className="spot-card__episodes">
                     {spot.activityRecords?.length ? (
@@ -1262,6 +1568,113 @@ export function PilgrimageApp({
         <span>© 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
+
+      {isTodayModeOpen && schedule ? (
+        <div className="today-mode" role="presentation">
+          <section
+            className="today-mode__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="today-mode-title"
+          >
+            <header className="today-mode__header">
+              <div>
+                <small>TODAY&apos;S JOURNEY</small>
+                <h2 id="today-mode-title">当日用モード</h2>
+                <p>
+                  {visitDate === japanDate()
+                    ? `${visitDate.replaceAll("-", ".")} · 現在 ${displayClock(currentJapanMinutes)}`
+                    : `${visitDate.replaceAll("-", ".")} の予定を確認中`}
+                </p>
+              </div>
+              <button type="button" onClick={() => setIsTodayModeOpen(false)} aria-label="当日用モードを閉じる">×</button>
+            </header>
+
+            <div className="today-mode__progress">
+              <div>
+                <strong>{completedScheduledSpotIds.length} / {schedule.entries.length}</strong>
+                <span>訪問済み</span>
+              </div>
+              <progress value={completedScheduledSpotIds.length} max={schedule.entries.length} />
+            </div>
+
+            {nextTodayEntry ? (
+              <article className="today-mode__next">
+                <small>NEXT SPOT · {displayClock(nextTodayEntry.arrival + todayOffsetMinutes)} 到着予定</small>
+                <h3>{nextTodayEntry.spot.name}</h3>
+                <p>{nextTodayEntry.spot.address}</p>
+                <div className={`opening-status opening-status--${openingHoursStatus(nextTodayEntry.spot, visitDate, nextTodayEntry.arrival + todayOffsetMinutes).kind}`}>
+                  {openingHoursStatus(nextTodayEntry.spot, visitDate, nextTodayEntry.arrival + todayOffsetMinutes).label}
+                </div>
+                <div className="today-mode__next-actions">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${nextTodayEntry.spot.lat},${nextTodayEntry.spot.lng}&travelmode=${navigationTravelMode(travelMode)}&dir_action=navigate`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    現在地からGoogle Mapsで向かう
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                  <button type="button" onClick={() => toggleCompletedSpot(nextTodayEntry.spot.id)}>訪問済みにする</button>
+                </div>
+              </article>
+            ) : (
+              <article className="today-mode__complete">
+                <strong>本日の予定はすべて訪問済みです</strong>
+                <p>お疲れさまでした。帰路も安全に気をつけてください。</p>
+              </article>
+            )}
+
+            <div className="today-mode__tools">
+              <button
+                type="button"
+                onClick={alignRemainingScheduleToNow}
+                disabled={!nextTodayEntry || visitDate !== japanDate()}
+              >
+                残りを現在時刻に合わせる
+              </button>
+              <button type="button" onClick={() => setTodayOffsetMinutes(0)} disabled={!todayOffsetMinutes}>
+                時刻補正を戻す
+              </button>
+              <button type="button" onClick={() => setCompletedSpotIds([])} disabled={!completedScheduledSpotIds.length}>
+                訪問済みをリセット
+              </button>
+              <p>
+                {visitDate === japanDate()
+                  ? `時刻補正 ${todayOffsetMinutes >= 0 ? "+" : ""}${todayOffsetMinutes}分 · 補正は通信せず表示だけを調整します。`
+                  : "現在時刻への補正は、訪問日当日に利用できます。"}
+              </p>
+            </div>
+
+            <ol className="today-mode__list">
+              {schedule.entries.map((entry) => {
+                const isComplete = completedSpotIds.includes(entry.spot.id);
+                const adjustedArrival = entry.arrival + todayOffsetMinutes;
+                const adjustedDeparture = entry.departure + todayOffsetMinutes;
+                const hoursStatus = openingHoursStatus(entry.spot, visitDate, adjustedArrival);
+                return (
+                  <li key={entry.spot.id} className={isComplete ? "is-complete" : ""}>
+                    <button type="button" onClick={() => toggleCompletedSpot(entry.spot.id)} aria-pressed={isComplete}>
+                      <span className="today-mode__check" aria-hidden="true">{isComplete ? "✓" : ""}</span>
+                      <time>{displayClock(adjustedArrival)}</time>
+                      <div>
+                        <strong>{entry.spot.shortName}</strong>
+                        <small>{displayClock(adjustedDeparture)} 出発 · {entry.stay}分滞在</small>
+                        <span className={`opening-status opening-status--${hoursStatus.kind}`}>{hoursStatus.label}</span>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+
+            <p className="today-mode__notice">
+              営業時間・交通状況は変わる場合があります。現地と公式案内を優先してください。
+              進捗と時刻補正はこの端末へ自動保存されます。
+            </p>
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }

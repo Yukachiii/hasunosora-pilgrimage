@@ -30,6 +30,38 @@ function optionalStayMinutes(value: unknown, current?: number) {
   return number;
 }
 
+function optionalTime(value: unknown, label: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+    throw new Error(`${label}は時刻として入力してください。`);
+  }
+  return value;
+}
+
+function optionalDate(value: unknown, label: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+    throw new Error(`${label}が正しくありません。`);
+  }
+  return value;
+}
+
+function optionalText(value: unknown, label: string, maxLength: number) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") throw new Error(`${label}が正しくありません。`);
+  const text = value.trim();
+  if (text.length > maxLength) throw new Error(`${label}は${maxLength}文字以内にしてください。`);
+  return text || undefined;
+}
+
+function closedWeekdays(value: unknown) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((day) => !Number.isInteger(day) || Number(day) < 0 || Number(day) > 6)) {
+    throw new Error("休業曜日が正しくありません。");
+  }
+  return Array.from(new Set(value as number[])).sort();
+}
+
 function officialUrl(value: unknown) {
   const text = requiredText(value, "公式URL", 500);
   const url = new URL(text);
@@ -59,6 +91,14 @@ export async function PUT(
     if (!categories.has(category as PilgrimageSpot["category"])) {
       throw new Error("カテゴリが正しくありません。");
     }
+    const openingTime = optionalTime(payload.openingTime, "営業開始時刻");
+    const closingTime = optionalTime(payload.closingTime, "営業終了時刻");
+    if (Boolean(openingTime) !== Boolean(closingTime)) {
+      throw new Error("営業開始時刻と終了時刻は両方入力してください。");
+    }
+    if (openingTime && closingTime && openingTime >= closingTime) {
+      throw new Error("営業終了時刻は開始時刻より後にしてください。");
+    }
 
     const edited: PilgrimageSpot = {
       ...base,
@@ -74,6 +114,11 @@ export async function PUT(
         payload.recommendedStayMinutes,
         base.recommendedStayMinutes,
       ),
+      openingTime,
+      closingTime,
+      closedWeekdays: closedWeekdays(payload.closedWeekdays),
+      openingHoursNote: optionalText(payload.openingHoursNote, "営業時間の補足", 300),
+      openingHoursCheckedAt: optionalDate(payload.openingHoursCheckedAt, "営業時間の確認日"),
       accessNote: requiredText(payload.accessNote, "アクセス案内", 160),
       sourceUrl: officialUrl(payload.sourceUrl),
     };

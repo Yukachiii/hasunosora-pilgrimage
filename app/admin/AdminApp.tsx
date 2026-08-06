@@ -1060,6 +1060,31 @@ function SpotManager({
           <label className="admin-field"><span>緯度</span><input type="number" step="any" value={draft.lat} onChange={(event) => update("lat", Number(event.target.value))} /></label>
           <label className="admin-field"><span>経度</span><input type="number" step="any" value={draft.lng} onChange={(event) => update("lng", Number(event.target.value))} /></label>
           <label className="admin-field"><span>推奨滞在時間（分）</span><input type="number" min="0" max="480" step="5" value={draft.recommendedStayMinutes ?? ""} placeholder="カテゴリ既定値" onChange={(event) => update("recommendedStayMinutes", event.target.value === "" ? undefined : Number(event.target.value))} /><small>未入力の場合はカテゴリごとの既定値を使います。</small></label>
+          <label className="admin-field"><span>営業・開館時刻</span><input type="time" value={draft.openingTime ?? ""} onChange={(event) => update("openingTime", event.target.value || undefined)} /><small>公式情報を確認できた場合だけ入力してください。</small></label>
+          <label className="admin-field"><span>営業・閉館時刻</span><input type="time" value={draft.closingTime ?? ""} onChange={(event) => update("closingTime", event.target.value || undefined)} /><small>最終入場は下の補足欄へ記載してください。</small></label>
+          <fieldset className="admin-field admin-field--wide admin-weekdays">
+            <legend>通常の休業曜日</legend>
+            <div>
+              {["日", "月", "火", "水", "木", "金", "土"].map((label, day) => (
+                <label key={label}>
+                  <input
+                    type="checkbox"
+                    checked={draft.closedWeekdays?.includes(day) ?? false}
+                    onChange={(event) => {
+                      const current = draft.closedWeekdays ?? [];
+                      update("closedWeekdays", event.target.checked
+                        ? Array.from(new Set([...current, day])).sort()
+                        : current.filter((value) => value !== day));
+                    }}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+            <small>祝日・臨時休業・季節営業は補足欄へ記載してください。</small>
+          </fieldset>
+          <label className="admin-field admin-field--wide"><span>営業時間の補足</span><textarea rows={3} maxLength={300} value={draft.openingHoursNote ?? ""} placeholder="例：最終入館16:30。祝日の場合は翌日休館。" onChange={(event) => update("openingHoursNote", event.target.value || undefined)} /></label>
+          <label className="admin-field"><span>営業時間の確認日</span><input type="date" value={draft.openingHoursCheckedAt ?? ""} onChange={(event) => update("openingHoursCheckedAt", event.target.value || undefined)} /><small>公式サイト等を最後に確認した日です。</small></label>
           <label className="admin-field admin-field--wide"><span>説明</span><textarea rows={5} maxLength={500} value={draft.description} onChange={(event) => update("description", event.target.value)} /></label>
           <label className="admin-field admin-field--wide"><span>活動記録</span><textarea rows={3} value={(draft.activityRecords ?? []).join("\n")} onChange={(event) => update("activityRecords", event.target.value.split("\n").map((line) => line.trim()).filter(Boolean))} /><small>例：103期 第5話。1行につき1件で入力してください。</small></label>
           <label className="admin-field admin-field--wide"><span>せーはす！放送回</span><textarea rows={3} value={(draft.sehasEpisodes ?? []).join("\n")} onChange={(event) => update("sehasEpisodes", event.target.value.split("\n").map((line) => line.trim()).filter(Boolean))} /><small>例：103期 #28。1行につき1件で入力してください。</small></label>

@@ -15,6 +15,13 @@
       "when": 1786005298090,
       "tag": "0001_bored_firelord",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786017110973,
+      "tag": "0002_lucky_the_hood",
+      "breakpoints": true
     }
   ]
 }

@@ -151,6 +151,39 @@ function optionalStayMinutes(value, current) {
   return number;
 }
 
+function optionalTime(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const text = String(value).trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) {
+    throw new AdminError(`${label}は時刻として入力してください。`);
+  }
+  return text;
+}
+
+function optionalDate(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const text = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || Number.isNaN(Date.parse(`${text}T00:00:00Z`))) {
+    throw new AdminError(`${label}が正しくありません。`);
+  }
+  return text;
+}
+
+function optionalText(value, label, maximum) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const text = String(value).trim();
+  if (text.length > maximum) throw new AdminError(`${label}は${maximum}文字以内にしてください。`);
+  return text;
+}
+
+function closedWeekdays(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
+    throw new AdminError("休業曜日が正しくありません。");
+  }
+  return Array.from(new Set(value)).sort();
+}
+
 function officialUrl(value) {
   const text = requiredText(value, "参照URL", 500);
   let parsed;
@@ -186,6 +219,14 @@ function validateSpot(value, spotId, current) {
     current.appearances,
     "カード・その他の登場情報",
   );
+  const openingTime = optionalTime(value.openingTime, "営業開始時刻");
+  const closingTime = optionalTime(value.closingTime, "営業終了時刻");
+  if (Boolean(openingTime) !== Boolean(closingTime)) {
+    throw new AdminError("営業開始時刻と終了時刻は両方入力してください。");
+  }
+  if (openingTime && closingTime && openingTime >= closingTime) {
+    throw new AdminError("営業終了時刻は開始時刻より後にしてください。");
+  }
   return {
     ...current,
     id: spotId,
@@ -201,6 +242,11 @@ function validateSpot(value, spotId, current) {
       value.recommendedStayMinutes,
       current.recommendedStayMinutes,
     ),
+    openingTime,
+    closingTime,
+    closedWeekdays: closedWeekdays(value.closedWeekdays),
+    openingHoursNote: optionalText(value.openingHoursNote, "営業時間の補足", 300),
+    openingHoursCheckedAt: optionalDate(value.openingHoursCheckedAt, "営業時間の確認日"),
     activityRecords,
     sehasEpisodes,
     accessNote: requiredText(value.accessNote, "アクセス案内", 160),
