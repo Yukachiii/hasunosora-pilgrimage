@@ -987,6 +987,30 @@ button {
   list-style: none;
 }
 
+.itinerary-editor > ol {
+  max-height: min(46vh, 500px);
+  padding: 2px 7px 2px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(125, 185, 196, 0.8) rgba(125, 185, 196, 0.12);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.itinerary-editor > ol::-webkit-scrollbar {
+  width: 7px;
+}
+
+.itinerary-editor > ol::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.12);
+}
+
+.itinerary-editor > ol::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.8);
+}
+
 .itinerary-editor li {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
@@ -2597,6 +2621,10 @@ footer > span {
 
   .itinerary-editor li {
     grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .itinerary-editor > ol {
+    max-height: min(44vh, 390px);
   }
 
   .itinerary-actions {
