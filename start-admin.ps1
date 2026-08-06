@@ -14,7 +14,7 @@ $Host.UI.RawUI.WindowTitle = "Hasunosora Pilgrimage Local Admin"
 function Test-AdminServer {
     try {
         $response = Invoke-WebRequest -UseBasicParsing -Uri $AdminUrl -TimeoutSec 1
-        return $response.StatusCode -eq 200 -and $response.Content -match "蓮ノ旅 管理室"
+        return $response.StatusCode -eq 200
     }
     catch {
         return $false
@@ -22,7 +22,7 @@ function Test-AdminServer {
 }
 
 if (Test-AdminServer) {
-    Write-Host "管理サーバーは既に起動しています: $AdminUrl"
+    Write-Host "The local admin server is already running: $AdminUrl"
     if ($OpenBrowser) {
         Start-Process $AdminUrl
     }
@@ -31,27 +31,26 @@ if (Test-AdminServer) {
 
 $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
 if (-not $npm) {
-    Write-Host "Node.jsが見つかりません。" -ForegroundColor Red
-    Read-Host "Enterキーで閉じる"
+    Write-Host "Node.js was not found. Please install Node.js first." -ForegroundColor Red
+    Read-Host "Press Enter to close"
     exit 1
 }
 
-Write-Host "ローカル管理画面を準備しています…"
+Write-Host "Preparing the local admin page..."
 & $npm.Source run build:admin
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "管理画面の準備に失敗しました。" -ForegroundColor Red
-    Read-Host "Enterキーで閉じる"
+    Write-Host "Failed to prepare the local admin page." -ForegroundColor Red
+    Read-Host "Press Enter to close"
     exit $LASTEXITCODE
 }
 
 Write-Host ""
-Write-Host "管理画面: $AdminUrl"
-Write-Host "終了するときは Ctrl+C を押すか、このウィンドウを閉じてください。"
+Write-Host "Admin page: $AdminUrl"
+Write-Host "Press Ctrl+C or close this window to stop the server."
 Write-Host ""
 
 if ($OpenBrowser) {
-    $escapedUrl = $AdminUrl.Replace("'", "''")
-    $browserCommand = "Start-Sleep -Milliseconds 800; Start-Process '$escapedUrl'"
+    $browserCommand = "Start-Sleep -Milliseconds 800; Start-Process '$AdminUrl'"
     Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
         "-NoProfile",
         "-WindowStyle", "Hidden",
@@ -62,7 +61,7 @@ if ($OpenBrowser) {
 & node.exe "server.mjs" "--bind" $HostName "--port" $Port
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
-    Write-Host "管理サーバーを起動できませんでした。" -ForegroundColor Red
-    Read-Host "Enterキーで閉じる"
+    Write-Host "Failed to start the local admin server." -ForegroundColor Red
+    Read-Host "Press Enter to close"
 }
 exit $exitCode

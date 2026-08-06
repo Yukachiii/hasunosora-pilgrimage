@@ -14,7 +14,10 @@ const sitePath = path.join(contentDirectory, "site.json");
 const photosDirectory = path.join(projectDirectory, "public", "photos");
 const writeToken = randomBytes(32).toString("base64url");
 const maximumJsonBody = 8 * 1024 * 1024;
-const allowedCategories = new Set(["交通", "まち歩き", "眺望", "宿泊", "甘味", "海辺", "文化"]);
+const allowedCategories = new Set([
+  "交通", "まち歩き", "眺望", "宿泊", "甘味", "海辺", "文化",
+  "飲食", "買い物", "レジャー", "寺社",
+]);
 const spotIdPattern = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const assetIdPattern = /^(?:[a-f0-9]{16}|kanazawa-station-20260724)$/;
 let writeQueue = Promise.resolve();
@@ -118,6 +121,14 @@ function requiredText(value, label, maximum) {
   return text;
 }
 
+function optionalTextList(value, current, label) {
+  const items = value ?? current ?? [];
+  if (!Array.isArray(items) || items.length > 20) {
+    throw new AdminError(`${label}が正しくありません。`);
+  }
+  return items.map((item) => requiredText(item, label, 160));
+}
+
 function coordinate(value, label, minimum, maximum) {
   const number = Number(value);
   if (!Number.isFinite(number) || number < minimum || number > maximum) {
@@ -127,15 +138,15 @@ function coordinate(value, label, minimum, maximum) {
 }
 
 function officialUrl(value) {
-  const text = requiredText(value, "公式URL", 500);
+  const text = requiredText(value, "参照URL", 500);
   let parsed;
   try {
     parsed = new URL(text);
   } catch {
-    throw new AdminError("公式URLはhttpまたはhttpsで入力してください。");
+    throw new AdminError("参照URLはhttpまたはhttpsで入力してください。");
   }
   if (!new Set(["http:", "https:"]).has(parsed.protocol)) {
-    throw new AdminError("公式URLはhttpまたはhttpsで入力してください。");
+    throw new AdminError("参照URLはhttpまたはhttpsで入力してください。");
   }
   return text;
 }
@@ -146,6 +157,21 @@ function validateSpot(value, spotId, current) {
   }
   const category = requiredText(value.category, "カテゴリ", 30);
   if (!allowedCategories.has(category)) throw new AdminError("カテゴリが正しくありません。");
+  const activityRecords = optionalTextList(
+    value.activityRecords,
+    current.activityRecords,
+    "活動記録",
+  );
+  const sehasEpisodes = optionalTextList(
+    value.sehasEpisodes,
+    current.sehasEpisodes,
+    "せーはす！放送回",
+  );
+  const normalizedAppearances = optionalTextList(
+    value.appearances,
+    current.appearances,
+    "カード・その他の登場情報",
+  );
   return {
     ...current,
     id: spotId,
@@ -157,8 +183,11 @@ function validateSpot(value, spotId, current) {
     lat: coordinate(value.lat, "緯度", -90, 90),
     lng: coordinate(value.lng, "経度", -180, 180),
     description: requiredText(value.description, "説明", 500),
+    activityRecords,
+    sehasEpisodes,
     accessNote: requiredText(value.accessNote, "アクセス案内", 160),
     sourceUrl: officialUrl(value.sourceUrl),
+    appearances: normalizedAppearances,
   };
 }
 
@@ -523,6 +552,19 @@ async function requestHandler(request, response, initialSpots) {
           return;
         }
         sendJson(response, await publishToGitHub());
+        return;
+      }
+
+      if (request.method === "POST" && pathname === "/api/admin/shutdown") {
+        if (!requireWriteAccess(request, response)) return;
+        response.once("finish", () => {
+          setTimeout(() => {
+            console.log("Hasunosora Admin: stopped from the admin page.");
+            server.close(() => process.exit(0));
+            server.closeIdleConnections?.();
+          }, 100);
+        });
+        sendJson(response, { stopped: true });
         return;
       }
 

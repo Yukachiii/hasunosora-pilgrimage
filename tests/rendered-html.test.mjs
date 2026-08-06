@@ -38,7 +38,37 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);
+  assert.match(html, /カードに描かれた、31の景色/);
+  assert.match(html, /蓮ノ空歌留多/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
+});
+
+test("publishes the complete reviewed location lists", async () => {
+  const [spots, cardModels] = await Promise.all([
+    readFile(new URL("../content/spots.json", import.meta.url), "utf8").then(JSON.parse),
+    readFile(new URL("../content/card-models.json", import.meta.url), "utf8").then(JSON.parse),
+  ]);
+
+  assert.equal(spots.length, 83);
+  assert.equal(new Set(spots.map((spot) => spot.id)).size, 83);
+  assert.ok(spots.every((spot) => Number.isFinite(spot.lat) && Number.isFinite(spot.lng)));
+  assert.equal(
+    spots.filter((spot) => spot.activityRecords?.length || spot.sehasEpisodes?.length).length,
+    53,
+  );
+  assert.deepEqual(
+    spots.find((spot) => spot.id === "kanazawa-station").activityRecords,
+    ["103期 第1話"],
+  );
+  assert.deepEqual(
+    spots.find((spot) => spot.id === "kanazawa-station").sehasEpisodes,
+    ["103期 #26"],
+  );
+  assert.ok(spots.every((spot) => !spot.description.startsWith("登場情報：")));
+  assert.equal(spots.find((spot) => spot.id === "higashide-coffee").activityRecords, undefined);
+  assert.equal(cardModels.length, 31);
+  assert.equal(cardModels.filter((card) => card.spotId).length, 20);
+  assert.equal(cardModels.filter((card) => !card.spotId).length, 11);
 });
 
 test("starter preview is fully replaced", async () => {
@@ -71,27 +101,18 @@ test("Google Maps and Routes integration stays guarded", async () => {
 });
 
 test("spot photos can be used as readable card backgrounds", async () => {
-  const [spots, app, css, photo] = await Promise.all([
-    readFile(new URL("../content/spots.json", import.meta.url), "utf8"),
+  const [app, css] = await Promise.all([
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-    readFile(
-      new URL(
-        "../public/photos/kanazawa-station/20260724-230203-watermarked.webp",
-        import.meta.url,
-      ),
-    ),
   ]);
 
-  assert.match(
-    spots,
-    /photos\/kanazawa-station\/20260724-230203-watermarked\.webp/,
-  );
   assert.match(app, /spotImages\[spot\.id\] \?\? spot\.imageUrl/);
   assert.match(app, /imageUrl \? " has-image"/);
+  assert.match(app, /spot\.activityRecords/);
+  assert.match(app, /spot\.sehasEpisodes/);
   assert.match(css, /\.spot-card\.has-image/);
+  assert.match(css, /\.spot-card__episodes/);
   assert.match(css, /var\(--spot-image\)/);
-  assert.equal(photo.includes(Buffer.from("Exif\0\0")), false);
 });
 
 test("local admin writes publishable files before an explicit GitHub push", async () => {

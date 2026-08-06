@@ -244,6 +244,8 @@ export function AdminApp({
   const [publishStatus, setPublishStatus] = useState<PublishStatus | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishMessage, setPublishMessage] = useState("");
+  const [shuttingDown, setShuttingDown] = useState(false);
+  const [serverStopped, setServerStopped] = useState(false);
 
   useEffect(() => {
     if (!localMode) return;
@@ -285,6 +287,29 @@ export function AdminApp({
     }
   }
 
+  async function shutdownServer() {
+    if (!localMode || !localToken || shuttingDown || serverStopped) return;
+    if (!window.confirm(
+      "管理サーバーを終了しますか？まだ保存していない入力内容は失われます。",
+    )) return;
+
+    setShuttingDown(true);
+    setPublishMessage("");
+    try {
+      const response = await fetch("/api/admin/shutdown", {
+        method: "POST",
+        headers: { "x-local-admin-token": localToken },
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "管理サーバーを終了できませんでした。");
+      setServerStopped(true);
+      setPublishMessage("管理サーバーを終了しました。このタブは閉じてかまいません。");
+    } catch (error) {
+      setPublishMessage(error instanceof Error ? error.message : "管理サーバーを終了できませんでした。");
+      setShuttingDown(false);
+    }
+  }
+
   return (
     <main className="admin-shell">
       <header className="admin-header">
@@ -302,19 +327,31 @@ export function AdminApp({
           {localMode ? (
             <>
               <span>{publishStatus?.hasLocalChanges ? "未公開の変更あり" : "ローカル専用"}</span>
-              <button
-                className="admin-publish admin-publish--compact"
-                type="button"
-                disabled={
-                  publishing ||
-                  !publishStatus?.available ||
-                  !publishStatus.remoteConfigured ||
-                  !publishStatus.identityConfigured
-                }
-                onClick={publishToGitHub}
-              >
-                {publishing ? "公開中…" : "GitHub Pagesへ公開"}
-              </button>
+              <div className="admin-account__actions">
+                <button
+                  className="admin-publish admin-publish--compact"
+                  type="button"
+                  disabled={
+                    publishing ||
+                    shuttingDown ||
+                    serverStopped ||
+                    !publishStatus?.available ||
+                    !publishStatus.remoteConfigured ||
+                    !publishStatus.identityConfigured
+                  }
+                  onClick={publishToGitHub}
+                >
+                  {publishing ? "公開中…" : "GitHub Pagesへ公開"}
+                </button>
+                <button
+                  className="admin-shutdown"
+                  type="button"
+                  disabled={shuttingDown || serverStopped}
+                  onClick={shutdownServer}
+                >
+                  {serverStopped ? "終了済み" : shuttingDown ? "終了中…" : "サーバーを終了"}
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -820,8 +857,11 @@ function SpotManager({
           <label className="admin-field"><span>緯度</span><input type="number" step="any" value={draft.lat} onChange={(event) => update("lat", Number(event.target.value))} /></label>
           <label className="admin-field"><span>経度</span><input type="number" step="any" value={draft.lng} onChange={(event) => update("lng", Number(event.target.value))} /></label>
           <label className="admin-field admin-field--wide"><span>説明</span><textarea rows={5} maxLength={500} value={draft.description} onChange={(event) => update("description", event.target.value)} /></label>
+          <label className="admin-field admin-field--wide"><span>活動記録</span><textarea rows={3} value={(draft.activityRecords ?? []).join("\n")} onChange={(event) => update("activityRecords", event.target.value.split("\n").map((line) => line.trim()).filter(Boolean))} /><small>例：103期 第5話。1行につき1件で入力してください。</small></label>
+          <label className="admin-field admin-field--wide"><span>せーはす！放送回</span><textarea rows={3} value={(draft.sehasEpisodes ?? []).join("\n")} onChange={(event) => update("sehasEpisodes", event.target.value.split("\n").map((line) => line.trim()).filter(Boolean))} /><small>例：103期 #28。1行につき1件で入力してください。</small></label>
+          <label className="admin-field admin-field--wide"><span>カード・その他の登場情報</span><textarea rows={4} value={(draft.appearances ?? []).join("\n")} onChange={(event) => update("appearances", event.target.value.split("\n").map((line) => line.trim()).filter(Boolean))} /><small>カード背景などを1行につき1件で入力してください。</small></label>
           <label className="admin-field admin-field--wide"><span>アクセス案内</span><input value={draft.accessNote} maxLength={160} onChange={(event) => update("accessNote", event.target.value)} /></label>
-          <label className="admin-field admin-field--wide"><span>施設・観光公式URL</span><input type="url" value={draft.sourceUrl} maxLength={500} onChange={(event) => update("sourceUrl", event.target.value)} /></label>
+          <label className="admin-field admin-field--wide"><span>場所・公式情報URL</span><input type="url" value={draft.sourceUrl} maxLength={500} onChange={(event) => update("sourceUrl", event.target.value)} /></label>
         </div>
         <div className="spot-form__actions">
           <button className="admin-publish" type="submit" disabled={saving}>{saving ? "保存中…" : "修正を保存する"}<span>→</span></button>

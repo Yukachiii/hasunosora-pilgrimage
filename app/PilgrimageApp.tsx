@@ -10,7 +10,7 @@ import {
   GooglePilgrimageMap,
   type RouteResult,
 } from "./GooglePilgrimageMap";
-import type { PilgrimageSpot } from "./spots";
+import { cardModels, type PilgrimageSpot } from "./spots";
 
 type TravelMode = "WALKING" | "DRIVING" | "TRANSIT" | "BICYCLING";
 
@@ -48,6 +48,29 @@ export function PilgrimageApp({
   const [routeRequestId, setRouteRequestId] = useState(0);
   const [hasRequestedRoute, setHasRequestedRoute] = useState(false);
   const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
+  const [spotQuery, setSpotQuery] = useState("");
+  const [areaFilter, setAreaFilter] = useState("すべて");
+
+  const areas = useMemo(
+    () => Array.from(new Set(spots.map((spot) => spot.area))),
+    [spots],
+  );
+  const filteredSpots = useMemo(() => {
+    const normalizedQuery = spotQuery.trim().toLocaleLowerCase("ja");
+    return spots.filter((spot) => {
+      if (areaFilter !== "すべて" && spot.area !== areaFilter) return false;
+      if (!normalizedQuery) return true;
+      return [
+        spot.name,
+        spot.shortName,
+        spot.address,
+        spot.category,
+        ...(spot.activityRecords ?? []),
+        ...(spot.sehasEpisodes ?? []),
+        ...(spot.appearances ?? []),
+      ].some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
+    });
+  }, [areaFilter, spotQuery, spots]);
 
   const spotById = (id: string) => spots.find((spot) => spot.id === id);
   const selectedSpot = spotById(selectedId) ?? spots[0];
@@ -112,6 +135,7 @@ export function PilgrimageApp({
         <nav className="desktop-nav" aria-label="メインナビゲーション">
           <a href="#map">巡礼マップ</a>
           <a href="#spots">スポット</a>
+          <a href="#card-models">カードモデル地</a>
           <a href="#guide">巡礼のしおり</a>
         </nav>
         <a
@@ -148,7 +172,7 @@ export function PilgrimageApp({
             <em>同じ景色</em>を歩こう。
           </h1>
           <p className="hero-lead">
-            金沢から加賀まで、作品にまつわる場所をひとつの地図に。
+            金沢から能登・加賀まで、作品にまつわる場所をひとつの地図に。
             行きたい場所を選んだら、そのまま次の景色へ向かえます。
           </p>
           <div className="hero-actions">
@@ -174,7 +198,7 @@ export function PilgrimageApp({
             <strong>KANAZAWA</strong>
             <span>36.5781° N · 136.6481° E</span>
           </div>
-          <div className="vertical-copy">ONE STORY · SEVEN PLACES</div>
+          <div className="vertical-copy">ONE STORY · {spots.length} PLACES</div>
         </div>
         <div className="hero-stats">
           <div>
@@ -182,7 +206,7 @@ export function PilgrimageApp({
             <span>SPOTS</span>
           </div>
           <div>
-            <strong>4</strong>
+            <strong>{areas.length}</strong>
             <span>AREAS</span>
           </div>
           <div>
@@ -264,10 +288,12 @@ export function PilgrimageApp({
                       setRouteResult({ state: "idle" });
                     }}
                   >
-                    {spots.map((spot) => (
-                      <option key={spot.id} value={spot.id}>
-                        {spot.shortName}
-                      </option>
+                    {areas.map((area) => (
+                      <optgroup label={area} key={area}>
+                        {spots.filter((spot) => spot.area === area).map((spot) => (
+                          <option key={spot.id} value={spot.id}>{spot.shortName}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </span>
@@ -292,10 +318,12 @@ export function PilgrimageApp({
                       setRouteResult({ state: "idle" });
                     }}
                   >
-                    {spots.map((spot) => (
-                      <option key={spot.id} value={spot.id}>
-                        {spot.shortName}
-                      </option>
+                    {areas.map((area) => (
+                      <optgroup label={area} key={area}>
+                        {spots.filter((spot) => spot.area === area).map((spot) => (
+                          <option key={spot.id} value={spot.id}>{spot.shortName}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </span>
@@ -383,16 +411,37 @@ export function PilgrimageApp({
         <div className="section-heading">
           <div>
             <p className="section-number">02 — SPOT LIST</p>
-            <h2>物語をたどる、{spots.length}つの場所</h2>
+            <h2>物語をたどる、{spots.length}か所</h2>
           </div>
           <p>
-            今回はMVP用の初期スポットです。作品内の登場場面や比較写真は、
-            場所リスト確定後に追加できます。
+            活動記録・せーはす！・関連映像等から整理した一覧です。
+            名称や営業情報は、訪問前に各施設の最新案内も確認してください。
           </p>
         </div>
 
+        <div className="spot-filters" aria-label="スポットの絞り込み">
+          <label>
+            <span>キーワード</span>
+            <input
+              type="search"
+              value={spotQuery}
+              onChange={(event) => setSpotQuery(event.target.value)}
+              placeholder="施設名・住所・登場回で検索"
+            />
+          </label>
+          <label>
+            <span>エリア</span>
+            <select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}>
+              <option>すべて</option>
+              {areas.map((area) => <option key={area}>{area}</option>)}
+            </select>
+          </label>
+          <p><strong>{filteredSpots.length}</strong> / {spots.length} SPOTS</p>
+        </div>
+
         <div className="spot-grid">
-          {spots.map((spot, index) => {
+          {filteredSpots.map((spot) => {
+            const index = spots.findIndex((item) => item.id === spot.id);
             const imageUrl = spotImages[spot.id] ?? spot.imageUrl;
             return (
             <article
@@ -430,23 +479,93 @@ export function PilgrimageApp({
                 </div>
                 <h3>{spot.name}</h3>
                 <p>{spot.description}</p>
+                {spot.activityRecords?.length || spot.sehasEpisodes?.length ? (
+                  <dl className="spot-card__episodes">
+                    {spot.activityRecords?.length ? (
+                      <div>
+                        <dt>活動記録</dt>
+                        <dd>{spot.activityRecords.join("・")}</dd>
+                      </div>
+                    ) : null}
+                    {spot.sehasEpisodes?.length ? (
+                      <div>
+                        <dt>せーはす！</dt>
+                        <dd>{spot.sehasEpisodes.join("・")}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : null}
+                {spot.appearances?.length ? (
+                  <div className="spot-card__appearances">
+                    {spot.appearances.map((appearance) => (
+                      <span key={appearance}>{appearance}</span>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="spot-card__meta">
                   <span>{spot.accessNote}</span>
                   <span aria-hidden="true">↗</span>
                 </div>
               </button>
               <a href={spot.sourceUrl} target="_blank" rel="noreferrer">
-                施設・観光公式情報
+                場所・公式情報
                 <span aria-hidden="true">↗</span>
               </a>
             </article>
           )})}
         </div>
+        {!filteredSpots.length && (
+          <p className="spot-empty">条件に合うスポットがありません。検索語かエリアを変更してください。</p>
+        )}
+      </section>
+
+      <section className="card-models-section" id="card-models">
+        <div className="section-heading">
+          <div>
+            <p className="section-number">03 — CARD MODEL LOCATIONS</p>
+            <h2>カードに描かれた、31の景色</h2>
+          </div>
+          <p>
+            現実の地点まで特定できたカードイラストを整理しています。
+            B判定は公式明記を確認できていない候補地です。
+          </p>
+        </div>
+        <div className="card-model-grid">
+          {cardModels.map((card, index) => (
+            <article className="card-model" key={card.id}>
+              <div className="card-model__topline">
+                <span>C{String(index + 1).padStart(2, "0")}</span>
+                <small className={`confidence confidence--${card.confidence.toLocaleLowerCase()}`}>
+                  判定 {card.confidence}
+                </small>
+              </div>
+              <h3>{card.card}</h3>
+              <strong>{card.model}</strong>
+              <p>{card.address}</p>
+              {card.note && <small className="card-model__note">{card.note}</small>}
+              {card.spotId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedId(card.spotId!);
+                    document.querySelector("#map")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  地図の登録スポットを見る <span aria-hidden="true">→</span>
+                </button>
+              ) : (
+                <a href={card.sourceUrl} target="_blank" rel="noreferrer">
+                  Google マップで場所を見る <span aria-hidden="true">↗</span>
+                </a>
+              )}
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="guide-section" id="guide">
         <div className="guide-intro">
-          <p className="section-number">03 — PILGRIMAGE NOTES</p>
+          <p className="section-number">04 — PILGRIMAGE NOTES</p>
           <h2>
             好きな場所を、
             <br />

@@ -174,8 +174,8 @@ export function GooglePilgrimageMap({
         };
 
         const map = new MapConstructor(mapElementRef.current, {
-          center: { lat: 36.49, lng: 136.55 },
-          zoom: 9,
+          center: { lat: 36.74, lng: 136.72 },
+          zoom: 8,
           mapId,
           mapTypeControl: false,
           streetViewControl: false,
@@ -228,7 +228,7 @@ export function GooglePilgrimageMap({
     const selected = spots.find((spot) => spot.id === selectedId);
     if (selected) {
       map.panTo({ lat: selected.lat, lng: selected.lng });
-      map.setZoom(selected.area === "加賀" || selected.area === "小松" ? 11 : 13);
+      map.setZoom(14);
     }
   }, [mapState, selectedId, spots]);
 
