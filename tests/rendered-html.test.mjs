@@ -443,6 +443,7 @@ test("Mapbox comparison MVP keeps the Google version intact", async () => {
   assert.match(html, /徒歩・自転車・車/);
   assert.match(html, /公共交通.*対象外/);
   assert.match(html, /公開トークン/);
+  assert.match(html, /地図の見た目/);
 
   const [mvp, page, pagesEntry, pagesConfig, envExample, app] = await Promise.all([
     readFile(new URL("../app/MapboxMvp.tsx", import.meta.url), "utf8"),
@@ -458,6 +459,9 @@ test("Mapbox comparison MVP keeps the Google version intact", async () => {
   assert.match(mvp, /MAX_OPTIMIZATION_STOPS = 12/);
   assert.match(mvp, /recommendedStayMinutes/);
   assert.match(mvp, /localStorage\.setItem\(TOKEN_STORAGE_KEY/);
+  assert.match(mvp, /language: "ja"/);
+  assert.match(mvp, /setConfigProperty\("basemap", "theme"/);
+  assert.match(mvp, /setConfigProperty\("basemap", "lightPreset"/);
   assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
   assert.match(pagesEntry, /VITE_MAPBOX_ACCESS_TOKEN/);
   assert.match(pagesConfig, /github-pages\/mapbox\/index\.html/);

@@ -112,6 +112,11 @@
   line-height: 1.6;
 }
 
+.noticeActions {
+  display: flex;
+  gap: 8px;
+}
+
 .notice button,
 .secondaryButton {
   border: 1px solid rgba(31, 45, 61, 0.25);
@@ -133,6 +138,124 @@
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 16px 46px rgba(31, 45, 61, 0.07);
+}
+
+.appearancePanel {
+  margin: 0 0 24px;
+  padding: 28px;
+  border: 1px solid rgba(95, 174, 190, 0.35);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(232, 245, 246, 0.88));
+  box-shadow: 0 16px 46px rgba(31, 45, 61, 0.07);
+}
+
+.appearanceHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: start;
+}
+
+.appearanceHeading h2 {
+  margin: 0;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: clamp(25px, 3vw, 38px);
+  font-weight: 500;
+}
+
+.appearanceHeading p:not(.sectionLabel) {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.appearanceFields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.appearanceFields .field {
+  margin-top: 0;
+}
+
+.colorField {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.colorField > span {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.colorField input {
+  width: 48px;
+  height: 44px;
+  border: 1px solid rgba(31, 45, 61, 0.22);
+  border-radius: 8px;
+  padding: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.colorField code {
+  align-self: stretch;
+  display: grid;
+  min-width: 0;
+  place-items: center start;
+  border: 1px solid rgba(31, 45, 61, 0.22);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.appearanceToggles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.appearanceToggles label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+}
+
+.appearanceToggles input {
+  width: 18px;
+  height: 18px;
+  accent-color: #63aebd;
+}
+
+.appearanceToggles span {
+  display: grid;
+  gap: 3px;
+}
+
+.appearanceToggles strong {
+  font-size: 12px;
+}
+
+.appearanceToggles small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .tokenPanel h2,
@@ -752,6 +875,10 @@
   .searchResults {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .appearanceFields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -793,10 +920,31 @@
     grid-row: 2;
   }
 
+  .noticeActions {
+    flex-direction: column;
+  }
+
   .tokenPanel {
     grid-template-columns: 1fr;
     gap: 20px;
     padding: 20px;
+  }
+
+  .appearancePanel {
+    padding: 20px;
+  }
+
+  .appearanceHeading {
+    display: grid;
+  }
+
+  .appearanceHeading .secondaryButton {
+    justify-self: start;
+  }
+
+  .appearanceFields,
+  .appearanceToggles {
+    grid-template-columns: 1fr;
   }
 
   .tokenForm {

@@ -11,6 +11,10 @@ type TravelProfile =
   | "mapbox/driving"
   | "mapbox/driving-traffic";
 
+type MapLanguage = "ja" | "auto" | "en" | "local";
+type MapTheme = "default" | "faded" | "monochrome";
+type LightPreset = "day" | "dawn" | "dusk" | "night";
+
 type MapboxMvpProps = {
   initialToken?: string;
   spots: PilgrimageSpot[];
@@ -104,8 +108,16 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
   const [token, setToken] = useState(initialToken.trim());
   const [tokenDraft, setTokenDraft] = useState(initialToken.trim());
   const [showTokenSetup, setShowTokenSetup] = useState(!initialToken.trim());
+  const [showAppearance, setShowAppearance] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapMessage, setMapMessage] = useState("");
+  const [mapLanguage, setMapLanguage] = useState<MapLanguage>("ja");
+  const [mapTheme, setMapTheme] = useState<MapTheme>("faded");
+  const [lightPreset, setLightPreset] = useState<LightPreset>("day");
+  const [showPoiLabels, setShowPoiLabels] = useState(true);
+  const [showTransitLabels, setShowTransitLabels] = useState(true);
+  const [show3dObjects, setShow3dObjects] = useState(false);
+  const [routeColor, setRouteColor] = useState("#6eb7c6");
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
     const available = new Set(spots.map((spot) => spot.id));
     return DEFAULT_SPOT_IDS.filter((id) => available.has(id));
@@ -176,6 +188,16 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: "mapbox://styles/mapbox/standard",
+      language: "ja",
+      config: {
+        basemap: {
+          theme: "faded",
+          lightPreset: "day",
+          showPointOfInterestLabels: true,
+          showTransitLabels: true,
+          show3dObjects: false,
+        },
+      },
       center: [136.6562, 36.5708],
       zoom: 12.6,
       attributionControl: true,
@@ -198,6 +220,30 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
       setMapReady(false);
     };
   }, [token]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    map.setLanguage(mapLanguage === "local" ? undefined : mapLanguage);
+    map.setConfigProperty("basemap", "theme", mapTheme);
+    map.setConfigProperty("basemap", "lightPreset", lightPreset);
+    map.setConfigProperty("basemap", "showPointOfInterestLabels", showPoiLabels);
+    map.setConfigProperty("basemap", "showTransitLabels", showTransitLabels);
+    map.setConfigProperty("basemap", "show3dObjects", show3dObjects);
+    if (map.getLayer("mvp-route-line")) {
+      map.setPaintProperty("mvp-route-line", "line-color", routeColor);
+    }
+  }, [
+    lightPreset,
+    mapLanguage,
+    mapReady,
+    mapTheme,
+    routeColor,
+    show3dObjects,
+    showPoiLabels,
+    showTransitLabels,
+  ]);
 
   const toggleSpot = useCallback((spotId: string) => {
     setRouteResult(null);
@@ -264,7 +310,7 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
         type: "line",
         source: "mvp-route",
         paint: {
-          "line-color": "#6eb7c6",
+          "line-color": routeColor,
           "line-width": 5,
           "line-opacity": 0.95,
         },
@@ -274,7 +320,7 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
     const bounds = new mapboxgl.LngLatBounds();
     routeResult.geometry.coordinates.forEach(([lng, lat]) => bounds.extend([lng, lat]));
     map.fitBounds(bounds, { padding: 70, maxZoom: 15, duration: 700 });
-  }, [mapReady, routeResult]);
+  }, [mapReady, routeColor, routeResult]);
 
   function applyToken() {
     const nextToken = tokenDraft.trim();
@@ -302,6 +348,16 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
     setTokenDraft("");
     setRouteResult(null);
     setShowTokenSetup(true);
+  }
+
+  function resetAppearance() {
+    setMapLanguage("ja");
+    setMapTheme("faded");
+    setLightPreset("day");
+    setShowPoiLabels(true);
+    setShowTransitLabels(true);
+    setShow3dObjects(false);
+    setRouteColor("#6eb7c6");
   }
 
   function moveSpot(index: number, direction: -1 | 1) {
@@ -429,9 +485,14 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
       <section className={styles.notice}>
         <strong>比較用MVP</strong>
         <span>公共交通と東京・大阪からの経路は対象外です。現地での徒歩・自転車・車を比較します。</span>
-        <button type="button" onClick={() => setShowTokenSetup((current) => !current)}>
-          接続設定
-        </button>
+        <div className={styles.noticeActions}>
+          <button type="button" onClick={() => setShowAppearance((current) => !current)}>
+            地図の見た目
+          </button>
+          <button type="button" onClick={() => setShowTokenSetup((current) => !current)}>
+            接続設定
+          </button>
+        </div>
       </section>
 
       {showTokenSetup && (
@@ -456,6 +517,68 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
             {token && <button type="button" className={styles.secondaryButton} onClick={clearToken}>削除</button>}
           </div>
           {mapMessage && <p className={styles.errorText}>{mapMessage}</p>}
+        </section>
+      )}
+
+      {showAppearance && (
+        <section className={styles.appearancePanel} aria-label="地図の見た目設定">
+          <div className={styles.appearanceHeading}>
+            <div>
+              <p className={styles.sectionLabel}>MAP APPEARANCE</p>
+              <h2>地図の見た目を調整</h2>
+              <p>変更はすぐ地図へ反映され、ルートの再検索は必要ありません。</p>
+            </div>
+            <button type="button" className={styles.secondaryButton} onClick={resetAppearance}>
+              初期設定に戻す
+            </button>
+          </div>
+          <div className={styles.appearanceFields}>
+            <label className={styles.field}>
+              <span>地名の言語</span>
+              <select value={mapLanguage} onChange={(event) => setMapLanguage(event.target.value as MapLanguage)}>
+                <option value="ja">日本語</option>
+                <option value="auto">端末の言語</option>
+                <option value="local">現地語</option>
+                <option value="en">英語</option>
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>地図の雰囲気</span>
+              <select value={mapTheme} onChange={(event) => setMapTheme(event.target.value as MapTheme)}>
+                <option value="faded">やわらかい</option>
+                <option value="default">標準</option>
+                <option value="monochrome">モノクロ</option>
+              </select>
+            </label>
+            <label className={styles.field}>
+              <span>時間帯</span>
+              <select value={lightPreset} onChange={(event) => setLightPreset(event.target.value as LightPreset)}>
+                <option value="day">昼</option>
+                <option value="dawn">朝</option>
+                <option value="dusk">夕方</option>
+                <option value="night">夜</option>
+              </select>
+            </label>
+            <label className={styles.colorField}>
+              <span>ルート線の色</span>
+              <input type="color" value={routeColor} onChange={(event) => setRouteColor(event.target.value)} />
+              <code>{routeColor.toUpperCase()}</code>
+            </label>
+          </div>
+          <div className={styles.appearanceToggles}>
+            <label>
+              <input type="checkbox" checked={showPoiLabels} onChange={(event) => setShowPoiLabels(event.target.checked)} />
+              <span><strong>施設名</strong><small>店舗や観光地の名称</small></span>
+            </label>
+            <label>
+              <input type="checkbox" checked={showTransitLabels} onChange={(event) => setShowTransitLabels(event.target.checked)} />
+              <span><strong>交通表示</strong><small>駅や交通機関の名称</small></span>
+            </label>
+            <label>
+              <input type="checkbox" checked={show3dObjects} onChange={(event) => setShow3dObjects(event.target.checked)} />
+              <span><strong>立体表示</strong><small>建物やランドマーク</small></span>
+            </label>
+          </div>
         </section>
       )}
 
