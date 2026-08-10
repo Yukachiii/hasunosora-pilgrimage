@@ -695,6 +695,7 @@ export function PilgrimageApp({
           <a href="#collaborations">コラボ</a>
           <a href="#spots">スポット</a>
           <a href="#card-models">カードモデル地</a>
+          <a href="./mapbox/">Mapbox β</a>
           <a href="#guide">巡礼のしおり</a>
         </nav>
         <a
@@ -748,6 +749,10 @@ export function PilgrimageApp({
             <a className="text-link" href="#spots">
               全{spots.length}スポットを見る
               <span aria-hidden="true">→</span>
+            </a>
+            <a className="text-link" href="./mapbox/">
+              Mapbox比較版 β
+              <span aria-hidden="true">↗</span>
             </a>
           </div>
         </div>

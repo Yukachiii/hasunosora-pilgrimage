@@ -428,3 +428,39 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /Public page: touch-first layout/);
   assert.match(css, /\.mobile-nav/);
 });
+
+test("Mapbox comparison MVP keeps the Google version intact", async () => {
+  const response = await requestApp(new Request("http://localhost/mapbox", {
+    headers: {
+      accept: "text/html",
+      host: "localhost",
+    },
+  }));
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /MAPBOX COMPARISON MVP/);
+  assert.match(html, /最大.*12.*SPOTS/);
+  assert.match(html, /徒歩・自転車・車/);
+  assert.match(html, /公共交通.*対象外/);
+  assert.match(html, /公開トークン/);
+
+  const [mvp, page, pagesEntry, pagesConfig, envExample, app] = await Promise.all([
+    readFile(new URL("../app/MapboxMvp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/mapbox/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/mapbox/main.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../vite.pages.config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../.env.example", import.meta.url), "utf8"),
+    readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(mvp, /optimized-trips\/v1/);
+  assert.match(mvp, /directions\/v5/);
+  assert.match(mvp, /MAX_OPTIMIZATION_STOPS = 12/);
+  assert.match(mvp, /recommendedStayMinutes/);
+  assert.match(mvp, /localStorage\.setItem\(TOKEN_STORAGE_KEY/);
+  assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
+  assert.match(pagesEntry, /VITE_MAPBOX_ACCESS_TOKEN/);
+  assert.match(pagesConfig, /github-pages\/mapbox\/index\.html/);
+  assert.match(envExample, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
+  assert.match(app, /Mapbox比較版 β/);
+});

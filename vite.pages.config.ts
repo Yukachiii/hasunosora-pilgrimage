@@ -1,4 +1,5 @@
 import react from "@vitejs/plugin-react";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -11,5 +12,11 @@ export default defineConfig({
     outDir: "../pages-dist",
     emptyOutDir: true,
     sourcemap: false,
+    rollupOptions: {
+      input: {
+        main: resolve("github-pages/index.html"),
+        mapbox: resolve("github-pages/mapbox/index.html"),
+      },
+    },
   },
 });
