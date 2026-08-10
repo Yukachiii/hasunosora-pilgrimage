@@ -81,6 +81,16 @@ function defaultStayMinutes(spot: PilgrimageSpot) {
   return spot.recommendedStayMinutes ?? 30;
 }
 
+function buildGoogleTransitUrl(origin: PilgrimageSpot, destination: PilgrimageSpot) {
+  const params = new URLSearchParams({
+    api: "1",
+    origin: `${origin.name}, ${origin.address}`,
+    destination: `${destination.name}, ${destination.address}`,
+    travelmode: "transit",
+  });
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
 function buildSchedule(
   result: RouteResult | null,
   stays: Record<string, number>,
@@ -731,6 +741,9 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
               <span><small>終了</small><strong>{formatClock(endTime)}</strong></span>
             </div>
           </div>
+          <p className={styles.transitGuide}>
+            公共交通の時刻・運賃は変わることがあります。各区間のボタンからGoogle Mapsを開き、出発前に最新の経路をご確認ください。
+          </p>
           <ol className={styles.schedule}>
             {schedule.map((entry, index) => (
               <li key={entry.spot.id}>
@@ -738,6 +751,23 @@ export function MapboxMvp({ initialToken = "", spots }: MapboxMvpProps) {
                 <div>
                   <span>SPOT {String(index + 1).padStart(2, "0")}</span>
                   <h3>{entry.spot.name}</h3>
+                  {entry.nextTravelSeconds !== null && schedule[index + 1] && (
+                    <div className={styles.transitLeg}>
+                      <div>
+                        <small>PUBLIC TRANSIT</small>
+                        <strong>{entry.spot.name} → {schedule[index + 1].spot.name}</strong>
+                      </div>
+                      <a
+                        href={buildGoogleTransitUrl(entry.spot, schedule[index + 1].spot)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`${entry.spot.name}から${schedule[index + 1].spot.name}までの公共交通ルートをGoogle Mapsで確認`}
+                      >
+                        Google Mapsで公共交通を確認
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    </div>
+                  )}
                   <p>{entry.stayMinutes}分滞在・{formatClock(entry.departure)}出発</p>
                   {entry.nextTravelSeconds !== null && <small>次へ 約{formatDuration(entry.nextTravelSeconds)}</small>}
                 </div>

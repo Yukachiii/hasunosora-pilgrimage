@@ -462,6 +462,9 @@ test("Mapbox comparison MVP keeps the Google version intact", async () => {
   assert.match(mvp, /language: "ja"/);
   assert.match(mvp, /setConfigProperty\("basemap", "theme"/);
   assert.match(mvp, /setConfigProperty\("basemap", "lightPreset"/);
+  assert.match(mvp, /https:\/\/www\.google\.com\/maps\/dir\//);
+  assert.match(mvp, /travelmode: "transit"/);
+  assert.match(mvp, /Google Mapsで公共交通を確認/);
   assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
   assert.match(pagesEntry, /VITE_MAPBOX_ACCESS_TOKEN/);
   assert.match(pagesConfig, /github-pages\/mapbox\/index\.html/);

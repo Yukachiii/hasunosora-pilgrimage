@@ -819,6 +819,61 @@
   font-size: 12px;
 }
 
+.transitGuide {
+  margin: 22px 34px 0;
+  border: 1px solid rgba(154, 215, 224, 0.3);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, 0.76);
+  background: rgba(154, 215, 224, 0.08);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.transitLeg {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin: 8px 0 4px;
+  border: 1px solid rgba(154, 215, 224, 0.28);
+  border-radius: 10px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.transitLeg > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.transitLeg strong {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transitLeg a {
+  display: inline-flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 8px;
+  padding: 11px 13px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.transitLeg a:hover {
+  background: var(--ice-pale);
+}
+
 .footer {
   display: flex;
   justify-content: space-between;
@@ -1037,6 +1092,25 @@
 
   .schedule h3 {
     font-size: 18px;
+  }
+
+  .transitGuide {
+    margin: 18px 20px 0;
+  }
+
+  .transitLeg {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .transitLeg strong {
+    white-space: normal;
+  }
+
+  .transitLeg a {
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .footer {
