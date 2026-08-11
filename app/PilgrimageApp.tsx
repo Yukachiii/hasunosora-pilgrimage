@@ -733,10 +733,7 @@ export function PilgrimageApp({
             ISHIKAWA · KANAZAWA
           </div>
           <p className="hero-kicker">蓮ノ空女学院スクールアイドルクラブ</p>
-          <h1>
-            <span className="hero-title-line">好きな物語と、</span>
-            <span className="hero-title-line"><em>同じ景色</em>を歩こう。</span>
-          </h1>
+          <h1 className="hero-title-space" aria-hidden="true" />
           <p className="hero-lead">
             金沢から能登・加賀まで、作品にまつわる場所をひとつの地図に。
             行きたい場所を選んだら、そのまま次の景色へ向かえます。

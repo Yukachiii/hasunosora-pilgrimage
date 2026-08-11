@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     openGraph: {
       title: "蓮ノ旅｜蓮ノ空・金沢 聖地巡礼ガイド",
-      description: "好きな物語と、同じ景色を歩こう。",
+      description: "蓮ノ空・金沢の舞台をめぐる、非公式の聖地巡礼ガイド。",
       type: "website",
       locale: "ja_JP",
       url: origin,
@@ -27,14 +27,14 @@ export async function generateMetadata(): Promise<Metadata> {
           url: `${origin}/og.png`,
           width: 1734,
           height: 907,
-          alt: "蓮ノ旅 — 好きな物語と、同じ景色を歩こう。",
+          alt: "蓮ノ旅 — 蓮ノ空・金沢 聖地巡礼ガイド",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
       title: "蓮ノ旅｜蓮ノ空・金沢 聖地巡礼ガイド",
-      description: "好きな物語と、同じ景色を歩こう。",
+      description: "蓮ノ空・金沢の舞台をめぐる、非公式の聖地巡礼ガイド。",
       images: [`${origin}/og.png`],
     },
   };

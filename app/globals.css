@@ -274,9 +274,8 @@ button {
   line-height: 1.17;
 }
 
-.hero-title-line {
-  display: block;
-  white-space: nowrap;
+.hero-title-space {
+  min-height: 2lh;
 }
 
 .hero h1 em,

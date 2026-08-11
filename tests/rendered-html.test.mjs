@@ -37,7 +37,8 @@ test("server-renders the pilgrimage MVP", async () => {
 
   const html = await response.text();
   assert.match(html, /蓮ノ旅/);
-  assert.match(html, /好きな物語と/);
+  assert.doesNotMatch(html, /好きな物語と|同じ景色/);
+  assert.match(html, /hero-title-space/);
   assert.match(html, /一日の巡礼予定を作る/);
   assert.match(html, /期間限定のコラボを巡る/);
   assert.match(html, /おいでよ！石川大観光Ⅱ/);

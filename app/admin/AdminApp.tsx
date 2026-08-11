@@ -930,7 +930,7 @@ function PhotoManager({
                 <div className="crop-preview__shade" />
                 <div className="crop-preview__copy">
                   <small>{placement === "hero" ? "TITLE BACKGROUND" : currentSpot?.area}</small>
-                  <strong>{placement === "hero" ? "好きな物語と、同じ景色を歩こう。" : currentSpot?.name}</strong>
+                  <strong>{placement === "hero" ? "蓮ノ旅" : currentSpot?.name}</strong>
                 </div>
               </div>
               <div className="crop-controls">
