@@ -15,7 +15,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve("github-pages/index.html"),
-        mapbox: resolve("github-pages/mapbox/index.html"),
       },
     },
   },

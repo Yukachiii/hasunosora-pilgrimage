@@ -8,10 +8,10 @@ import {
   type CSSProperties,
 } from "react";
 import {
-  GooglePilgrimageMap,
+  MapboxPilgrimageMap,
   type RouteRequest,
   type RouteResult,
-} from "./GooglePilgrimageMap";
+} from "./MapboxPilgrimageMap";
 import {
   formatOpeningHours,
   formatDuration,
@@ -46,10 +46,11 @@ const travelModes: Array<{
   value: TravelMode;
   label: string;
   icon: string;
+  disabled?: boolean;
 }> = [
   { value: "WALKING", label: "徒歩", icon: "歩" },
   { value: "DRIVING", label: "車", icon: "車" },
-  { value: "TRANSIT", label: "公共交通", icon: "交" },
+  { value: "TRANSIT", label: "公共交通（準備中）", icon: "交", disabled: true },
   { value: "BICYCLING", label: "自転車", icon: "自" },
 ];
 
@@ -120,9 +121,8 @@ function collaborationsForSpot(spot: PilgrimageSpot) {
 }
 
 type Props = {
-  googleMapsConfig: {
-    apiKey: string;
-    mapId: string;
+  mapboxConfig: {
+    accessToken: string;
   };
   routeServiceUrl?: string;
   spots: PilgrimageSpot[];
@@ -131,7 +131,7 @@ type Props = {
 };
 
 export function PilgrimageApp({
-  googleMapsConfig,
+  mapboxConfig,
   routeServiceUrl = "",
   spots,
   spotImages,
@@ -201,9 +201,9 @@ export function PilgrimageApp({
         if (draft) {
           setItineraryIds(draft.itineraryIds);
           setStayMinutes((current) => ({ ...current, ...draft.stayMinutes }));
-          setTravelMode(draft.travelMode);
+          setTravelMode(draft.travelMode === "TRANSIT" ? "WALKING" : draft.travelMode);
           setOptimizeOrder(draft.optimizeOrder);
-          setSourceStationId(draft.sourceStationId);
+          setSourceStationId("");
           setVisitDate(draft.visitDate || japanDate());
           setStartTime(draft.startTime);
           setItineraryCollaborationId(draft.itineraryCollaborationId as CollaborationId | "");
@@ -336,7 +336,6 @@ export function PilgrimageApp({
     [itineraryIds, spots],
   );
   const availableSpots = spots.filter((spot) => !itineraryIds.includes(spot.id));
-  const stationRegions = Array.from(new Set(majorStations.map((station) => station.region)));
 
   const plannedSpots = useMemo(() => {
     if (routeResult.state !== "success" || !routeResult.orderedStopIds?.length || !routeRequest) {
@@ -460,9 +459,9 @@ export function PilgrimageApp({
     const snapshot = saved.snapshot;
     setItineraryIds(snapshot.itineraryIds);
     setStayMinutes((current) => ({ ...current, ...snapshot.stayMinutes }));
-    setTravelMode(snapshot.travelMode);
+    setTravelMode(snapshot.travelMode === "TRANSIT" ? "WALKING" : snapshot.travelMode);
     setOptimizeOrder(snapshot.optimizeOrder);
-    setSourceStationId(snapshot.sourceStationId);
+    setSourceStationId("");
     setVisitDate(snapshot.visitDate || japanDate());
     setStartTime(snapshot.startTime);
     setItineraryCollaborationId(snapshot.itineraryCollaborationId as CollaborationId | "");
@@ -695,7 +694,6 @@ export function PilgrimageApp({
           <a href="#collaborations">コラボ</a>
           <a href="#spots">スポット</a>
           <a href="#card-models">カードモデル地</a>
-          <a href="./mapbox/">Mapbox β</a>
           <a href="#guide">巡礼のしおり</a>
         </nav>
         <a
@@ -747,10 +745,6 @@ export function PilgrimageApp({
               全{spots.length}スポットを見る
               <span aria-hidden="true">→</span>
             </a>
-            <a className="text-link" href="./mapbox/">
-              Mapbox比較版 β
-              <span aria-hidden="true">↗</span>
-            </a>
           </div>
         </div>
         <div className="hero-visual" aria-hidden="true">
@@ -778,7 +772,7 @@ export function PilgrimageApp({
           </div>
           <div>
             <strong>ROUTE</strong>
-            <span>BY GOOGLE MAPS</span>
+            <span>MAP BY MAPBOX</span>
           </div>
         </div>
       </section>
@@ -797,14 +791,13 @@ export function PilgrimageApp({
 
         <div className="map-layout">
           <div className="map-column">
-            <GooglePilgrimageMap
+            <MapboxPilgrimageMap
               spots={spots}
               selectedId={selectedId}
               onSelect={setSelectedId}
               routeRequest={routeRequest}
               onRouteResult={handleRouteResult}
-              apiKey={googleMapsConfig.apiKey}
-              mapId={googleMapsConfig.mapId}
+              accessToken={mapboxConfig.accessToken}
               routeServiceUrl={routeServiceUrl}
             />
             <div className="selected-spot-bar">
@@ -847,7 +840,7 @@ export function PilgrimageApp({
                 <h3>一日の巡礼予定を作る</h3>
               </div>
               <span className="route-badge">
-                Google Maps
+                Mapbox
               </span>
             </div>
 
@@ -883,21 +876,15 @@ export function PilgrimageApp({
                 <span>出発駅（任意）</span>
                 <select
                   value={sourceStationId}
-                  onChange={(event) => {
-                    setSourceStationId(event.target.value);
-                    invalidateRoute();
-                  }}
+                  disabled
+                  aria-describedby="station-search-status"
                 >
-                  <option value="">現地の最初のスポットから開始</option>
-                  {stationRegions.map((region) => (
-                    <optgroup label={region} key={region}>
-                      {majorStations.filter((station) => station.region === region).map((station) => (
-                        <option key={station.id} value={station.id}>{station.name}</option>
-                      ))}
-                    </optgroup>
-                  ))}
+                  <option value="">主要駅からの公共交通検索は準備中</option>
                 </select>
               </label>
+              <p id="station-search-status" className="journey-start__status">
+                現在は最初のスポットからの徒歩・車・自転車ルートを検索できます。
+              </p>
               <div>
                 <label>
                   <span>訪問日</span>
@@ -1029,15 +1016,16 @@ export function PilgrimageApp({
               <legend>移動手段</legend>
               <div>
                 {travelModes.map((mode) => (
-                  <label key={mode.value}>
+                  <label key={mode.value} className={mode.disabled ? "is-disabled" : undefined}>
                     <input
                       type="radio"
                       name="travel-mode"
                       value={mode.value}
                       checked={travelMode === mode.value}
+                      disabled={mode.disabled}
                       onChange={() => {
+                        if (mode.disabled) return;
                         setTravelMode(mode.value);
-                        if (mode.value === "TRANSIT") setOptimizeOrder(false);
                         invalidateRoute();
                       }}
                     />
@@ -1164,7 +1152,7 @@ export function PilgrimageApp({
                 </ol>
                 <p>
                   滞在込み <strong>{formatDuration(schedule.finish - schedule.start)}</strong>
-                  {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · Google推奨順で表示" : ""}
+                  {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · 最適化した順で表示" : ""}
                 </p>
                 <button
                   type="button"

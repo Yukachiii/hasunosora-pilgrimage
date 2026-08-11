@@ -45,7 +45,7 @@ npm.cmd run build:pages
 
 出力先は `pages-dist/` です。`main` ブランチへプッシュすると `.github/workflows/deploy-pages.yml` が公開ページを自動更新します。管理画面、ローカルサーバー、元写真、環境変数はPagesの配信物に含まれません。
 
-Google MapsのブラウザAPIキーは、GitHub ActionsのSecret `GOOGLE_MAPS_BROWSER_API_KEY` からビルド時に設定します。キーはGitHub Pagesの公開元とMaps JavaScript API・Routes APIに制限してください。
+Mapboxの公開トークンは、GitHub ActionsのSecret `MAPBOX_ACCESS_TOKEN` からビルド時に設定します。トークンは公開ページのURLだけを許可するサイト専用トークンにしてください。
 
 ## サーバー側ルート検索
 
@@ -55,14 +55,14 @@ APIキーはブラウザへ配信されません。短時間の重複検索を�
 1分10回までに制限しています。
 
 - 徒歩・車・自転車: 最初と最後を固定し、中間地点を最適化可能
-- 公共交通: 指定順を維持し、各スポットの滞在終了時刻から次の区間を検索
-- 主要駅: 選択した駅から最初のスポットまでを公共交通で検索
+- 公共交通: 現在は公開画面で無効化
+- 主要駅: 公共交通検索の再設計まで一時停止
 - 手動調整: 画面で並べ替えた順序をサーバーがそのまま使用
 
 GitHub Pagesだけではサーバー処理を実行できません。サーバー版を別途公開した後、
 GitHub ActionsのSecret `ROUTE_API_URL` に
 `https://サーバーのドメイン/api/routes/plan` を設定すると、Pages版もそのAPIを利用します。
-未設定時は従来のブラウザ内ルート検索へ自動的に戻ります。
+未設定時はMapbox Directions APIを使うブラウザ内ルート検索へ自動的に戻ります。
 
 サーバー用キーはブラウザ用と分け、Google Cloud側でRoutes APIのみに制限してください。
 

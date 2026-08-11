@@ -120,20 +120,18 @@ test("starter preview is fully replaced", async () => {
   await access(new URL("../public/og.png", import.meta.url));
 });
 
-test("Google Maps and Routes integration stays guarded", async () => {
+test("Mapbox map and route integration stays guarded", async () => {
   const [page, map] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/GooglePilgrimageMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /GOOGLE_MAPS_BROWSER_API_KEY/);
-  assert.match(page, /GOOGLE_MAPS_MAP_ID/);
-  assert.match(map, /maps\.googleapis\.com\/maps\/api\/js/);
-  assert.match(map, /auth_referrer_policy=origin/);
-  assert.match(map, /gm_authFailure/);
-  assert.match(map, /importLibrary\("routes"\)/);
-  assert.match(map, /computeRoutes/);
-  assert.match(map, /routeComputationCache/);
+  assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
+  assert.match(map, /mapbox:\/\/styles\/mapbox\/standard/);
+  assert.match(map, /language: "ja"/);
+  assert.match(map, /theme: "faded"/);
+  assert.match(map, /optimized-trips\/v1/);
+  assert.match(map, /directions\/v5/);
   assert.match(map, /optimizeWaypointOrder/);
 });
 
@@ -141,7 +139,7 @@ test("day planner supports multiple stops without a server dependency", async ()
   const [app, planner, map] = await Promise.all([
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/GooglePilgrimageMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /訪問するスポット/);
@@ -152,6 +150,9 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(planner, /大阪駅/);
   assert.match(planner, /recommendedStayMinutes/);
   assert.match(map, /requestedRoute\.travelMode === "TRANSIT"/);
+  assert.match(map, /公共交通機関と主要駅からの経路検索は現在準備中/);
+  assert.match(app, /公共交通（準備中）/);
+  assert.match(app, /disabled/);
 });
 
 test("server route planner validates requests before using Google Routes", async () => {
@@ -171,7 +172,7 @@ test("server route planner validates requests before using Google Routes", async
 
   const [routeApi, map, page, pagesMain, workflow, usageStore] = await Promise.all([
     readFile(new URL("../app/api/routes/plan/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/GooglePilgrimageMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/deploy-pages.yml", import.meta.url), "utf8"),
@@ -430,45 +431,27 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.mobile-nav/);
 });
 
-test("Mapbox comparison MVP keeps the Google version intact", async () => {
-  const response = await requestApp(new Request("http://localhost/mapbox", {
-    headers: {
-      accept: "text/html",
-      host: "localhost",
-    },
-  }));
-  assert.equal(response.status, 200);
-  const html = await response.text();
-  assert.match(html, /MAPBOX COMPARISON MVP/);
-  assert.match(html, /最大.*12.*SPOTS/);
-  assert.match(html, /徒歩・自転車・車/);
-  assert.match(html, /公共交通.*対象外/);
-  assert.match(html, /公開トークン/);
-  assert.match(html, /地図の見た目/);
-
-  const [mvp, page, pagesEntry, pagesConfig, envExample, app] = await Promise.all([
-    readFile(new URL("../app/MapboxMvp.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/mapbox/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../github-pages/mapbox/main.tsx", import.meta.url), "utf8"),
+test("Mapbox is the main map and the comparison version is removed", async () => {
+  const [map, page, pagesEntry, pagesConfig, envExample, app, workflow] = await Promise.all([
+    readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
     readFile(new URL("../vite.pages.config.ts", import.meta.url), "utf8"),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/deploy-pages.yml", import.meta.url), "utf8"),
   ]);
 
-  assert.match(mvp, /optimized-trips\/v1/);
-  assert.match(mvp, /directions\/v5/);
-  assert.match(mvp, /MAX_OPTIMIZATION_STOPS = 12/);
-  assert.match(mvp, /recommendedStayMinutes/);
-  assert.match(mvp, /localStorage\.setItem\(TOKEN_STORAGE_KEY/);
-  assert.match(mvp, /language: "ja"/);
-  assert.match(mvp, /setConfigProperty\("basemap", "theme"/);
-  assert.match(mvp, /setConfigProperty\("basemap", "lightPreset"/);
-  assert.match(mvp, /https:\/\/www\.google\.com\/maps\/dir\//);
-  assert.match(mvp, /travelmode: "transit"/);
-  assert.match(mvp, /Google Mapsで公共交通を確認/);
+  assert.match(map, /optimized-trips\/v1/);
+  assert.match(map, /directions\/v5/);
+  assert.match(map, /showTransitLabels: true/);
   assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
   assert.match(pagesEntry, /VITE_MAPBOX_ACCESS_TOKEN/);
-  assert.match(pagesConfig, /github-pages\/mapbox\/index\.html/);
+  assert.doesNotMatch(pagesConfig, /github-pages\/mapbox\/index\.html/);
   assert.match(envExample, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
-  assert.match(app, /Mapbox比較版 β/);
+  assert.match(workflow, /MAPBOX_ACCESS_TOKEN/);
+  assert.match(app, /MAP BY MAPBOX/);
+  assert.doesNotMatch(app, /Mapbox比較版|href="\.\/mapbox\//);
+  await assert.rejects(access(new URL("../app/mapbox/page.tsx", import.meta.url)));
+  await assert.rejects(access(new URL("../github-pages/mapbox/index.html", import.meta.url)));
 });

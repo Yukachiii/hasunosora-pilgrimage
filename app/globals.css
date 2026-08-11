@@ -563,12 +563,12 @@ button {
   background: #dfe9e6;
 }
 
-.google-map {
+.mapbox-map {
   width: 100%;
   height: 100%;
 }
 
-.google-map--hidden {
+.mapbox-map--hidden {
   display: none;
 }
 
@@ -696,11 +696,26 @@ button {
 }
 
 .map-marker {
+  padding: 0;
+  cursor: pointer;
   transform: rotate(-45deg);
 }
 
 .map-marker > span {
   transform: rotate(45deg);
+}
+
+.map-marker.is-active {
+  background: #7f6084;
+  box-shadow:
+    0 0 0 5px rgba(230, 224, 240, 0.88),
+    0 9px 24px rgba(71, 53, 90, 0.34);
+  transform: rotate(-45deg) scale(1.16);
+}
+
+.mapboxgl-ctrl-logo,
+.mapboxgl-ctrl-attrib {
+  opacity: 0.78;
 }
 
 .map-fallback__note {
@@ -944,6 +959,13 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 9px;
+}
+
+.journey-start__status {
+  margin: -2px 0 4px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.6;
 }
 
 .journey-start span,
@@ -1320,6 +1342,11 @@ button {
   cursor: pointer;
   font-size: 8px;
   font-weight: 700;
+}
+
+.travel-modes label.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .travel-modes input {

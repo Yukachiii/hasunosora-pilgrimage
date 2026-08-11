@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { PilgrimageApp } from "../app/PilgrimageApp";
 import { spots } from "../app/spots";
 import siteSettings from "../content/site.json";
@@ -23,10 +24,8 @@ const publicSpots = spots.map((spot) => ({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <PilgrimageApp
-      googleMapsConfig={{
-        apiKey: import.meta.env.VITE_GOOGLE_MAPS_BROWSER_API_KEY?.trim() ?? "",
-        mapId:
-          import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim() || "DEMO_MAP_ID",
+      mapboxConfig={{
+        accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "",
       }}
       routeServiceUrl={import.meta.env.VITE_ROUTE_API_URL?.trim() ?? ""}
       spots={publicSpots}

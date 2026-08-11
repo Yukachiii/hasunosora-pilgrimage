@@ -9,9 +9,8 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const googleMapsConfig = {
-    apiKey: process.env.GOOGLE_MAPS_BROWSER_API_KEY?.trim() ?? "",
-    mapId: process.env.GOOGLE_MAPS_MAP_ID?.trim() || "DEMO_MAP_ID",
+  const mapboxConfig = {
+    accessToken: process.env.MAPBOX_PUBLIC_ACCESS_TOKEN?.trim() ?? "",
   };
 
   let spots = baseSpots;
@@ -44,7 +43,7 @@ export default async function Home() {
 
   return (
     <PilgrimageApp
-      googleMapsConfig={googleMapsConfig}
+      mapboxConfig={mapboxConfig}
       routeServiceUrl="/api/routes/plan"
       spots={spots}
       spotImages={spotImages}
