@@ -1,6 +1,7 @@
 import spotData from "../content/spots.json";
 import cardModelData from "../content/card-models.json";
 import collaborationData from "../content/collaborations.json";
+import transitSearchNameData from "../content/transit-search-names.json";
 
 export type CollaborationId =
   | "ishikawa-dai-kanko-2"
@@ -33,6 +34,7 @@ export type PilgrimageSpot = {
   sehasEpisodes?: string[];
   accessNote: string;
   sourceUrl: string;
+  transitSearchName: string;
   recommendedStayMinutes?: number;
   openingTime?: string;
   closingTime?: string;
@@ -88,7 +90,12 @@ export type CardModelLocation = {
   characters: CardCharacter[];
 };
 
-export const spots = spotData as PilgrimageSpot[];
+const transitSearchNames = transitSearchNameData as Record<string, string>;
+
+export const spots = spotData.map((spot) => ({
+  ...spot,
+  transitSearchName: transitSearchNames[spot.id] ?? spot.name,
+})) as PilgrimageSpot[];
 export const cardModels = cardModelData.map((card) => ({
   ...card,
   characters: cardCharacters.filter((character) => card.card.includes(character)),

@@ -136,23 +136,28 @@ test("Mapbox map and route integration stays guarded", async () => {
 });
 
 test("day planner supports multiple stops without a server dependency", async () => {
-  const [app, planner, map] = await Promise.all([
+  const [app, planner, map, yahooTransit] = await Promise.all([
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/yahoo-transit.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /訪問するスポット/);
-  assert.match(app, /推奨順/);
+  assert.match(app, /訪問順を自動で最適化/);
   assert.match(app, /移動時間と訪問順を計算し、一日の予定として表示します/);
   assert.match(app, /cardCharacterFilter/);
   assert.match(planner, /東京駅/);
   assert.match(planner, /大阪駅/);
   assert.match(planner, /recommendedStayMinutes/);
   assert.match(map, /requestedRoute\.travelMode === "TRANSIT"/);
-  assert.match(map, /公共交通機関と主要駅からの経路検索は現在準備中/);
-  assert.match(app, /公共交通（準備中）/);
-  assert.match(app, /disabled/);
+  assert.doesNotMatch(map, /公共交通機関と主要駅からの経路検索は現在準備中/);
+  assert.match(app, /Yahoo!乗換案内で検索/);
+  assert.match(app, /全国の主要駅から最初のスポット/);
+  assert.doesNotMatch(app, /公共交通（準備中）/);
+  assert.match(yahooTransit, /transit\.yahoo\.co\.jp\/search\/result/);
+  assert.match(yahooTransit, /m1: paddedMinute\[0\]/);
+  assert.match(yahooTransit, /m2: paddedMinute\[1\]/);
 });
 
 test("server route planner validates requests before using Google Routes", async () => {
@@ -294,7 +299,7 @@ test("Routes API usage is private and available in the admin dashboard", async (
   assert.match(localServer, /"x-route-usage-admin-token": token/);
 });
 
-test("server route planner optimizes stops and applies dwell time to transit departures", async () => {
+test("server route planner sends public transit to Yahoo without using Google Routes", async () => {
   const originalFetch = globalThis.fetch;
   const originalKey = process.env.GOOGLE_ROUTES_SERVER_API_KEY;
   const googleRequests = [];
@@ -307,12 +312,11 @@ test("server route planner optimizes stops and applies dwell time to transit dep
       return originalFetch(input, init);
     }
     googleRequests.push(JSON.parse(init.body));
-    const seconds = [3600, 600, 900][googleRequests.length - 1] ?? 600;
     return new Response(JSON.stringify({
       routes: [{
         distanceMeters: 1000,
-        duration: `${seconds}s`,
-        legs: [{ duration: `${seconds}s` }],
+        duration: "600s",
+        legs: [{ duration: "600s" }],
         polyline: { encodedPolyline: "_p~iF~ps|U" },
       }],
     }), { status: 200, headers: { "content-type": "application/json" } });
@@ -335,20 +339,11 @@ test("server route planner optimizes stops and applies dwell time to transit dep
         departureTime: departure.toISOString(),
       }),
     }));
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 400);
     const result = await response.json();
-    assert.equal(result.source, "server");
-    assert.equal(result.apiRequestCount, 3);
-    assert.equal(result.accessDurationMinutes, 60);
-    assert.deepEqual(result.legDurationMinutes, [10, 15]);
-    assert.deepEqual(
-      googleRequests.map((request) => request.departureTime),
-      [
-        departure.toISOString(),
-        new Date(departure.getTime() + 75 * 60_000).toISOString(),
-        new Date(departure.getTime() + 115 * 60_000).toISOString(),
-      ],
-    );
+    assert.equal(result.code, "EXTERNAL_TRANSIT");
+    assert.match(result.error, /Yahoo!乗換案内/);
+    assert.equal(googleRequests.length, 0);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.GOOGLE_ROUTES_SERVER_API_KEY;

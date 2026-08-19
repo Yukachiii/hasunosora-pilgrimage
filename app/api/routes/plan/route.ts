@@ -124,6 +124,13 @@ function normalizeRequest(value: unknown): NormalizedPlan {
     throw new RoutePlanError("ルート条件が正しくありません。");
   }
   const body = value as Partial<ServerRoutePlanRequest>;
+  if (body.travelMode === "TRANSIT") {
+    throw new RoutePlanError(
+      "公共交通はYahoo!乗換案内から検索してください。",
+      400,
+      "EXTERNAL_TRANSIT",
+    );
+  }
   if (!Array.isArray(body.stopIds) || body.stopIds.length < 2 || body.stopIds.length > maximumStops) {
     throw new RoutePlanError(`スポットは2～${maximumStops}か所で指定してください。`);
   }

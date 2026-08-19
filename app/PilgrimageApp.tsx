@@ -39,6 +39,10 @@ import {
   type PilgrimageCollaboration,
   type PilgrimageSpot,
 } from "./spots";
+import {
+  buildYahooTransitUrl,
+  createYahooTransitLegs,
+} from "./yahoo-transit";
 
 const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v2";
 
@@ -50,7 +54,7 @@ const travelModes: Array<{
 }> = [
   { value: "WALKING", label: "徒歩", icon: "歩" },
   { value: "DRIVING", label: "車", icon: "車" },
-  { value: "TRANSIT", label: "公共交通（準備中）", icon: "交", disabled: true },
+  { value: "TRANSIT", label: "公共交通", icon: "交" },
   { value: "BICYCLING", label: "自転車", icon: "自" },
 ];
 
@@ -166,6 +170,7 @@ export function PilgrimageApp({
   const [todayOffsetMinutes, setTodayOffsetMinutes] = useState(0);
   const [isTodayModeOpen, setIsTodayModeOpen] = useState(false);
   const [currentJapanMinutes, setCurrentJapanMinutes] = useState(() => japanClockMinutes());
+  const [transitLegOverrides, setTransitLegOverrides] = useState<Record<string, { date: string; time: string }>>({});
 
   useEffect(() => {
     let wasAccepted = false;
@@ -201,9 +206,9 @@ export function PilgrimageApp({
         if (draft) {
           setItineraryIds(draft.itineraryIds);
           setStayMinutes((current) => ({ ...current, ...draft.stayMinutes }));
-          setTravelMode(draft.travelMode === "TRANSIT" ? "WALKING" : draft.travelMode);
+          setTravelMode(draft.travelMode);
           setOptimizeOrder(draft.optimizeOrder);
-          setSourceStationId("");
+          setSourceStationId(draft.sourceStationId);
           setVisitDate(draft.visitDate || japanDate());
           setStartTime(draft.startTime);
           setItineraryCollaborationId(draft.itineraryCollaborationId as CollaborationId | "");
@@ -378,8 +383,8 @@ export function PilgrimageApp({
     }) : [],
     travelMode,
     optimizeWaypointOrder: travelMode !== "TRANSIT" && optimizeOrder,
-    accessOriginId: sourceStationId,
-    departureTime: travelMode === "TRANSIT" || sourceStationId
+    accessOriginId: travelMode === "TRANSIT" ? sourceStationId : "",
+    departureTime: travelMode === "TRANSIT"
       ? departureIso(visitDate, startTime)
       : "",
   }), [itineraryIds, optimizeOrder, sourceStationId, spots, startTime, stayMinutes, travelMode, visitDate]);
@@ -390,12 +395,27 @@ export function PilgrimageApp({
       : [],
     travelMode: routeRequest.travelMode,
     optimizeWaypointOrder: routeRequest.optimizeWaypointOrder,
-    accessOriginId: routeRequest.accessOrigin?.id ?? "",
-    departureTime: routeRequest.travelMode === "TRANSIT" || routeRequest.accessOrigin
+    accessOriginId: routeRequest.travelMode === "TRANSIT" ? routeRequest.accessOrigin?.id ?? "" : "",
+    departureTime: routeRequest.travelMode === "TRANSIT"
       ? routeRequest.departureTime
       : "",
   }) : "", [routeRequest]);
-  const routeIsCurrent = routeResult.state === "success" && currentRouteSignature === requestedRouteSignature;
+  const routeIsCurrent = (
+    routeResult.state === "success" || routeResult.state === "external"
+  ) && currentRouteSignature === requestedRouteSignature;
+  const transitLegs = useMemo(() => {
+    if (routeRequest?.travelMode !== "TRANSIT" || !routeIsCurrent) return [];
+    return createYahooTransitLegs(
+      routeRequest.stops,
+      routeRequest.accessOrigin,
+      visitDate,
+      startTime,
+      routeRequest.stayMinutes,
+    ).map((leg) => ({
+      ...leg,
+      ...(transitLegOverrides[leg.id] ?? {}),
+    }));
+  }, [routeIsCurrent, routeRequest, startTime, transitLegOverrides, visitDate]);
 
   const completedScheduledSpotIds = schedule
     ? schedule.entries.filter((entry) => completedSpotIds.includes(entry.spot.id)).map((entry) => entry.spot.id)
@@ -459,9 +479,9 @@ export function PilgrimageApp({
     const snapshot = saved.snapshot;
     setItineraryIds(snapshot.itineraryIds);
     setStayMinutes((current) => ({ ...current, ...snapshot.stayMinutes }));
-    setTravelMode(snapshot.travelMode === "TRANSIT" ? "WALKING" : snapshot.travelMode);
+    setTravelMode(snapshot.travelMode);
     setOptimizeOrder(snapshot.optimizeOrder);
-    setSourceStationId("");
+    setSourceStationId(snapshot.sourceStationId);
     setVisitDate(snapshot.visitDate || japanDate());
     setStartTime(snapshot.startTime);
     setItineraryCollaborationId(snapshot.itineraryCollaborationId as CollaborationId | "");
@@ -498,6 +518,7 @@ export function PilgrimageApp({
     setRouteResult({ state: "idle" });
     setIsTodayModeOpen(false);
     setTodayOffsetMinutes(0);
+    setTransitLegOverrides({});
   }
 
   const handleRouteResult = useCallback((result: RouteResult) => {
@@ -513,8 +534,10 @@ export function PilgrimageApp({
       return;
     }
     if (routeIsCurrent) return;
-    const accessOrigin = majorStations.find((station) => station.id === sourceStationId);
-    setRouteRequest({
+    const accessOrigin = travelMode === "TRANSIT"
+      ? majorStations.find((station) => station.id === sourceStationId)
+      : undefined;
+    const request: RouteRequest = {
       requestId: Date.now(),
       stops: itinerarySpots,
       travelMode,
@@ -522,7 +545,24 @@ export function PilgrimageApp({
       stayMinutes: { ...stayMinutes },
       accessOrigin,
       departureTime: departureIso(visitDate, startTime),
-    });
+    };
+    setRouteRequest(request);
+    if (travelMode === "TRANSIT") {
+      const legs = createYahooTransitLegs(
+        itinerarySpots,
+        accessOrigin,
+        visitDate,
+        startTime,
+        stayMinutes,
+      );
+      setTransitLegOverrides(Object.fromEntries(
+        legs.map((leg) => [leg.id, { date: leg.date, time: leg.time }]),
+      ));
+      setRouteResult({
+        state: "external",
+        message: "訪問順にYahoo!乗換案内の区間検索を用意しました。",
+      });
+    }
     setSelectedId(itinerarySpots.at(-1)!.id);
   }
 
@@ -840,7 +880,7 @@ export function PilgrimageApp({
                 <h3>一日の巡礼予定を作る</h3>
               </div>
               <span className="route-badge">
-                Mapbox
+                {travelMode === "TRANSIT" ? "Yahoo!乗換案内" : "Mapbox"}
               </span>
             </div>
 
@@ -876,14 +916,29 @@ export function PilgrimageApp({
                 <span>出発駅（任意）</span>
                 <select
                   value={sourceStationId}
-                  disabled
+                  disabled={travelMode !== "TRANSIT"}
+                  onChange={(event) => {
+                    setSourceStationId(event.target.value);
+                    invalidateRoute();
+                  }}
                   aria-describedby="station-search-status"
                 >
-                  <option value="">主要駅からの公共交通検索は準備中</option>
+                  <option value="">現地の最初のスポットから開始</option>
+                  {Array.from(new Set(majorStations.map((station) => station.region))).map((region) => (
+                    <optgroup label={region} key={region}>
+                      {majorStations
+                        .filter((station) => station.region === region)
+                        .map((station) => (
+                          <option value={station.id} key={station.id}>{station.name}</option>
+                        ))}
+                    </optgroup>
+                  ))}
                 </select>
               </label>
               <p id="station-search-status" className="journey-start__status">
-                現在は最初のスポットからの徒歩・車・自転車ルートを検索できます。
+                {travelMode === "TRANSIT"
+                  ? "全国の主要駅から最初のスポットまでの検索も追加できます。"
+                  : "公共交通を選ぶと、出発駅を指定できます。"}
               </p>
               <div>
                 <label>
@@ -1061,13 +1116,15 @@ export function PilgrimageApp({
               {routeResult.state === "loading"
                 ? "計算しています…"
                 : routeIsCurrent
-                  ? "この内容は計算済みです"
-                  : "この内容で予定を計算する"}
+                  ? travelMode === "TRANSIT" ? "検索リンクを作成済みです" : "この内容は計算済みです"
+                  : travelMode === "TRANSIT" ? "Yahoo!検索リンクを作る" : "この内容で予定を計算する"}
               <span aria-hidden="true">→</span>
             </button>
 
             <p className="route-api-note">
-              移動時間と訪問順を計算し、一日の予定として表示します。
+              {travelMode === "TRANSIT"
+                ? "指定順に区間検索を作ります。検索結果はYahoo!乗換案内で確認してください。"
+                : "移動時間と訪問順を計算し、一日の予定として表示します。"}
             </p>
 
             <div
@@ -1105,6 +1162,12 @@ export function PilgrimageApp({
                   </div>
                 </>
               )}
+              {routeResult.state === "external" && (
+                <>
+                  <span className="result-symbol">交</span>
+                  <p>{routeResult.message}</p>
+                </>
+              )}
               {(routeResult.state === "fallback" ||
                 routeResult.state === "error") && (
                 <>
@@ -1113,6 +1176,72 @@ export function PilgrimageApp({
                 </>
               )}
             </div>
+
+            {transitLegs.length ? (
+              <section className="transit-search-panel" aria-label="Yahoo!乗換案内の区間検索">
+                <div className="transit-search-panel__heading">
+                  <div>
+                    <small>PUBLIC TRANSIT</small>
+                    <strong>区間ごとに乗換を調べる</strong>
+                  </div>
+                  <span>{transitLegs.length}区間</span>
+                </div>
+                <p>
+                  2区間目以降の時刻は、移動を各60分として仮置きしています。
+                  前の検索結果に合わせて出発時刻を調整してください。
+                </p>
+                <ol>
+                  {transitLegs.map((leg, index) => (
+                    <li key={leg.id}>
+                      <div className="transit-search-panel__route">
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <div>
+                          <strong>{leg.fromLabel} → {leg.toLabel}</strong>
+                          <small>検索名：{leg.from} → {leg.to}</small>
+                        </div>
+                      </div>
+                      <div className="transit-search-panel__datetime">
+                        <label>
+                          <span>出発日</span>
+                          <input
+                            type="date"
+                            min={visitDate}
+                            max={japanDate(100)}
+                            value={leg.date}
+                            onChange={(event) => setTransitLegOverrides((current) => ({
+                              ...current,
+                              [leg.id]: { date: event.target.value, time: leg.time },
+                            }))}
+                          />
+                        </label>
+                        <label>
+                          <span>出発時刻</span>
+                          <input
+                            type="time"
+                            value={leg.time}
+                            onChange={(event) => setTransitLegOverrides((current) => ({
+                              ...current,
+                              [leg.id]: { date: leg.date, time: event.target.value },
+                            }))}
+                          />
+                        </label>
+                      </div>
+                      <a
+                        href={buildYahooTransitUrl(leg)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Yahoo!乗換案内で検索
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+                <small>
+                  Yahoo!側で表示される施設候補、運休日、臨時ダイヤも確認してください。
+                </small>
+              </section>
+            ) : null}
 
             {schedule && routeResult.state === "success" && (
               <section className="day-schedule" aria-label="作成した一日予定">

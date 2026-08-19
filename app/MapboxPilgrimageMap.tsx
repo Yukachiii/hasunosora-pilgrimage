@@ -17,7 +17,7 @@ export type RouteRequest = {
 };
 
 export type RouteResult = {
-  state: "idle" | "loading" | "success" | "fallback" | "error";
+  state: "idle" | "loading" | "success" | "external" | "fallback" | "error";
   distance?: string;
   duration?: string;
   travelDurationMinutes?: number;
@@ -272,17 +272,13 @@ export function MapboxPilgrimageMap({
     const controller = new AbortController();
 
     async function calculateRoute() {
+      if (requestedRoute.travelMode === "TRANSIT") {
+        clearRoute();
+        return;
+      }
       onRouteResult({ state: "loading" });
       clearRoute();
       try {
-        if (requestedRoute.travelMode === "TRANSIT" || requestedRoute.accessOrigin) {
-          onRouteResult({
-            state: "fallback",
-            message: "公共交通機関と主要駅からの経路検索は現在準備中です。",
-          });
-          return;
-        }
-
         if (routeServiceUrl) {
           let serverResponse: Response | null = null;
           try {
@@ -448,7 +444,7 @@ export function MapboxPilgrimageMap({
         </div>
       )}
       {mapState === "loading" && <div className="map-loading">地図を読み込んでいます…</div>}
-      {routeRequest && (
+      {routeRequest && routeRequest.travelMode !== "TRANSIT" && (
         <div className="open-maps-links">
           <a href={buildGoogleMapsUrl(routeRequest)} target="_blank" rel="noreferrer">
             現地ルートを開く <span aria-hidden="true">↗</span>
