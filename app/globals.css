@@ -840,12 +840,32 @@ button {
 }
 
 .route-planner {
-  align-self: stretch;
+  align-self: start;
+  max-height: 660px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
   box-shadow: var(--shadow);
+  scrollbar-color: rgba(125, 185, 196, 0.8) rgba(125, 185, 196, 0.12);
+  scrollbar-width: thin;
+}
+
+.route-planner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.route-planner::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.12);
+}
+
+.route-planner::-webkit-scrollbar-thumb {
+  border: 2px solid white;
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.8);
 }
 
 .route-planner__heading {
@@ -3123,6 +3143,8 @@ footer > span {
 
   .route-planner {
     display: block;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .spot-grid {

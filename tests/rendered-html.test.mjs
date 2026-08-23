@@ -430,6 +430,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.mobile-nav/);
   assert.match(css, /\.transit-search-panel__confirmed/);
   assert.match(css, /\.transit-search-panel__progress/);
+  assert.match(css, /\.route-planner\s*\{[^}]*max-height:\s*660px/s);
+  assert.match(css, /@media \(max-width:\s*1080px\)[\s\S]*?\.route-planner\s*\{[^}]*max-height:\s*none/s);
 });
 
 test("Mapbox is the main map and the comparison version is removed", async () => {
