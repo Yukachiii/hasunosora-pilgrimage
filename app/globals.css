@@ -649,8 +649,7 @@ button {
   transform: rotate(18deg);
 }
 
-.fallback-pin,
-.map-marker {
+.fallback-pin {
   display: grid;
   width: 38px;
   height: 38px;
@@ -683,8 +682,7 @@ button {
   transform: translate(-50%, -50%) rotate(-45deg) scale(1.18);
 }
 
-.fallback-pin--collaboration,
-.map-marker--collaboration {
+.fallback-pin--collaboration {
   background: var(--lavender-deep);
   box-shadow:
     0 0 0 4px rgba(230, 224, 240, 0.8),
@@ -693,24 +691,6 @@ button {
 
 .fallback-pin--collaboration.is-active {
   background: #7f6084;
-}
-
-.map-marker {
-  padding: 0;
-  cursor: pointer;
-  transform: rotate(-45deg);
-}
-
-.map-marker > span {
-  transform: rotate(45deg);
-}
-
-.map-marker.is-active {
-  background: #7f6084;
-  box-shadow:
-    0 0 0 5px rgba(230, 224, 240, 0.88),
-    0 9px 24px rgba(71, 53, 90, 0.34);
-  transform: rotate(-45deg) scale(1.16);
 }
 
 .mapboxgl-ctrl-logo,

@@ -453,6 +453,10 @@ test("Mapbox is the main map and the comparison version is removed", async () =>
   assert.match(map, /optimized-trips\/v1/);
   assert.match(map, /directions\/v5/);
   assert.match(map, /showTransitLabels: true/);
+  assert.match(map, /clusterMaxZoom:\s*15/);
+  assert.match(map, /clusterRadius:\s*52/);
+  assert.match(map, /SPOT_CLUSTER_COUNT_LAYER_ID/);
+  assert.match(map, /getClusterExpansionZoom/);
   assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
   assert.match(pagesEntry, /VITE_MAPBOX_ACCESS_TOKEN/);
   assert.doesNotMatch(pagesConfig, /github-pages\/mapbox\/index\.html/);

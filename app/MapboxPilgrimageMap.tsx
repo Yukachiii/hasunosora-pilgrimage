@@ -50,6 +50,12 @@ const TOKEN_STORAGE_KEY = "hasunosora-mapbox-public-token";
 const ROUTE_SOURCE_ID = "pilgrimage-route";
 const ROUTE_SHADOW_LAYER_ID = "pilgrimage-route-shadow";
 const ROUTE_LAYER_ID = "pilgrimage-route-line";
+const SPOT_SOURCE_ID = "pilgrimage-spots";
+const SPOT_CLUSTER_LAYER_ID = "pilgrimage-spot-clusters";
+const SPOT_CLUSTER_COUNT_LAYER_ID = "pilgrimage-spot-cluster-count";
+const SPOT_LAYER_ID = "pilgrimage-spot-points";
+const SELECTED_SPOT_LAYER_ID = "pilgrimage-selected-spot";
+const SPOT_LABEL_LAYER_ID = "pilgrimage-spot-labels";
 
 function buildGoogleMapsUrl(request: RouteRequest) {
   const params = new URLSearchParams({
@@ -109,6 +115,21 @@ function mapboxProfile(mode: TravelMode) {
   return "mapbox/walking";
 }
 
+function spotFeatureCollection(spots: PilgrimageSpot[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  return {
+    type: "FeatureCollection",
+    features: spots.map((spot, index) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [spot.lng, spot.lat] },
+      properties: {
+        spotId: spot.id,
+        indexLabel: String(index + 1).padStart(2, "0"),
+        collaboration: spot.collaborationIds?.length ? 1 : 0,
+      },
+    })),
+  };
+}
+
 export function MapboxPilgrimageMap({
   spots,
   selectedId,
@@ -120,7 +141,6 @@ export function MapboxPilgrimageMap({
 }: Props) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
   const onSelectRef = useRef(onSelect);
   const [token, setToken] = useState(accessToken.trim());
   const [mapState, setMapState] = useState<"fallback" | "loading" | "ready" | "error">(
@@ -223,8 +243,6 @@ export function MapboxPilgrimageMap({
 
     return () => {
       cancelled = true;
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
       map.remove();
       mapRef.current = null;
     };
@@ -233,33 +251,138 @@ export function MapboxPilgrimageMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapState !== "ready") return;
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = spots.map((spot, index) => {
-      const markerButton = document.createElement("button");
-      markerButton.type = "button";
-      markerButton.className = [
-        "map-marker",
-        spot.collaborationIds?.length ? "map-marker--collaboration" : "",
-        selectedId === spot.id ? "is-active" : "",
-      ].filter(Boolean).join(" ");
-      const label = document.createElement("span");
-      label.textContent = String(index + 1).padStart(2, "0");
-      markerButton.appendChild(label);
-      markerButton.title = spot.name;
-      markerButton.setAttribute("aria-label", `${spot.name}を選択`);
-      markerButton.addEventListener("click", () => onSelectRef.current(spot.id));
-      return new mapboxgl.Marker({ element: markerButton, anchor: "bottom" })
-        .setLngLat([spot.lng, spot.lat])
-        .addTo(map);
-    });
-  }, [mapState, selectedId, spots]);
+    const data = spotFeatureCollection(spots);
+    const existingSource = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+    if (existingSource) {
+      existingSource.setData(data);
+    } else {
+      map.addSource(SPOT_SOURCE_ID, {
+        type: "geojson",
+        data,
+        cluster: true,
+        clusterMaxZoom: 15,
+        clusterRadius: 52,
+      });
+      map.addLayer({
+        id: SPOT_CLUSTER_LAYER_ID,
+        type: "circle",
+        source: SPOT_SOURCE_ID,
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": ["step", ["get", "point_count"], "#6eb7c6", 10, "#4e7482", 30, "#7f6084"],
+          "circle-radius": ["step", ["get", "point_count"], 18, 10, 22, 30, 27],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 3,
+          "circle-opacity": 0.94,
+        },
+      });
+      map.addLayer({
+        id: SPOT_CLUSTER_COUNT_LAYER_ID,
+        type: "symbol",
+        source: SPOT_SOURCE_ID,
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": ["get", "point_count_abbreviated"],
+          "text-size": 11,
+          "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+        },
+        paint: { "text-color": "#ffffff" },
+      });
+      map.addLayer({
+        id: SPOT_LAYER_ID,
+        type: "circle",
+        source: SPOT_SOURCE_ID,
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-color": ["case", ["==", ["get", "collaboration"], 1], "#9b789d", "#263446"],
+          "circle-radius": 14,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 3,
+          "circle-opacity": 0.96,
+        },
+      });
+      map.addLayer({
+        id: SELECTED_SPOT_LAYER_ID,
+        type: "circle",
+        source: SPOT_SOURCE_ID,
+        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "spotId"], ""]],
+        paint: {
+          "circle-color": "#7f6084",
+          "circle-radius": 18,
+          "circle-stroke-color": "#eee8f4",
+          "circle-stroke-width": 5,
+        },
+      });
+      map.addLayer({
+        id: SPOT_LABEL_LAYER_ID,
+        type: "symbol",
+        source: SPOT_SOURCE_ID,
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          "text-field": ["get", "indexLabel"],
+          "text-size": 9,
+          "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+          "text-allow-overlap": true,
+        },
+        paint: { "text-color": "#ffffff" },
+      });
+    }
+
+    const handleClusterClick = (event: mapboxgl.MapLayerMouseEvent) => {
+      const feature = event.features?.[0];
+      if (!feature || feature.geometry.type !== "Point") return;
+      const clusterId = Number(feature.properties?.cluster_id);
+      const source = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+      if (!source || !Number.isFinite(clusterId)) return;
+      source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+        if (error) return;
+        map.easeTo({
+          center: feature.geometry.coordinates as [number, number],
+          zoom,
+          duration: 450,
+        });
+      });
+    };
+    const handleSpotClick = (event: mapboxgl.MapLayerMouseEvent) => {
+      const spotId = event.features?.[0]?.properties?.spotId;
+      if (typeof spotId === "string") onSelectRef.current(spotId);
+    };
+    const showPointer = () => { map.getCanvas().style.cursor = "pointer"; };
+    const clearPointer = () => { map.getCanvas().style.cursor = ""; };
+
+    map.on("click", SPOT_CLUSTER_LAYER_ID, handleClusterClick);
+    map.on("click", SPOT_LAYER_ID, handleSpotClick);
+    map.on("mouseenter", SPOT_CLUSTER_LAYER_ID, showPointer);
+    map.on("mouseleave", SPOT_CLUSTER_LAYER_ID, clearPointer);
+    map.on("mouseenter", SPOT_LAYER_ID, showPointer);
+    map.on("mouseleave", SPOT_LAYER_ID, clearPointer);
+
+    return () => {
+      map.off("click", SPOT_CLUSTER_LAYER_ID, handleClusterClick);
+      map.off("click", SPOT_LAYER_ID, handleSpotClick);
+      map.off("mouseenter", SPOT_CLUSTER_LAYER_ID, showPointer);
+      map.off("mouseleave", SPOT_CLUSTER_LAYER_ID, clearPointer);
+      map.off("mouseenter", SPOT_LAYER_ID, showPointer);
+      map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
+    };
+  }, [mapState, spots]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapState !== "ready" || !map.getLayer(SELECTED_SPOT_LAYER_ID)) return;
+    map.setFilter(SELECTED_SPOT_LAYER_ID, [
+      "all",
+      ["!", ["has", "point_count"]],
+      ["==", ["get", "spotId"], selectedId],
+    ]);
+  }, [mapState, selectedId]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapState !== "ready") return;
     const selected = spots.find((spot) => spot.id === selectedId);
     if (!selected) return;
-    map.easeTo({ center: [selected.lng, selected.lat], zoom: 14, duration: 450 });
+    map.easeTo({ center: [selected.lng, selected.lat], zoom: 16.2, duration: 450 });
   }, [mapState, selectedId, spots]);
 
   useEffect(() => {
