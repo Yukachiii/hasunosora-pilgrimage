@@ -153,6 +153,8 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(map, /requestedRoute\.travelMode === "TRANSIT"/);
   assert.doesNotMatch(map, /公共交通機関と主要駅からの経路検索は現在準備中/);
   assert.match(app, /Yahoo!乗換案内で検索/);
+  assert.match(app, /Yahoo!の検索結果を確認する/);
+  assert.match(app, /confirmedTransitLegCount/);
   assert.match(app, /全国の主要駅から最初のスポット/);
   assert.doesNotMatch(app, /公共交通（準備中）/);
   assert.match(yahooTransit, /transit\.yahoo\.co\.jp\/search\/result/);
@@ -407,6 +409,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
 
   assert.match(storage, /PLANNER_DRAFT_STORAGE_KEY/);
   assert.match(storage, /SAVED_ITINERARIES_STORAGE_KEY/);
+  assert.match(storage, /transitLegProgress/);
+  assert.match(storage, /sanitizeTransitLegProgress/);
   assert.match(app, /前回の編集中旅程を復元しました/);
   assert.match(app, /この内容は計算済みです/);
   assert.match(app, /当日用モード/);
@@ -424,6 +428,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.spot-card__hours/);
   assert.match(css, /Public page: touch-first layout/);
   assert.match(css, /\.mobile-nav/);
+  assert.match(css, /\.transit-search-panel__confirmed/);
+  assert.match(css, /\.transit-search-panel__progress/);
 });
 
 test("Mapbox is the main map and the comparison version is removed", async () => {

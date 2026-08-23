@@ -1547,6 +1547,31 @@ button {
   font-size: 11px;
 }
 
+.transit-search-panel__progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.16);
+  color: var(--ice-deep);
+}
+
+.transit-search-panel__progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.16);
+}
+
+.transit-search-panel__progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--ice-deep);
+}
+
+.transit-search-panel__progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--ice-deep);
+}
+
 .transit-search-panel > p,
 .transit-search-panel > small {
   margin: 0;
@@ -1575,6 +1600,11 @@ button {
   border: 1px solid var(--line);
   border-radius: 5px;
   background: #fafaf7;
+}
+
+.transit-search-panel li.is-confirmed {
+  border-color: rgba(125, 185, 196, 0.72);
+  background: rgba(210, 235, 239, 0.15);
 }
 
 .transit-search-panel__route {
@@ -1660,6 +1690,45 @@ button {
   font-size: 9px;
   font-weight: 800;
   text-decoration: none;
+}
+
+.transit-search-panel__confirmed {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+.transit-search-panel__confirmed input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--ice-deep);
+}
+
+.transit-search-panel__confirmed > span {
+  display: grid;
+  gap: 2px;
+}
+
+.transit-search-panel__confirmed strong {
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.transit-search-panel__confirmed small {
+  color: var(--ink-soft);
+  font-size: 7px;
+}
+
+.transit-search-panel li.is-confirmed .transit-search-panel__confirmed {
+  border-color: rgba(125, 185, 196, 0.62);
+  background: rgba(210, 235, 239, 0.34);
 }
 
 .day-schedule {
@@ -3631,6 +3700,19 @@ footer > span {
 
   .transit-search-panel li > a {
     min-height: 48px;
+    font-size: 11px;
+  }
+
+  .transit-search-panel__confirmed {
+    min-height: 48px;
+  }
+
+  .transit-search-panel__confirmed input {
+    width: 22px;
+    height: 22px;
+  }
+
+  .transit-search-panel__confirmed strong {
     font-size: 11px;
   }
 

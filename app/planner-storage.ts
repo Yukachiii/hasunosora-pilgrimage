@@ -3,6 +3,12 @@ import type { TravelMode } from "./route-planner";
 export const PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1";
 export const SAVED_ITINERARIES_STORAGE_KEY = "hasunosora-pilgrimage.saved-itineraries.v1";
 
+export type TransitLegProgress = Record<string, {
+  date: string;
+  time: string;
+  confirmed: boolean;
+}>;
+
 export type PlannerSnapshot = {
   itineraryIds: string[];
   stayMinutes: Record<string, number>;
@@ -14,6 +20,7 @@ export type PlannerSnapshot = {
   itineraryCollaborationId: string;
   completedSpotIds: string[];
   todayOffsetMinutes: number;
+  transitLegProgress: TransitLegProgress;
 };
 
 export type SavedItinerary = {
@@ -24,6 +31,35 @@ export type SavedItinerary = {
 };
 
 const travelModes: TravelMode[] = ["WALKING", "DRIVING", "TRANSIT", "BICYCLING"];
+
+function sanitizeTransitLegProgress(value: unknown): TransitLegProgress {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .slice(0, 30)
+      .flatMap(([id, progress]) => {
+        if (
+          !id ||
+          id.length > 180 ||
+          !progress ||
+          typeof progress !== "object" ||
+          Array.isArray(progress)
+        ) return [];
+        const candidate = progress as Record<string, unknown>;
+        if (
+          typeof candidate.date !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(candidate.date) ||
+          typeof candidate.time !== "string" ||
+          !/^([01]\d|2[0-3]):[0-5]\d$/.test(candidate.time)
+        ) return [];
+        return [[id, {
+          date: candidate.date,
+          time: candidate.time,
+          confirmed: candidate.confirmed === true,
+        }]];
+      }),
+  );
+}
 
 export function sanitizePlannerSnapshot(
   value: unknown,
@@ -67,6 +103,7 @@ export function sanitizePlannerSnapshot(
     todayOffsetMinutes: Number.isFinite(candidate.todayOffsetMinutes)
       ? Math.max(-1440, Math.min(1440, Math.round(Number(candidate.todayOffsetMinutes))))
       : 0,
+    transitLegProgress: sanitizeTransitLegProgress(candidate.transitLegProgress),
   };
 }
 

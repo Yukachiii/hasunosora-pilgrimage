@@ -28,6 +28,7 @@ import {
   sanitizePlannerSnapshot,
   type PlannerSnapshot,
   type SavedItinerary,
+  type TransitLegProgress,
 } from "./planner-storage";
 import {
   cardCharacters,
@@ -170,7 +171,7 @@ export function PilgrimageApp({
   const [todayOffsetMinutes, setTodayOffsetMinutes] = useState(0);
   const [isTodayModeOpen, setIsTodayModeOpen] = useState(false);
   const [currentJapanMinutes, setCurrentJapanMinutes] = useState(() => japanClockMinutes());
-  const [transitLegOverrides, setTransitLegOverrides] = useState<Record<string, { date: string; time: string }>>({});
+  const [transitLegProgress, setTransitLegProgress] = useState<TransitLegProgress>({});
 
   useEffect(() => {
     let wasAccepted = false;
@@ -214,6 +215,7 @@ export function PilgrimageApp({
           setItineraryCollaborationId(draft.itineraryCollaborationId as CollaborationId | "");
           setCompletedSpotIds(draft.completedSpotIds);
           setTodayOffsetMinutes(draft.todayOffsetMinutes);
+          setTransitLegProgress(draft.transitLegProgress);
           setSelectedId(draft.itineraryIds[0]);
           setPlannerStorageMessage("前回の編集中旅程を復元しました");
         }
@@ -242,6 +244,7 @@ export function PilgrimageApp({
       itineraryCollaborationId,
       completedSpotIds,
       todayOffsetMinutes,
+      transitLegProgress,
     };
     let message: string;
     try {
@@ -252,7 +255,7 @@ export function PilgrimageApp({
     }
     const messageTimer = window.setTimeout(() => setPlannerStorageMessage(message), 0);
     return () => window.clearTimeout(messageTimer);
-  }, [completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, travelMode, visitDate]);
+  }, [completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode, visitDate]);
 
   useEffect(() => {
     if (!isTodayModeOpen) return undefined;
@@ -411,11 +414,17 @@ export function PilgrimageApp({
       visitDate,
       startTime,
       routeRequest.stayMinutes,
-    ).map((leg) => ({
-      ...leg,
-      ...(transitLegOverrides[leg.id] ?? {}),
-    }));
-  }, [routeIsCurrent, routeRequest, startTime, transitLegOverrides, visitDate]);
+    ).map((leg) => {
+      const progress = transitLegProgress[leg.id];
+      return {
+        ...leg,
+        date: progress?.date ?? leg.date,
+        time: progress?.time ?? leg.time,
+        confirmed: progress?.confirmed ?? false,
+      };
+    });
+  }, [routeIsCurrent, routeRequest, startTime, transitLegProgress, visitDate]);
+  const confirmedTransitLegCount = transitLegs.filter((leg) => leg.confirmed).length;
 
   const completedScheduledSpotIds = schedule
     ? schedule.entries.filter((entry) => completedSpotIds.includes(entry.spot.id)).map((entry) => entry.spot.id)
@@ -434,6 +443,7 @@ export function PilgrimageApp({
       itineraryCollaborationId,
       completedSpotIds,
       todayOffsetMinutes,
+      transitLegProgress,
     };
   }
 
@@ -491,6 +501,7 @@ export function PilgrimageApp({
     setItineraryName(saved.name);
     setIsTodayModeOpen(false);
     invalidateRoute();
+    setTransitLegProgress(snapshot.transitLegProgress);
     setPlannerStorageMessage(`「${saved.name}」を読み込みました`);
   }
 
@@ -518,7 +529,7 @@ export function PilgrimageApp({
     setRouteResult({ state: "idle" });
     setIsTodayModeOpen(false);
     setTodayOffsetMinutes(0);
-    setTransitLegOverrides({});
+    setTransitLegProgress({});
   }
 
   const handleRouteResult = useCallback((result: RouteResult) => {
@@ -555,8 +566,11 @@ export function PilgrimageApp({
         startTime,
         stayMinutes,
       );
-      setTransitLegOverrides(Object.fromEntries(
-        legs.map((leg) => [leg.id, { date: leg.date, time: leg.time }]),
+      setTransitLegProgress((current) => Object.fromEntries(
+        legs.map((leg) => [
+          leg.id,
+          current[leg.id] ?? { date: leg.date, time: leg.time, confirmed: false },
+        ]),
       ));
       setRouteResult({
         state: "external",
@@ -1184,15 +1198,21 @@ export function PilgrimageApp({
                     <small>PUBLIC TRANSIT</small>
                     <strong>区間ごとに乗換を調べる</strong>
                   </div>
-                  <span>{transitLegs.length}区間</span>
+                  <span>{confirmedTransitLegCount} / {transitLegs.length} 確認済み</span>
                 </div>
+                <progress
+                  className="transit-search-panel__progress"
+                  value={confirmedTransitLegCount}
+                  max={transitLegs.length}
+                  aria-label={`${transitLegs.length}区間中${confirmedTransitLegCount}区間を確認済み`}
+                />
                 <p>
                   2区間目以降の時刻は、移動を各60分として仮置きしています。
-                  前の検索結果に合わせて出発時刻を調整してください。
+                  前の検索結果に合わせて出発時刻を調整し、確認済みにしてください。
                 </p>
                 <ol>
                   {transitLegs.map((leg, index) => (
-                    <li key={leg.id}>
+                    <li key={leg.id} className={leg.confirmed ? "is-confirmed" : undefined}>
                       <div className="transit-search-panel__route">
                         <span>{String(index + 1).padStart(2, "0")}</span>
                         <div>
@@ -1208,9 +1228,13 @@ export function PilgrimageApp({
                             min={visitDate}
                             max={japanDate(100)}
                             value={leg.date}
-                            onChange={(event) => setTransitLegOverrides((current) => ({
+                            onChange={(event) => setTransitLegProgress((current) => ({
                               ...current,
-                              [leg.id]: { date: event.target.value, time: leg.time },
+                              [leg.id]: {
+                                date: event.target.value,
+                                time: leg.time,
+                                confirmed: false,
+                              },
                             }))}
                           />
                         </label>
@@ -1219,9 +1243,13 @@ export function PilgrimageApp({
                           <input
                             type="time"
                             value={leg.time}
-                            onChange={(event) => setTransitLegOverrides((current) => ({
+                            onChange={(event) => setTransitLegProgress((current) => ({
                               ...current,
-                              [leg.id]: { date: leg.date, time: event.target.value },
+                              [leg.id]: {
+                                date: leg.date,
+                                time: event.target.value,
+                                confirmed: false,
+                              },
                             }))}
                           />
                         </label>
@@ -1234,10 +1262,29 @@ export function PilgrimageApp({
                         Yahoo!乗換案内で検索
                         <span aria-hidden="true">↗</span>
                       </a>
+                      <label className="transit-search-panel__confirmed">
+                        <input
+                          type="checkbox"
+                          checked={leg.confirmed}
+                          onChange={(event) => setTransitLegProgress((current) => ({
+                            ...current,
+                            [leg.id]: {
+                              date: leg.date,
+                              time: leg.time,
+                              confirmed: event.target.checked,
+                            },
+                          }))}
+                        />
+                        <span>
+                          <strong>{leg.confirmed ? "確認済み" : "Yahoo!の検索結果を確認する"}</strong>
+                          <small>{leg.confirmed ? "この区間の時刻を確認しました" : "結果を見たあとにチェックしてください"}</small>
+                        </span>
+                      </label>
                     </li>
                   ))}
                 </ol>
                 <small>
+                  確認状態と調整した時刻は、この端末の旅程にだけ保存されます。
                   Yahoo!側で表示される施設候補、運休日、臨時ダイヤも確認してください。
                 </small>
               </section>
