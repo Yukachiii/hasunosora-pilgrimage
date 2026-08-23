@@ -970,6 +970,7 @@ button {
 .journey-start > label,
 .journey-start__datetime > label {
   display: grid;
+  min-width: 0;
   gap: 6px;
 }
 
@@ -3711,6 +3712,15 @@ footer > span {
   .collaboration-route-fill,
   .journey-start {
     padding: 13px;
+  }
+
+  .journey-start__datetime {
+    grid-template-columns: 1fr;
+  }
+
+  .journey-start__today {
+    min-width: 52px;
+    height: 32px;
   }
 
   .collaboration-route-fill--section {

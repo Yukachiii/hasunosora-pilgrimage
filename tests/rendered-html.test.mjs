@@ -443,6 +443,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.map-layout\s*\{[^}]*align-items:\s*stretch/s);
   assert.match(css, /\.route-planner\s*\{[^}]*align-self:\s*stretch[^}]*height:\s*auto[^}]*max-height:\s*none/s);
   assert.match(css, /\.route-workspace__controls/);
+  assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.journey-start__datetime\s*\{[^}]*grid-template-columns:\s*1fr/s);
   assert.match(css, /\.route-planner \.itinerary-editor > ol\s*\{[^}]*max-height:\s*none/s);
   assert.match(css, /@media \(max-width:\s*1080px\)[\s\S]*?\.route-planner\s*\{[^}]*max-height:\s*none/s);
   const rightColumn = app.match(/<aside className="route-planner"[\s\S]*?<\/aside>/)?.[0] ?? "";
