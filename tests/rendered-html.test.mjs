@@ -156,6 +156,8 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(app, /Yahoo!の検索結果を確認する/);
   assert.match(app, /confirmedTransitLegCount/);
   assert.match(app, /全国の主要駅から最初のスポット/);
+  assert.match(app, /className="journey-start__today"/);
+  assert.match(app, /setVisitDate\(japanDate\(\)\)/);
   assert.doesNotMatch(app, /公共交通（準備中）/);
   assert.match(yahooTransit, /transit\.yahoo\.co\.jp\/search\/result/);
   assert.match(yahooTransit, /m1: paddedMinute\[0\]/);
@@ -438,7 +440,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.mobile-nav/);
   assert.match(css, /\.transit-search-panel__confirmed/);
   assert.match(css, /\.transit-search-panel__progress/);
-  assert.match(css, /\.route-planner\s*\{[^}]*max-height:\s*640px/s);
+  assert.match(css, /\.map-layout\s*\{[^}]*align-items:\s*stretch/s);
+  assert.match(css, /\.route-planner\s*\{[^}]*align-self:\s*stretch[^}]*height:\s*auto[^}]*max-height:\s*none/s);
   assert.match(css, /\.route-workspace__controls/);
   assert.match(css, /\.route-planner \.itinerary-editor > ol\s*\{[^}]*max-height:\s*none/s);
   assert.match(css, /@media \(max-width:\s*1080px\)[\s\S]*?\.route-planner\s*\{[^}]*max-height:\s*none/s);

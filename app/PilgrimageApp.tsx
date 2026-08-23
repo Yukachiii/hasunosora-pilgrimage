@@ -896,10 +896,22 @@ export function PilgrimageApp({
                   ? "全国の主要駅から最初のスポットまでの検索も追加できます。"
                   : "公共交通を選ぶと、出発駅を指定できます。"}
               </p>
-              <div>
-                <label>
-                  <span>訪問日</span>
+              <div className="journey-start__datetime">
+                <div className="journey-start__date">
+                  <label htmlFor="visit-date">訪問日</label>
+                  <button
+                    className="journey-start__today"
+                    type="button"
+                    disabled={visitDate === japanDate()}
+                    onClick={() => {
+                      setVisitDate(japanDate());
+                      if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
+                    }}
+                  >
+                    今日
+                  </button>
                   <input
+                    id="visit-date"
                     type="date"
                     min={japanDate()}
                     max={japanDate(99)}
@@ -909,7 +921,7 @@ export function PilgrimageApp({
                       if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
                     }}
                   />
-                </label>
+                </div>
                 <label>
                   <span>出発時刻</span>
                   <input
