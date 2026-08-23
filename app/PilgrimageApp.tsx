@@ -798,44 +798,75 @@ export function PilgrimageApp({
             </div>
           </div>
 
-          <aside className="route-planner" id="planner" aria-label="一日の予定作成">
-            <div className="route-planner__heading">
-              <div>
-                <p>DAY PLANNER</p>
-                <h3>一日の巡礼予定を作る</h3>
+          <aside className="route-planner" aria-label="訪問するスポット">
+            <div className="itinerary-editor">
+              <div className="itinerary-editor__heading">
+                <strong>訪問するスポット</strong>
+                <span>{itineraryIds.length} / {maximumItineraryStops}</span>
               </div>
-              <span className="route-badge">
-                {travelMode === "TRANSIT" ? "Yahoo!乗換案内" : "Mapbox"}
-              </span>
-            </div>
-
-            <div className="collaboration-route-fill">
-              <label>
-                <span>コラボから自動入力</span>
+              <ol>
+                {itinerarySpots.map((spot, index) => (
+                  <li key={spot.id}>
+                    <span className={`route-point ${index === 0 ? "route-point--start" : index === itinerarySpots.length - 1 ? "route-point--goal" : ""}`}>
+                      {index === 0 ? "S" : index === itinerarySpots.length - 1 ? "G" : index + 1}
+                    </span>
+                    <div>
+                      <strong>{spot.shortName}</strong>
+                      <label>
+                        滞在
+                        <input
+                          type="number"
+                          min="0"
+                          max="480"
+                          step="5"
+                          value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}
+                          onChange={(event) => changeStayMinutes(spot.id, Number(event.target.value))}
+                        />
+                        分
+                      </label>
+                    </div>
+                    <div className="itinerary-actions">
+                      <button type="button" disabled={index === 0} onClick={() => moveSpot(index, -1)} aria-label={`${spot.name}を一つ前へ`}>↑</button>
+                      <button type="button" disabled={index === itinerarySpots.length - 1} onClick={() => moveSpot(index, 1)} aria-label={`${spot.name}を一つ後ろへ`}>↓</button>
+                      <button type="button" disabled={itinerarySpots.length <= 2} onClick={() => removeSpot(index)} aria-label={`${spot.name}を予定から外す`}>×</button>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="itinerary-add">
                 <select
-                  value={itineraryCollaborationId}
-                  onChange={(event) =>
-                    fillItineraryFromCollaboration(event.target.value as CollaborationId | "")
-                  }
+                  value={availableSpots.some((spot) => spot.id === addSpotId) ? addSpotId : availableSpots[0]?.id ?? ""}
+                  onChange={(event) => setAddSpotId(event.target.value)}
+                  disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}
+                  aria-label="追加するスポット"
                 >
-                  <option value="">コラボを選択してください</option>
-                  {collaborations.map((collaboration) => (
-                    <option key={collaboration.id} value={collaboration.id}>
-                      {collaboration.name}（{collaboration.locations.length}か所）
-                    </option>
-                  ))}
+                  {areas.map((area) => {
+                    const areaSpots = availableSpots.filter((spot) => spot.area === area);
+                    return areaSpots.length ? (
+                      <optgroup label={area} key={area}>
+                        {areaSpots.map((spot) => <option key={spot.id} value={spot.id}>{spot.shortName}</option>)}
+                      </optgroup>
+                    ) : null;
+                  })}
                 </select>
-              </label>
-              {itineraryCollaborationId ? (
-                <p>
-                  <strong>{collaborationById(itineraryCollaborationId)?.name}</strong>の登録地点を予定へ自動入力しました。
-                  順番・滞在時間・不要な地点は下で調整できます。
-                </p>
-              ) : (
-                <p>選択すると対象地点をまとめて予定へ追加します。</p>
-              )}
+                <button type="button" onClick={() => addSpot()} disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}>追加</button>
+              </div>
             </div>
+          </aside>
+        </div>
 
+        <section className="route-workspace" id="planner" aria-label="ルート条件と一日の予定">
+          <div className="route-workspace__heading">
+            <div>
+              <p>DAY PLANNER</p>
+              <h3>ルート条件と一日の予定</h3>
+            </div>
+            <span className="route-badge">
+              {travelMode === "TRANSIT" ? "Yahoo!乗換案内" : "Mapbox"}
+            </span>
+          </div>
+
+          <div className="route-workspace__controls">
             <div className="journey-start">
               <label>
                 <span>出発駅（任意）</span>
@@ -893,59 +924,7 @@ export function PilgrimageApp({
               </div>
             </div>
 
-            <div className="itinerary-editor">
-              <div className="itinerary-editor__heading">
-                <strong>訪問するスポット</strong>
-                <span>{itineraryIds.length} / {maximumItineraryStops}</span>
-              </div>
-              <ol>
-                {itinerarySpots.map((spot, index) => (
-                  <li key={spot.id}>
-                    <span className={`route-point ${index === 0 ? "route-point--start" : index === itinerarySpots.length - 1 ? "route-point--goal" : ""}`}>
-                      {index === 0 ? "S" : index === itinerarySpots.length - 1 ? "G" : index + 1}
-                    </span>
-                    <div>
-                      <strong>{spot.shortName}</strong>
-                      <label>
-                        滞在
-                        <input
-                          type="number"
-                          min="0"
-                          max="480"
-                          step="5"
-                          value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}
-                          onChange={(event) => changeStayMinutes(spot.id, Number(event.target.value))}
-                        />
-                        分
-                      </label>
-                    </div>
-                    <div className="itinerary-actions">
-                      <button type="button" disabled={index === 0} onClick={() => moveSpot(index, -1)} aria-label={`${spot.name}を一つ前へ`}>↑</button>
-                      <button type="button" disabled={index === itinerarySpots.length - 1} onClick={() => moveSpot(index, 1)} aria-label={`${spot.name}を一つ後ろへ`}>↓</button>
-                      <button type="button" disabled={itinerarySpots.length <= 2} onClick={() => removeSpot(index)} aria-label={`${spot.name}を予定から外す`}>×</button>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <div className="itinerary-add">
-                <select
-                  value={availableSpots.some((spot) => spot.id === addSpotId) ? addSpotId : availableSpots[0]?.id ?? ""}
-                  onChange={(event) => setAddSpotId(event.target.value)}
-                  disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}
-                  aria-label="追加するスポット"
-                >
-                  {areas.map((area) => {
-                    const areaSpots = availableSpots.filter((spot) => spot.area === area);
-                    return areaSpots.length ? (
-                      <optgroup label={area} key={area}>
-                        {areaSpots.map((spot) => <option key={spot.id} value={spot.id}>{spot.shortName}</option>)}
-                      </optgroup>
-                    ) : null;
-                  })}
-                </select>
-                <button type="button" onClick={() => addSpot()} disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}>追加</button>
-              </div>
-            </div>
+            <div className="route-workspace__options">
 
             <fieldset className="travel-modes">
               <legend>移動手段</legend>
@@ -1006,6 +985,8 @@ export function PilgrimageApp({
                 ? "指定順に区間検索を作ります。検索結果はYahoo!乗換案内で確認してください。"
                 : "移動時間と訪問順を計算し、一日の予定として表示します。"}
             </p>
+            </div>
+          </div>
 
             <div
               className={`route-result route-result--${routeResult.state}`}
@@ -1206,8 +1187,7 @@ export function PilgrimageApp({
                 </button>
               </section>
             )}
-          </aside>
-        </div>
+        </section>
       </section>
 
       <section className="collaborations-section" id="collaborations">
@@ -1220,6 +1200,32 @@ export function PilgrimageApp({
             公式発表済みの企画から、加賀温泉郷コラボと石川県コラボ第5弾だけを掲載しています。
             開催期間や各施設の休業日は、出発前に公式案内も確認してください。
           </p>
+        </div>
+        <div className="collaboration-route-fill collaboration-route-fill--section">
+          <label>
+            <span>コラボから訪問スポットを自動入力</span>
+            <select
+              value={itineraryCollaborationId}
+              onChange={(event) =>
+                fillItineraryFromCollaboration(event.target.value as CollaborationId | "")
+              }
+            >
+              <option value="">コラボを選択してください</option>
+              {collaborations.map((collaboration) => (
+                <option key={collaboration.id} value={collaboration.id}>
+                  {collaboration.name}（{collaboration.locations.length}か所）
+                </option>
+              ))}
+            </select>
+          </label>
+          {itineraryCollaborationId ? (
+            <p>
+              <strong>{collaborationById(itineraryCollaborationId)?.name}</strong>の登録地点を訪問リストへ入力しました。
+              地図横の一覧で順番・滞在時間・不要な地点を調整できます。
+            </p>
+          ) : (
+            <p>選択すると、このコラボの対象地点を訪問リストへまとめて追加します。</p>
+          )}
         </div>
         <div className="collaboration-grid">
           {collaborations.map((collaboration) => {

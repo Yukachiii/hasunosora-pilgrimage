@@ -821,42 +821,35 @@ button {
 
 .route-planner {
   align-self: start;
+  height: 640px;
   max-height: 640px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
   box-shadow: var(--shadow);
-  scrollbar-color: rgba(125, 185, 196, 0.8) rgba(125, 185, 196, 0.12);
-  scrollbar-width: thin;
 }
 
-.route-planner::-webkit-scrollbar {
-  width: 8px;
+.route-workspace {
+  margin-top: 22px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+  scroll-margin-top: 24px;
 }
 
-.route-planner::-webkit-scrollbar-track {
-  border-radius: 999px;
-  background: rgba(125, 185, 196, 0.12);
-}
-
-.route-planner::-webkit-scrollbar-thumb {
-  border: 2px solid white;
-  border-radius: 999px;
-  background: rgba(125, 185, 196, 0.8);
-}
-
-.route-planner__heading {
+.route-workspace__heading {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 26px;
+  margin-bottom: 22px;
 }
 
-.route-planner__heading p {
+.route-workspace__heading p {
   margin: 0 0 5px;
   color: var(--ice-deep);
   font-size: 9px;
@@ -864,11 +857,27 @@ button {
   letter-spacing: 0.17em;
 }
 
-.route-planner__heading h3 {
+.route-workspace__heading h3 {
   margin: 0;
   font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
   font-size: 23px;
   font-weight: 500;
+}
+
+.route-workspace__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.route-workspace__controls .journey-start {
+  height: 100%;
+  margin-bottom: 0;
+}
+
+.route-workspace__options .travel-modes {
+  margin-top: 0;
 }
 
 .route-badge {
@@ -930,6 +939,13 @@ button {
 
 .collaboration-route-fill p strong {
   color: var(--ink);
+}
+
+.collaboration-route-fill--section {
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  align-items: end;
+  margin-bottom: 24px;
+  padding: 18px;
 }
 
 .collaboration-route-fill small {
@@ -3003,12 +3019,9 @@ footer > span {
     padding: 20px;
   }
 
-  .route-planner__heading {
-    margin-bottom: 16px;
-  }
-
-  .route-planner__heading h3 {
-    font-size: 21px;
+  .route-planner .itinerary-editor {
+    height: 100%;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .collaboration-route-fill {
@@ -3030,6 +3043,16 @@ footer > span {
     line-height: 1.4;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .collaboration-route-fill--section {
+    grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+    margin-bottom: 24px;
+    padding: 18px;
+  }
+
+  .collaboration-route-fill--section select {
+    height: 40px;
   }
 
   .journey-start {
@@ -3058,8 +3081,8 @@ footer > span {
     gap: 7px;
   }
 
-  .itinerary-editor > ol {
-    max-height: 176px;
+  .route-planner .itinerary-editor > ol {
+    max-height: none;
   }
 
   .itinerary-editor li {
@@ -3142,8 +3165,13 @@ footer > span {
 
   .route-planner {
     display: block;
+    height: auto;
     max-height: none;
     overflow-y: visible;
+  }
+
+  .route-workspace__controls {
+    grid-template-columns: 1fr;
   }
 
   .spot-grid {
@@ -3626,18 +3654,28 @@ footer > span {
     border-radius: 7px;
   }
 
-  .route-planner__heading {
+  .route-workspace {
+    padding: 20px 14px;
+    border-radius: 7px;
+  }
+
+  .route-workspace__heading {
     gap: 10px;
     margin-bottom: 20px;
   }
 
-  .route-planner__heading h3 {
+  .route-workspace__heading h3 {
     font-size: 21px;
   }
 
   .collaboration-route-fill,
   .journey-start {
     padding: 13px;
+  }
+
+  .collaboration-route-fill--section {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .collaboration-route-fill select,

@@ -39,7 +39,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /蓮ノ旅/);
   assert.doesNotMatch(html, /好きな物語と|同じ景色/);
   assert.match(html, /hero-title-space/);
-  assert.match(html, /一日の巡礼予定を作る/);
+  assert.match(html, /ルート条件と一日の予定/);
   assert.match(html, /期間限定のコラボを巡る/);
   assert.match(html, /おいでよ！石川大観光Ⅱ/);
   assert.match(html, /蓮ノ小四辺形の休日/);
@@ -207,10 +207,10 @@ test("collaboration locations can fill a route plan without an API request", asy
     readFile(new URL("../content/collaborations.json", import.meta.url), "utf8").then(JSON.parse),
   ]);
 
-  assert.match(app, /コラボから自動入力/);
+  assert.match(app, /コラボから訪問スポットを自動入力/);
   assert.match(app, /fillItineraryFromCollaboration/);
   assert.match(app, /このコラボで予定を作る/);
-  assert.match(app, /対象地点をまとめて予定へ追加します/);
+  assert.match(app, /対象地点を訪問リストへまとめて追加します/);
   assert.doesNotMatch(app, /料金区分|API不使用|Google API|サーバー計算|ブラウザ計算/);
   assert.match(planner, /maximumItineraryStops = 27/);
   assert.equal(
@@ -220,6 +220,10 @@ test("collaboration locations can fill a route plan without an API request", asy
   assert.equal(
     collaborations.find((item) => item.id === "kaga-onsen-2026").locations.length,
     9,
+  );
+  assert.ok(
+    app.indexOf("02 — LIMITED COLLABORATIONS")
+      < app.indexOf("コラボから訪問スポットを自動入力"),
   );
 });
 
@@ -435,8 +439,13 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.transit-search-panel__confirmed/);
   assert.match(css, /\.transit-search-panel__progress/);
   assert.match(css, /\.route-planner\s*\{[^}]*max-height:\s*640px/s);
-  assert.match(css, /@media \(min-width:\s*1081px\)[\s\S]*?\.itinerary-editor > ol\s*\{[^}]*max-height:\s*176px/s);
+  assert.match(css, /\.route-workspace__controls/);
+  assert.match(css, /\.route-planner \.itinerary-editor > ol\s*\{[^}]*max-height:\s*none/s);
   assert.match(css, /@media \(max-width:\s*1080px\)[\s\S]*?\.route-planner\s*\{[^}]*max-height:\s*none/s);
+  const rightColumn = app.match(/<aside className="route-planner"[\s\S]*?<\/aside>/)?.[0] ?? "";
+  assert.match(rightColumn, /訪問するスポット/);
+  assert.doesNotMatch(rightColumn, /journey-start|travel-modes|collaboration-route-fill/);
+  assert.match(app, /className="route-workspace" id="planner"/);
 });
 
 test("Mapbox is the main map and the comparison version is removed", async () => {
