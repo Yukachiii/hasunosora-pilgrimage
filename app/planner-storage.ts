@@ -1,7 +1,6 @@
 import type { TravelMode } from "./route-planner";
 
-export const PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1";
-export const SAVED_ITINERARIES_STORAGE_KEY = "hasunosora-pilgrimage.saved-itineraries.v1";
+export const PLANNER_DRAFT_COOKIE_KEY = "hasunosora_planner_v2";
 
 export type TransitLegProgress = Record<string, {
   date: string;
@@ -23,14 +22,106 @@ export type PlannerSnapshot = {
   transitLegProgress: TransitLegProgress;
 };
 
-export type SavedItinerary = {
-  id: string;
-  name: string;
-  savedAt: string;
-  snapshot: PlannerSnapshot;
+const travelModes: TravelMode[] = ["WALKING", "DRIVING", "TRANSIT", "BICYCLING"];
+
+type CompactPlannerDraft = {
+  v: 2;
+  i: string[];
+  s: Array<[string, number]>;
+  m: TravelMode;
+  o: 0 | 1;
+  r: string;
+  d: string;
+  t: string;
+  c: string;
+  x: string[];
+  f: number;
+  p: Array<[string, string, string, 0 | 1]>;
 };
 
-const travelModes: TravelMode[] = ["WALKING", "DRIVING", "TRANSIT", "BICYCLING"];
+function compactPlannerDraft(snapshot: PlannerSnapshot): CompactPlannerDraft {
+  return {
+    v: 2,
+    i: snapshot.itineraryIds,
+    s: snapshot.itineraryIds.flatMap((id) => Number.isFinite(snapshot.stayMinutes[id])
+      ? [[id, snapshot.stayMinutes[id]] as [string, number]]
+      : []),
+    m: snapshot.travelMode,
+    o: snapshot.optimizeOrder ? 1 : 0,
+    r: snapshot.sourceStationId,
+    d: snapshot.visitDate,
+    t: snapshot.startTime,
+    c: snapshot.itineraryCollaborationId,
+    x: snapshot.completedSpotIds,
+    f: snapshot.todayOffsetMinutes,
+    p: Object.entries(snapshot.transitLegProgress).map(([id, progress]) => [
+      id,
+      progress.date,
+      progress.time,
+      progress.confirmed ? 1 : 0,
+    ]),
+  };
+}
+
+function encodedDraft(payload: CompactPlannerDraft) {
+  return encodeURIComponent(JSON.stringify(payload));
+}
+
+export function serializePlannerDraftCookie(snapshot: PlannerSnapshot) {
+  const payload = compactPlannerDraft(snapshot);
+  let encoded = encodedDraft(payload);
+  if (encoded.length <= 3800) return encoded;
+
+  payload.p = [];
+  encoded = encodedDraft(payload);
+  if (encoded.length <= 3800) return encoded;
+
+  payload.x = [];
+  encoded = encodedDraft(payload);
+  if (encoded.length <= 3800) return encoded;
+
+  payload.s = [];
+  return encodedDraft(payload);
+}
+
+export function parsePlannerDraftCookie(
+  cookieHeader: string,
+  validSpotIds: Set<string>,
+) {
+  const encoded = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${PLANNER_DRAFT_COOKIE_KEY}=`))
+    ?.slice(PLANNER_DRAFT_COOKIE_KEY.length + 1);
+  if (!encoded) return null;
+
+  try {
+    const compact = JSON.parse(decodeURIComponent(encoded)) as Partial<CompactPlannerDraft>;
+    if (compact.v !== 2) return null;
+    const transitLegProgress = Object.fromEntries(
+      Array.isArray(compact.p)
+        ? compact.p.flatMap((entry) => Array.isArray(entry) && entry.length === 4
+          ? [[entry[0], { date: entry[1], time: entry[2], confirmed: entry[3] === 1 }]]
+          : [])
+        : [],
+    );
+    return sanitizePlannerSnapshot({
+      itineraryIds: compact.i,
+      stayMinutes: Object.fromEntries(Array.isArray(compact.s) ? compact.s : []),
+      travelMode: compact.m,
+      optimizeOrder: compact.o !== 0,
+      sourceStationId: compact.r,
+      visitDate: compact.d,
+      startTime: compact.t,
+      itineraryCollaborationId: compact.c,
+      completedSpotIds: compact.x,
+      todayOffsetMinutes: compact.f,
+      transitLegProgress,
+    }, validSpotIds);
+  } catch {
+    return null;
+  }
+}
 
 function sanitizeTransitLegProgress(value: unknown): TransitLegProgress {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -105,26 +196,4 @@ export function sanitizePlannerSnapshot(
       : 0,
     transitLegProgress: sanitizeTransitLegProgress(candidate.transitLegProgress),
   };
-}
-
-export function parseSavedItineraries(raw: string | null, validSpotIds: Set<string>) {
-  if (!raw) return [];
-  try {
-    const values = JSON.parse(raw) as unknown;
-    if (!Array.isArray(values)) return [];
-    return values.flatMap((value): SavedItinerary[] => {
-      if (!value || typeof value !== "object") return [];
-      const candidate = value as Partial<SavedItinerary>;
-      const snapshot = sanitizePlannerSnapshot(candidate.snapshot, validSpotIds);
-      if (!snapshot || typeof candidate.id !== "string" || typeof candidate.name !== "string") return [];
-      return [{
-        id: candidate.id,
-        name: candidate.name.trim() || "名前のない旅程",
-        savedAt: typeof candidate.savedAt === "string" ? candidate.savedAt : "",
-        snapshot,
-      }];
-    }).slice(0, 30);
-  } catch {
-    return [];
-  }
 }

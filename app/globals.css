@@ -841,7 +841,7 @@ button {
 
 .route-planner {
   align-self: start;
-  max-height: 660px;
+  max-height: 640px;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 28px;
@@ -1010,104 +1010,6 @@ button {
   color: var(--ink);
   font: inherit;
   font-size: 11px;
-}
-
-.itinerary-storage {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 20px;
-  padding: 14px;
-  border: 1px solid rgba(125, 185, 196, 0.38);
-  border-radius: 5px;
-  background: rgba(210, 235, 239, 0.14);
-}
-
-.itinerary-storage__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.itinerary-storage__heading > div {
-  display: grid;
-  gap: 2px;
-}
-
-.itinerary-storage__heading small,
-.itinerary-storage__heading > span {
-  color: var(--ice-deep);
-  font-size: 7px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.itinerary-storage__heading strong {
-  font-size: 10px;
-}
-
-.itinerary-storage label {
-  display: grid;
-  gap: 5px;
-  color: var(--ink-soft);
-  font-size: 8px;
-  font-weight: 700;
-}
-
-.itinerary-storage select,
-.itinerary-storage input {
-  width: 100%;
-  height: 36px;
-  padding: 0 9px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  outline: none;
-  background: white;
-  color: var(--ink);
-  font: inherit;
-  font-size: 10px;
-}
-
-.itinerary-storage__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.itinerary-storage__actions button {
-  min-height: 31px;
-  padding: 0 10px;
-  border: 1px solid var(--ink);
-  border-radius: 4px;
-  background: var(--ink);
-  color: white;
-  font: inherit;
-  font-size: 8px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.itinerary-storage__actions button:not(:first-child) {
-  background: white;
-  color: var(--ink);
-}
-
-.itinerary-storage__actions button.is-danger {
-  border-color: #b85d63;
-  color: #a44750;
-}
-
-.itinerary-storage__message,
-.itinerary-storage > p {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 7px;
-  line-height: 1.6;
-}
-
-.itinerary-storage__message {
-  color: var(--ice-deep);
-  font-weight: 700;
 }
 
 .itinerary-editor {
@@ -3116,6 +3018,123 @@ footer > span {
   letter-spacing: 0.12em;
 }
 
+@media (min-width: 1081px) {
+  .route-planner {
+    padding: 20px;
+  }
+
+  .route-planner__heading {
+    margin-bottom: 16px;
+  }
+
+  .route-planner__heading h3 {
+    font-size: 21px;
+  }
+
+  .collaboration-route-fill {
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 10px;
+  }
+
+  .collaboration-route-fill label {
+    gap: 4px;
+  }
+
+  .collaboration-route-fill select {
+    height: 34px;
+  }
+
+  .collaboration-route-fill p {
+    overflow: hidden;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .journey-start {
+    gap: 7px;
+    margin-bottom: 12px;
+    padding: 10px;
+  }
+
+  .journey-start > label,
+  .journey-start > div > label {
+    gap: 4px;
+  }
+
+  .journey-start__status,
+  .route-api-note {
+    display: none;
+  }
+
+  .journey-start select,
+  .journey-start input,
+  .itinerary-add select {
+    height: 34px;
+  }
+
+  .itinerary-editor {
+    gap: 7px;
+  }
+
+  .itinerary-editor > ol {
+    max-height: 176px;
+  }
+
+  .itinerary-editor li {
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .itinerary-editor li > div:nth-child(2) {
+    gap: 3px;
+  }
+
+  .itinerary-editor li input {
+    height: 25px;
+  }
+
+  .travel-modes {
+    margin-top: 13px;
+  }
+
+  .travel-modes legend {
+    margin-bottom: 6px;
+  }
+
+  .travel-modes label {
+    gap: 3px;
+    padding: 6px 3px;
+  }
+
+  .mode-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .route-optimize {
+    gap: 8px;
+    margin-top: 9px;
+    padding: 9px;
+  }
+
+  .route-optimize small {
+    line-height: 1.35;
+  }
+
+  .route-search-button {
+    margin-top: 12px;
+    padding: 12px 14px;
+  }
+
+  .route-result {
+    min-height: 64px;
+    margin-top: 12px;
+    padding: 11px;
+  }
+}
+
 @media (max-width: 1080px) {
   .desktop-nav {
     display: none;
@@ -3637,27 +3656,19 @@ footer > span {
   }
 
   .collaboration-route-fill,
-  .journey-start,
-  .itinerary-storage {
+  .journey-start {
     padding: 13px;
   }
 
   .collaboration-route-fill select,
   .journey-start select,
   .journey-start input,
-  .itinerary-storage select,
-  .itinerary-storage input,
   .itinerary-add select,
   .spot-filters input,
   .spot-filters select,
   .card-model-filter select {
     min-height: 48px;
     font-size: 16px;
-  }
-
-  .itinerary-storage__actions button {
-    min-height: 44px;
-    flex: 1 1 132px;
   }
 
   .itinerary-editor li {

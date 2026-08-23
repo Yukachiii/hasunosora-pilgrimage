@@ -22,12 +22,11 @@ import {
   type TravelMode,
 } from "./route-planner";
 import {
-  parseSavedItineraries,
-  PLANNER_DRAFT_STORAGE_KEY,
-  SAVED_ITINERARIES_STORAGE_KEY,
+  parsePlannerDraftCookie,
+  PLANNER_DRAFT_COOKIE_KEY,
   sanitizePlannerSnapshot,
+  serializePlannerDraftCookie,
   type PlannerSnapshot,
-  type SavedItinerary,
   type TransitLegProgress,
 } from "./planner-storage";
 import {
@@ -46,6 +45,8 @@ import {
 } from "./yahoo-transit";
 
 const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v2";
+const LEGACY_PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1";
+const PLANNER_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 const travelModes: Array<{
   value: TravelMode;
@@ -162,11 +163,7 @@ export function PilgrimageApp({
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
   const [itineraryCollaborationId, setItineraryCollaborationId] = useState<CollaborationId | "">("");
   const [cardCharacterFilter, setCardCharacterFilter] = useState<CardCharacter | "すべて">("すべて");
-  const [savedItineraries, setSavedItineraries] = useState<SavedItinerary[]>([]);
-  const [activeSavedItineraryId, setActiveSavedItineraryId] = useState("");
-  const [itineraryName, setItineraryName] = useState("");
   const [hasRestoredPlannerStorage, setHasRestoredPlannerStorage] = useState(false);
-  const [plannerStorageMessage, setPlannerStorageMessage] = useState("端末内へ自動保存します");
   const [completedSpotIds, setCompletedSpotIds] = useState<string[]>([]);
   const [todayOffsetMinutes, setTodayOffsetMinutes] = useState(0);
   const [isTodayModeOpen, setIsTodayModeOpen] = useState(false);
@@ -200,10 +197,13 @@ export function PilgrimageApp({
     const restoreTimer = window.setTimeout(() => {
       const validSpotIds = new Set(spots.map((spot) => spot.id));
       try {
-        const draftRaw = window.localStorage.getItem(PLANNER_DRAFT_STORAGE_KEY);
-        const draft = draftRaw
-          ? sanitizePlannerSnapshot(JSON.parse(draftRaw) as unknown, validSpotIds)
-          : null;
+        const cookieDraft = parsePlannerDraftCookie(document.cookie, validSpotIds);
+        const legacyDraftRaw = cookieDraft
+          ? null
+          : window.localStorage.getItem(LEGACY_PLANNER_DRAFT_STORAGE_KEY);
+        const draft = cookieDraft ?? (legacyDraftRaw
+          ? sanitizePlannerSnapshot(JSON.parse(legacyDraftRaw) as unknown, validSpotIds)
+          : null);
         if (draft) {
           setItineraryIds(draft.itineraryIds);
           setStayMinutes((current) => ({ ...current, ...draft.stayMinutes }));
@@ -217,14 +217,9 @@ export function PilgrimageApp({
           setTodayOffsetMinutes(draft.todayOffsetMinutes);
           setTransitLegProgress(draft.transitLegProgress);
           setSelectedId(draft.itineraryIds[0]);
-          setPlannerStorageMessage("前回の編集中旅程を復元しました");
         }
-        setSavedItineraries(parseSavedItineraries(
-          window.localStorage.getItem(SAVED_ITINERARIES_STORAGE_KEY),
-          validSpotIds,
-        ));
       } catch {
-        setPlannerStorageMessage("端末の保存領域を利用できません");
+        // 保存領域が使えない場合も、通常の旅程作成はそのまま利用できます。
       }
       setHasRestoredPlannerStorage(true);
     }, 0);
@@ -246,15 +241,13 @@ export function PilgrimageApp({
       todayOffsetMinutes,
       transitLegProgress,
     };
-    let message: string;
     try {
-      window.localStorage.setItem(PLANNER_DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
-      message = "編集中の旅程をこの端末へ自動保存しました";
+      const encoded = serializePlannerDraftCookie(snapshot);
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `${PLANNER_DRAFT_COOKIE_KEY}=${encoded}; Max-Age=${PLANNER_COOKIE_MAX_AGE_SECONDS}; Path=/; SameSite=Lax${secure}`;
     } catch {
-      message = "端末への自動保存に失敗しました";
+      // 自動保存に失敗しても、画面上の編集中データは維持します。
     }
-    const messageTimer = window.setTimeout(() => setPlannerStorageMessage(message), 0);
-    return () => window.clearTimeout(messageTimer);
   }, [completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode, visitDate]);
 
   useEffect(() => {
@@ -430,88 +423,6 @@ export function PilgrimageApp({
     ? schedule.entries.filter((entry) => completedSpotIds.includes(entry.spot.id)).map((entry) => entry.spot.id)
     : [];
   const nextTodayEntry = schedule?.entries.find((entry) => !completedSpotIds.includes(entry.spot.id));
-
-  function createPlannerSnapshot(): PlannerSnapshot {
-    return {
-      itineraryIds,
-      stayMinutes,
-      travelMode,
-      optimizeOrder,
-      sourceStationId,
-      visitDate,
-      startTime,
-      itineraryCollaborationId,
-      completedSpotIds,
-      todayOffsetMinutes,
-      transitLegProgress,
-    };
-  }
-
-  function persistSavedItineraries(next: SavedItinerary[]) {
-    setSavedItineraries(next);
-    try {
-      window.localStorage.setItem(SAVED_ITINERARIES_STORAGE_KEY, JSON.stringify(next));
-      setPlannerStorageMessage("名前付き旅程をこの端末へ保存しました");
-    } catch {
-      setPlannerStorageMessage("名前付き旅程の保存に失敗しました");
-    }
-  }
-
-  function saveNamedItinerary() {
-    const name = itineraryName.trim() || `${visitDate} 巡礼予定`;
-    const savedAt = new Date().toISOString();
-    if (activeSavedItineraryId) {
-      persistSavedItineraries(savedItineraries.map((item) => item.id === activeSavedItineraryId
-        ? { ...item, name, savedAt, snapshot: createPlannerSnapshot() }
-        : item));
-      setItineraryName(name);
-      return;
-    }
-    const id = typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `itinerary-${Date.now()}`;
-    persistSavedItineraries([
-      { id, name, savedAt, snapshot: createPlannerSnapshot() },
-      ...savedItineraries,
-    ].slice(0, 30));
-    setActiveSavedItineraryId(id);
-    setItineraryName(name);
-  }
-
-  function loadSavedItinerary(id: string) {
-    setActiveSavedItineraryId(id);
-    if (!id) {
-      setItineraryName("");
-      return;
-    }
-    const saved = savedItineraries.find((item) => item.id === id);
-    if (!saved) return;
-    const snapshot = saved.snapshot;
-    setItineraryIds(snapshot.itineraryIds);
-    setStayMinutes((current) => ({ ...current, ...snapshot.stayMinutes }));
-    setTravelMode(snapshot.travelMode);
-    setOptimizeOrder(snapshot.optimizeOrder);
-    setSourceStationId(snapshot.sourceStationId);
-    setVisitDate(snapshot.visitDate || japanDate());
-    setStartTime(snapshot.startTime);
-    setItineraryCollaborationId(snapshot.itineraryCollaborationId as CollaborationId | "");
-    setCompletedSpotIds(snapshot.completedSpotIds);
-    setTodayOffsetMinutes(snapshot.todayOffsetMinutes);
-    setSelectedId(snapshot.itineraryIds[0]);
-    setItineraryName(saved.name);
-    setIsTodayModeOpen(false);
-    invalidateRoute();
-    setTransitLegProgress(snapshot.transitLegProgress);
-    setPlannerStorageMessage(`「${saved.name}」を読み込みました`);
-  }
-
-  function deleteSavedItinerary() {
-    if (!activeSavedItineraryId) return;
-    persistSavedItineraries(savedItineraries.filter((item) => item.id !== activeSavedItineraryId));
-    setActiveSavedItineraryId("");
-    setItineraryName("");
-    setPlannerStorageMessage("名前付き旅程を削除しました。編集中の内容は残っています");
-  }
 
   function toggleCompletedSpot(spotId: string) {
     setCompletedSpotIds((current) => current.includes(spotId)
@@ -981,51 +892,6 @@ export function PilgrimageApp({
                 </label>
               </div>
             </div>
-
-            <section className="itinerary-storage" aria-label="旅程の保存">
-              <div className="itinerary-storage__heading">
-                <div>
-                  <small>LOCAL SAVE</small>
-                  <strong>旅程をこの端末に保存</strong>
-                </div>
-                <span>この端末に保存</span>
-              </div>
-              <label>
-                <span>保存済みの旅程</span>
-                <select
-                  value={activeSavedItineraryId}
-                  onChange={(event) => loadSavedItinerary(event.target.value)}
-                >
-                  <option value="">編集中の旅程</option>
-                  {savedItineraries.map((item) => (
-                    <option value={item.id} key={item.id}>{item.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>旅程名</span>
-                <input
-                  type="text"
-                  maxLength={60}
-                  placeholder={`${visitDate} 巡礼予定`}
-                  value={itineraryName}
-                  onChange={(event) => setItineraryName(event.target.value)}
-                />
-              </label>
-              <div className="itinerary-storage__actions">
-                <button type="button" onClick={saveNamedItinerary}>
-                  {activeSavedItineraryId ? "変更を上書き保存" : "名前を付けて保存"}
-                </button>
-                {activeSavedItineraryId ? (
-                  <>
-                    <button type="button" onClick={() => loadSavedItinerary("")}>別の旅程として保存</button>
-                    <button type="button" className="is-danger" onClick={deleteSavedItinerary}>削除</button>
-                  </>
-                ) : null}
-              </div>
-              <small className="itinerary-storage__message" aria-live="polite">{plannerStorageMessage}</small>
-              <p>ログインや通信は不要です。別の端末・別のブラウザには共有されません。</p>
-            </section>
 
             <div className="itinerary-editor">
               <div className="itinerary-editor__heading">

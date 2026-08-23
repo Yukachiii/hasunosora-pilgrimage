@@ -407,15 +407,19 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(storage, /PLANNER_DRAFT_STORAGE_KEY/);
-  assert.match(storage, /SAVED_ITINERARIES_STORAGE_KEY/);
+  assert.match(storage, /PLANNER_DRAFT_COOKIE_KEY/);
+  assert.match(storage, /serializePlannerDraftCookie/);
+  assert.match(storage, /parsePlannerDraftCookie/);
+  assert.match(app, /document\.cookie/);
+  assert.doesNotMatch(app, /localStorage\.setItem\(PLANNER_DRAFT/);
   assert.match(storage, /transitLegProgress/);
   assert.match(storage, /sanitizeTransitLegProgress/);
-  assert.match(app, /前回の編集中旅程を復元しました/);
+  assert.match(app, /sanitizePlannerSnapshot/);
   assert.match(app, /この内容は計算済みです/);
   assert.match(app, /当日用モード/);
   assert.match(app, /現在地からGoogle Mapsで向かう/);
-  assert.match(app, /この端末に保存/);
+  assert.doesNotMatch(app, /LOCAL SAVE/);
+  assert.doesNotMatch(app, /旅程をこの端末に保存/);
   assert.match(app, /スマートフォン用メニュー/);
   assert.match(app, /href="#planner"/);
   assert.match(routePlanner, /openingHoursStatus/);
@@ -430,7 +434,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.mobile-nav/);
   assert.match(css, /\.transit-search-panel__confirmed/);
   assert.match(css, /\.transit-search-panel__progress/);
-  assert.match(css, /\.route-planner\s*\{[^}]*max-height:\s*660px/s);
+  assert.match(css, /\.route-planner\s*\{[^}]*max-height:\s*640px/s);
+  assert.match(css, /@media \(min-width:\s*1081px\)[\s\S]*?\.itinerary-editor > ol\s*\{[^}]*max-height:\s*176px/s);
   assert.match(css, /@media \(max-width:\s*1080px\)[\s\S]*?\.route-planner\s*\{[^}]*max-height:\s*none/s);
 });
 
