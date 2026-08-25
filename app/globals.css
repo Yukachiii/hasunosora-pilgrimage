@@ -1079,9 +1079,7 @@ button {
   padding: 2px 7px 2px 2px;
 }
 
-.itinerary-editor > ol,
-.spot-grid,
-.card-model-grid {
+.itinerary-editor > ol {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -1090,16 +1088,16 @@ button {
   scrollbar-width: thin;
 }
 
-:is(.itinerary-editor > ol, .spot-grid, .card-model-grid)::-webkit-scrollbar {
+.itinerary-editor > ol::-webkit-scrollbar {
   width: 7px;
 }
 
-:is(.itinerary-editor > ol, .spot-grid, .card-model-grid)::-webkit-scrollbar-track {
+.itinerary-editor > ol::-webkit-scrollbar-track {
   border-radius: 999px;
   background: rgba(125, 185, 196, 0.12);
 }
 
-:is(.itinerary-editor > ol, .spot-grid, .card-model-grid)::-webkit-scrollbar-thumb {
+.itinerary-editor > ol::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(125, 185, 196, 0.8);
 }
@@ -2069,10 +2067,11 @@ button {
 
 .spot-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  max-height: min(72vh, 820px);
-  padding: 2px 10px 10px 2px;
+  max-height: none;
+  padding: 2px;
+  overflow: visible;
 }
 
 .spot-card {
@@ -2416,8 +2415,9 @@ button {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  max-height: min(72vh, 820px);
-  padding: 2px 10px 10px 2px;
+  max-height: none;
+  padding: 2px;
+  overflow: visible;
 }
 
 .card-model {
@@ -3406,17 +3406,18 @@ footer > span {
   }
 
   .spot-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .card-model-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .spot-grid,
   .card-model-grid {
-    max-height: min(68dvh, 640px);
-    padding-right: 7px;
+    max-height: none;
+    padding: 0;
+    overflow: visible;
   }
 
   .card-model-filter {
@@ -3441,7 +3442,7 @@ footer > span {
   }
 
   .spot-card {
-    min-height: 290px;
+    min-height: 0;
   }
 
   .guide-section {
@@ -3840,18 +3841,105 @@ footer > span {
 
   .spot-grid,
   .card-model-grid {
-    max-height: min(72dvh, 680px);
-    scroll-snap-type: y proximity;
+    max-height: none;
+    gap: 8px;
+    overflow: visible;
   }
 
-  .spot-card,
-  .card-model {
-    scroll-snap-align: start;
+  .spot-card__main {
+    padding: 13px;
+  }
+
+  .spot-card__topline {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 12px;
+  }
+
+  .spot-card__topline > span {
+    font-size: 17px;
+  }
+
+  .spot-card__topline small {
+    font-size: 7px;
+    letter-spacing: 0.04em;
+  }
+
+  .spot-card__collaborations {
+    gap: 4px;
+    margin: -3px 0 10px;
+  }
+
+  .spot-card__collaborations > span {
+    width: 100%;
+    padding: 5px 6px;
+    font-size: 7px;
+  }
+
+  .spot-card h3 {
+    margin-bottom: 8px;
+    font-size: 15px;
+    line-height: 1.42;
+  }
+
+  .spot-card p {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 9px;
+    line-height: 1.6;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+
+  .spot-card__hours {
+    margin-top: 10px;
+    padding: 7px;
+  }
+
+  .spot-card__episodes {
+    gap: 6px;
+    margin-top: 10px;
+    padding: 8px;
+  }
+
+  .spot-card__episodes > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .spot-card__episodes dt,
+  .spot-card__episodes dd {
+    font-size: 7px;
+  }
+
+  .spot-card__appearances {
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .spot-card__appearances span {
+    padding: 4px 6px;
+    font-size: 7px;
+  }
+
+  .spot-card__meta {
+    padding-top: 12px;
+    font-size: 8px;
+  }
+
+  .spot-card__select {
+    width: calc(100% - 20px);
+    min-height: 40px;
+    margin: 0 10px 8px;
+    font-size: 9px;
   }
 
   .spot-card > a {
     min-height: 48px;
     align-items: center;
+    padding: 10px 12px;
+    font-size: 8px;
   }
 
   .card-model-filter {
@@ -3865,7 +3953,24 @@ footer > span {
   }
 
   .card-model {
-    padding: 18px;
+    padding: 12px;
+  }
+
+  .card-model__topline > span {
+    font-size: 15px;
+  }
+
+  .card-model h3 {
+    font-size: 14px;
+  }
+
+  .card-model > strong {
+    font-size: 10px;
+  }
+
+  .card-model p,
+  .card-model__note {
+    font-size: 8px;
   }
 
   .site-disclaimer__review {
@@ -5452,7 +5557,15 @@ footer > span {
   }
 
   .card-model__actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .card-model__actions button {
+    min-height: 40px;
+    padding: 5px;
+    font-size: 8px;
+    line-height: 1.35;
   }
 
   .selection-tray {
