@@ -543,6 +543,9 @@ export function PilgrimageApp({
       .map((appointment) => appointment.id)
     : []);
   const previousHotelName = activeDayIndex > 0 ? plannerDays[activeDayIndex - 1]?.hotelName ?? "" : "";
+  const optionalPlannerSettingCount = activePlannerDay.appointments.length
+    + (activePlannerDay.hotelName.trim() ? 1 : 0)
+    + (activePlannerDay.endTime !== "18:00" ? 1 : 0);
 
   function toggleCompletedSpot(spotId: string) {
     setCompletedSpotIds((current) => current.includes(spotId)
@@ -1019,7 +1022,7 @@ export function PilgrimageApp({
           </p>
         </div>
 
-        {activePage === "planner" ? (
+        {activePage === "planner" && plannerDays.length > 1 ? (
           <section className="planner-days" aria-labelledby="planner-days-title">
             <div className="planner-days__heading">
               <div>
@@ -1047,11 +1050,7 @@ export function PilgrimageApp({
               ))}
             </div>
             <div className="planner-days__active-note">
-              <span>
-                {previousHotelName
-                  ? `開始地点メモ：前日の宿泊地「${previousHotelName}」`
-                  : `${activeDayIndex + 1}日目を編集中`}
-              </span>
+              {previousHotelName ? <span>前日の宿泊地：{previousHotelName}</span> : <span />}
               <button type="button" onClick={removeActivePlannerDay} disabled={plannerDays.length <= 1}>
                 この日を削除
               </button>
@@ -1262,92 +1261,108 @@ export function PilgrimageApp({
                   />
                 </label>
               </div>
-              <div className="day-boundaries">
-                <label>
-                  <span>その日の終了目安</span>
-                  <input
-                    type="time"
-                    value={activePlannerDay.endTime}
-                    onChange={(event) => updateActivePlannerDay({ endTime: event.target.value })}
-                  />
-                </label>
-                <label>
-                  <span>宿泊地（任意）</span>
-                  <input
-                    type="text"
-                    maxLength={120}
-                    value={activePlannerDay.hotelName}
-                    placeholder="ホテル名・宿泊施設名"
-                    onChange={(event) => updateActivePlannerDay({ hotelName: event.target.value })}
-                  />
-                </label>
-                <p>
-                  宿泊地はこの日の終了地点と翌日の開始地点のメモとして表示します。位置検索や移動時間の計算は行わないため、APIは使用しません。
-                </p>
-              </div>
-
-              <section className="planner-appointments" aria-labelledby="planner-appointments-title">
-                <div className="planner-appointments__heading">
-                  <div>
-                    <strong id="planner-appointments-title">時間を固定する予定</strong>
-                    <span>予約・待ち合わせ・食事など</span>
-                  </div>
-                  <button type="button" onClick={addAppointment} disabled={activePlannerDay.appointments.length >= 12}>
-                    予定を追加
-                  </button>
+              {plannerDays.length === 1 ? (
+                <div className="multi-day-prompt">
+                  <span>宿泊を伴う旅行ですか？</span>
+                  <button type="button" onClick={addPlannerDay}>複数日にする</button>
                 </div>
-                {activePlannerDay.appointments.length ? (
-                  <ol>
-                    {activePlannerDay.appointments.map((appointment) => (
-                      <li key={appointment.id}>
-                        <label className="planner-appointment__title">
-                          <span>予定名</span>
-                          <input
-                            type="text"
-                            maxLength={80}
-                            value={appointment.title}
-                            onChange={(event) => updateAppointment(appointment.id, { title: event.target.value })}
-                          />
-                        </label>
-                        <label>
-                          <span>開始</span>
-                          <input
-                            type="time"
-                            value={appointment.time}
-                            onChange={(event) => updateAppointment(appointment.id, { time: event.target.value })}
-                          />
-                        </label>
-                        <label>
-                          <span>所要</span>
-                          <span className="planner-appointment__duration">
-                            <input
-                              type="number"
-                              min="0"
-                              max="720"
-                              step="5"
-                              value={appointment.durationMinutes}
-                              onChange={(event) => updateAppointment(appointment.id, {
-                                durationMinutes: Math.max(0, Math.min(720, Number(event.target.value) || 0)),
-                              })}
-                            />
-                            分
-                          </span>
-                        </label>
-                        <button
-                          type="button"
-                          className="planner-appointment__remove"
-                          onClick={() => removeAppointment(appointment.id)}
-                          aria-label={`${appointment.title || "予定"}を削除`}
-                        >
-                          ×
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p>時間が決まっている予定があれば追加してください。</p>
-                )}
-              </section>
+              ) : null}
+
+              <details className="planner-extras">
+                <summary>
+                  <span>
+                    <strong>宿泊・予約を追加</strong>
+                    <small>任意</small>
+                  </span>
+                  <em>{optionalPlannerSettingCount ? `${optionalPlannerSettingCount}件設定中` : "必要な場合のみ"}</em>
+                </summary>
+                <div className="planner-extras__body">
+                  <div className="day-boundaries">
+                    <label>
+                      <span>その日の終了目安</span>
+                      <input
+                        type="time"
+                        value={activePlannerDay.endTime}
+                        onChange={(event) => updateActivePlannerDay({ endTime: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <span>宿泊地（任意）</span>
+                      <input
+                        type="text"
+                        maxLength={120}
+                        value={activePlannerDay.hotelName}
+                        placeholder="ホテル名・宿泊施設名"
+                        onChange={(event) => updateActivePlannerDay({ hotelName: event.target.value })}
+                      />
+                    </label>
+                    <p>宿泊地は、翌日の開始地点メモにも表示されます。移動時間には含まれません。</p>
+                  </div>
+
+                  <section className="planner-appointments" aria-labelledby="planner-appointments-title">
+                    <div className="planner-appointments__heading">
+                      <div>
+                        <strong id="planner-appointments-title">時間を固定する予定</strong>
+                        <span>予約・待ち合わせ・食事など</span>
+                      </div>
+                      <button type="button" onClick={addAppointment} disabled={activePlannerDay.appointments.length >= 12}>
+                        予定を追加
+                      </button>
+                    </div>
+                    {activePlannerDay.appointments.length ? (
+                      <ol>
+                        {activePlannerDay.appointments.map((appointment) => (
+                          <li key={appointment.id}>
+                            <label className="planner-appointment__title">
+                              <span>予定名</span>
+                              <input
+                                type="text"
+                                maxLength={80}
+                                value={appointment.title}
+                                onChange={(event) => updateAppointment(appointment.id, { title: event.target.value })}
+                              />
+                            </label>
+                            <label>
+                              <span>開始</span>
+                              <input
+                                type="time"
+                                value={appointment.time}
+                                onChange={(event) => updateAppointment(appointment.id, { time: event.target.value })}
+                              />
+                            </label>
+                            <label>
+                              <span>所要</span>
+                              <span className="planner-appointment__duration">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="720"
+                                  step="5"
+                                  value={appointment.durationMinutes}
+                                  onChange={(event) => updateAppointment(appointment.id, {
+                                    durationMinutes: Math.max(0, Math.min(720, Number(event.target.value) || 0)),
+                                  })}
+                                />
+                                分
+                              </span>
+                            </label>
+                            <button
+                              type="button"
+                              className="planner-appointment__remove"
+                              onClick={() => removeAppointment(appointment.id)}
+                              aria-label={`${appointment.title || "予定"}を削除`}
+                            >
+                              ×
+                            </button>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p>時間が決まっている予定があれば追加してください。</p>
+                    )}
+                  </section>
+                </div>
+              </details>
               <div className="planner-step-actions">
                 <button type="button" className="is-secondary" onClick={() => setPlannerStep(1)}>場所へ戻る</button>
                 <button type="button" onClick={() => setPlannerStep(3)}>確認へ進む</button>
@@ -1357,13 +1372,19 @@ export function PilgrimageApp({
             <div className="route-workspace__options" hidden={plannerStep !== 3}>
 
             <div className="planner-review">
-              <span>{activeDayIndex + 1}日目 / {plannerDays.length}日間</span>
-              <span>{itineraryIds.length}か所</span>
-              <span>{visitDate.replaceAll("-", "/")} {startTime}開始</span>
-              <span>{activePlannerDay.endTime}まで</span>
-              {previousHotelName ? <span>開始：{previousHotelName}</span> : null}
-              {activePlannerDay.hotelName ? <span>宿泊：{activePlannerDay.hotelName}</span> : null}
+              <span>
+                {plannerDays.length > 1 ? `${activeDayIndex + 1}日目 · ` : ""}
+                {visitDate.replaceAll("-", "/")}
+              </span>
+              <span>{itineraryIds.length}か所 · {startTime}–{activePlannerDay.endTime}</span>
             </div>
+            {previousHotelName || activePlannerDay.hotelName ? (
+              <p className="planner-review__note">
+                {previousHotelName ? `前泊：${previousHotelName}` : ""}
+                {previousHotelName && activePlannerDay.hotelName ? " ／ " : ""}
+                {activePlannerDay.hotelName ? `宿泊：${activePlannerDay.hotelName}` : ""}
+              </p>
+            ) : null}
 
             {fixedAppointments.length ? (
               <section className="planner-fixed-review" aria-label="時間を固定した予定">

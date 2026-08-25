@@ -5239,7 +5239,7 @@ footer > span {
 .planner-days {
   width: min(980px, 100%);
   margin: -12px auto 28px;
-  padding: 18px;
+  padding: 13px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
@@ -5275,7 +5275,7 @@ footer > span {
 
 .planner-days__heading > button,
 .planner-appointments__heading > button {
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 13px;
   border: 1px solid var(--ink);
   border-radius: 4px;
@@ -5295,7 +5295,7 @@ footer > span {
 .planner-days__tabs {
   display: flex;
   gap: 8px;
-  margin: 14px 0;
+  margin: 10px 0 6px;
   padding-bottom: 3px;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -5303,9 +5303,9 @@ footer > span {
 
 .planner-days__tabs > button {
   display: grid;
-  min-width: 132px;
-  min-height: 68px;
-  flex: 1 0 132px;
+  min-width: 112px;
+  min-height: 54px;
+  flex: 1 0 112px;
   align-content: center;
   gap: 2px;
   padding: 10px 12px;
@@ -5335,8 +5335,8 @@ footer > span {
 }
 
 .planner-days__active-note {
-  min-height: 30px;
-  padding-top: 11px;
+  min-height: 24px;
+  padding-top: 7px;
   border-top: 1px solid var(--line);
 }
 
@@ -5462,6 +5462,101 @@ footer > span {
   background: rgba(217, 239, 242, 0.62);
   font-size: 9px;
   font-weight: 800;
+}
+
+.planner-review__note {
+  margin: -4px 0 14px;
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.multi-day-prompt {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fafbf9;
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.multi-day-prompt button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: white;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.planner-extras {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  overflow: hidden;
+}
+
+.planner-extras > summary {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 14px;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+}
+
+.planner-extras > summary::-webkit-details-marker {
+  display: none;
+}
+
+.planner-extras > summary::after {
+  content: "+";
+  color: var(--ink-soft);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.planner-extras[open] > summary::after {
+  content: "−";
+}
+
+.planner-extras > summary > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.planner-extras > summary strong {
+  font-size: 10px;
+}
+
+.planner-extras > summary small,
+.planner-extras > summary em {
+  color: var(--ink-soft);
+  font-size: 8px;
+  font-style: normal;
+}
+
+.planner-extras > summary em {
+  margin-left: auto;
+}
+
+.planner-extras__body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--line);
 }
 
 .day-boundaries {
@@ -5942,9 +6037,9 @@ footer > span {
   }
 
   .planner-days__tabs > button {
-    min-width: 116px;
-    min-height: 64px;
-    flex-basis: 116px;
+    min-width: 104px;
+    min-height: 54px;
+    flex-basis: 104px;
   }
 
   .planner-days__active-note {
@@ -5967,6 +6062,30 @@ footer > span {
   .planner-step-actions button {
     min-height: 48px;
     padding: 0 8px;
+  }
+
+  .multi-day-prompt {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .multi-day-prompt button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .planner-extras > summary {
+    min-height: 58px;
+    padding: 0 12px;
+  }
+
+  .planner-extras > summary em {
+    display: none;
+  }
+
+  .planner-extras__body {
+    padding: 0 12px 12px;
   }
 
   .day-boundaries {

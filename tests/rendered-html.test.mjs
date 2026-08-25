@@ -428,9 +428,13 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /この内容は計算済みです/);
   assert.match(app, /当日の予定/);
   assert.match(app, /日程を追加/);
+  assert.match(app, /plannerDays\.length > 1/);
+  assert.match(app, /複数日にする/);
+  assert.match(app, /className="planner-extras"/);
   assert.match(app, /宿泊地（任意）/);
   assert.match(app, /時間を固定する予定/);
   assert.match(app, /終了目安/);
+  assert.doesNotMatch(app, /APIは使用しません/);
   assert.match(app, /現在地からGoogle Mapsで向かう/);
   assert.doesNotMatch(app, /LOCAL SAVE/);
   assert.doesNotMatch(app, /旅程をこの端末に保存/);
