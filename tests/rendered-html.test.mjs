@@ -39,11 +39,11 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /蓮ノ旅/);
   assert.doesNotMatch(html, /好きな物語と|同じ景色/);
   assert.match(html, /hero-title-space/);
-  assert.match(html, /ルート条件と一日の予定/);
-  assert.match(html, /期間限定のコラボを巡る/);
+  assert.match(html, /スポットを地図から探す/);
+  assert.match(html, /コラボ/);
   assert.match(html, /おいでよ！石川大観光Ⅱ/);
   assert.match(html, /蓮ノ小四辺形の休日/);
-  assert.match(html, /巡礼へ出発する前に/);
+  assert.match(html, /利用前の確認/);
   assert.match(html, /内容に同意してサイトを見る/);
   assert.match(html, /type="checkbox"/);
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
@@ -53,7 +53,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);
-  assert.match(html, /カードに描かれた、.*31.*の景色/);
+  assert.match(html, /カードモデル地（.*31.*件）/);
   assert.match(html, /すべてのキャラクター/);
   assert.match(html, /等身パネル：.*百生吟子、安養寺姫芽/);
   assert.match(html, /蓮ノ空歌留多/);
@@ -422,12 +422,12 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(storage, /sanitizeTransitLegProgress/);
   assert.match(app, /sanitizePlannerSnapshot/);
   assert.match(app, /この内容は計算済みです/);
-  assert.match(app, /当日用モード/);
+  assert.match(app, /当日の予定/);
   assert.match(app, /現在地からGoogle Mapsで向かう/);
   assert.doesNotMatch(app, /LOCAL SAVE/);
   assert.doesNotMatch(app, /旅程をこの端末に保存/);
   assert.match(app, /スマートフォン用メニュー/);
-  assert.match(app, /href="#planner"/);
+  assert.match(app, /href=\{`#\/\$\{page\}`\}/);
   assert.match(routePlanner, /openingHoursStatus/);
   assert.match(routePlanner, /営業時間は公式情報を確認/);
   assert.match(adminApp, /通常の休業曜日/);
