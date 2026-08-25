@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
   type CSSProperties,
+  type SetStateAction,
 } from "react";
 import {
   MapboxPilgrimageMap,
@@ -26,6 +27,8 @@ import {
   PLANNER_DRAFT_COOKIE_KEY,
   sanitizePlannerSnapshot,
   serializePlannerDraftCookie,
+  type PlannerAppointment,
+  type PlannerDaySnapshot,
   type PlannerSnapshot,
   type TransitLegProgress,
 } from "./planner-storage";
@@ -82,6 +85,29 @@ function japanDate(daysFromToday = 0) {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
+}
+
+function dateAfter(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00+09:00`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function createPlannerDay(index: number, visitDate: string): PlannerDaySnapshot {
+  return {
+    id: `day-${Date.now()}-${index}`,
+    visitDate,
+    startTime: "09:00",
+    endTime: "18:00",
+    itineraryIds: [],
+    hotelName: "",
+    appointments: [],
+  };
 }
 
 function departureIso(date: string, time: string) {
@@ -160,7 +186,10 @@ export function PilgrimageApp({
   const [hasAcceptedVisitorNotice, setHasAcceptedVisitorNotice] = useState(false);
   const [visitorNoticeChecks, setVisitorNoticeChecks] = useState([false, false, false]);
   const [selectedId, setSelectedId] = useState(spots[0].id);
-  const [itineraryIds, setItineraryIds] = useState<string[]>([]);
+  const [plannerDays, setPlannerDays] = useState<PlannerDaySnapshot[]>(() => [
+    createPlannerDay(0, japanDate()),
+  ]);
+  const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [addSpotId, setAddSpotId] = useState(spots[0].id);
   const [stayMinutes, setStayMinutes] = useState<Record<string, number>>(() =>
     Object.fromEntries(spots.map((spot) => [spot.id, recommendedStayMinutes(spot)])),
@@ -168,10 +197,12 @@ export function PilgrimageApp({
   const [travelMode, setTravelMode] = useState<TravelMode>("WALKING");
   const [optimizeOrder, setOptimizeOrder] = useState(true);
   const [sourceStationId, setSourceStationId] = useState("");
-  const [visitDate, setVisitDate] = useState(() => japanDate());
-  const [startTime, setStartTime] = useState("09:00");
   const [routeRequest, setRouteRequest] = useState<RouteRequest | null>(null);
   const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
+  const [dayRouteCache, setDayRouteCache] = useState<Record<string, {
+    request: RouteRequest;
+    result: RouteResult;
+  }>>({});
   const [spotQuery, setSpotQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState("すべて");
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
@@ -184,6 +215,35 @@ export function PilgrimageApp({
   const [transitLegProgress, setTransitLegProgress] = useState<TransitLegProgress>({});
   const [activePage, setActivePage] = useState<AppPage>("explore");
   const [plannerStep, setPlannerStep] = useState<1 | 2 | 3>(1);
+  const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
+  const itineraryIds = activePlannerDay.itineraryIds;
+  const visitDate = activePlannerDay.visitDate;
+  const startTime = activePlannerDay.startTime;
+  const activeDayId = activePlannerDay.id;
+
+  function updateActivePlannerDay(
+    update: Partial<PlannerDaySnapshot> | ((day: PlannerDaySnapshot) => PlannerDaySnapshot),
+  ) {
+    setPlannerDays((current) => current.map((day, index) => {
+      if (index !== activeDayIndex) return day;
+      return typeof update === "function" ? update(day) : { ...day, ...update };
+    }));
+  }
+
+  function setItineraryIds(value: SetStateAction<string[]>) {
+    updateActivePlannerDay((day) => ({
+      ...day,
+      itineraryIds: typeof value === "function" ? value(day.itineraryIds) : value,
+    }));
+  }
+
+  function setVisitDate(value: string) {
+    updateActivePlannerDay({ visitDate: value });
+  }
+
+  function setStartTime(value: string) {
+    updateActivePlannerDay({ startTime: value });
+  }
 
   useEffect(() => {
     const syncPage = () => {
@@ -239,18 +299,17 @@ export function PilgrimageApp({
           ? sanitizePlannerSnapshot(JSON.parse(legacyDraftRaw) as unknown, validSpotIds)
           : null);
         if (draft) {
-          setItineraryIds(draft.itineraryIds);
+          setPlannerDays(draft.plannerDays);
+          setActiveDayIndex(draft.activeDayIndex);
           setStayMinutes((current) => ({ ...current, ...draft.stayMinutes }));
           setTravelMode(draft.travelMode);
           setOptimizeOrder(draft.optimizeOrder);
           setSourceStationId(draft.sourceStationId);
-          setVisitDate(draft.visitDate || japanDate());
-          setStartTime(draft.startTime);
           setItineraryCollaborationId(draft.itineraryCollaborationId as CollaborationId | "");
           setCompletedSpotIds(draft.completedSpotIds);
           setTodayOffsetMinutes(draft.todayOffsetMinutes);
           setTransitLegProgress(draft.transitLegProgress);
-          setSelectedId(draft.itineraryIds[0]);
+          if (draft.itineraryIds[0]) setSelectedId(draft.itineraryIds[0]);
         }
       } catch {
         // 保存領域が使えない場合も、通常の旅程作成はそのまま利用できます。
@@ -274,6 +333,8 @@ export function PilgrimageApp({
       completedSpotIds,
       todayOffsetMinutes,
       transitLegProgress,
+      plannerDays,
+      activeDayIndex,
     };
     try {
       const encoded = serializePlannerDraftCookie(snapshot);
@@ -282,7 +343,7 @@ export function PilgrimageApp({
     } catch {
       // 自動保存に失敗しても、画面上の編集中データは維持します。
     }
-  }, [completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode, visitDate]);
+  }, [activeDayIndex, completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, plannerDays, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode, visitDate]);
 
   useEffect(() => {
     if (activePage !== "today") return undefined;
@@ -374,6 +435,10 @@ export function PilgrimageApp({
     ),
     [itinerarySpots, stayMinutes],
   );
+  const allPlannedSpotCount = useMemo(
+    () => plannerDays.reduce((total, day) => total + day.itineraryIds.length, 0),
+    [plannerDays],
+  );
   const availableSpots = spots.filter((spot) => !itineraryIds.includes(spot.id));
 
   const plannedSpots = useMemo(() => {
@@ -461,6 +526,23 @@ export function PilgrimageApp({
     ? schedule.entries.filter((entry) => completedSpotIds.includes(entry.spot.id)).map((entry) => entry.spot.id)
     : [];
   const nextTodayEntry = schedule?.entries.find((entry) => !completedSpotIds.includes(entry.spot.id));
+  const scheduleOverrunMinutes = schedule
+    ? Math.max(0, schedule.finish - timeToMinutes(activePlannerDay.endTime))
+    : 0;
+  const dayTimeWindowInvalid = timeToMinutes(activePlannerDay.endTime) <= timeToMinutes(startTime);
+  const fixedAppointments = [...activePlannerDay.appointments].sort(
+    (left, right) => timeToMinutes(left.time) - timeToMinutes(right.time),
+  );
+  const appointmentConflictIds = new Set(schedule
+    ? fixedAppointments
+      .filter((appointment) => {
+        const appointmentStart = timeToMinutes(appointment.time);
+        const appointmentEnd = appointmentStart + appointment.durationMinutes;
+        return appointmentStart < schedule.finish && appointmentEnd > schedule.start;
+      })
+      .map((appointment) => appointment.id)
+    : []);
+  const previousHotelName = activeDayIndex > 0 ? plannerDays[activeDayIndex - 1]?.hotelName ?? "" : "";
 
   function toggleCompletedSpot(spotId: string) {
     setCompletedSpotIds((current) => current.includes(spotId)
@@ -476,6 +558,12 @@ export function PilgrimageApp({
   function invalidateRoute() {
     setRouteRequest(null);
     setRouteResult({ state: "idle" });
+    setDayRouteCache((current) => {
+      if (!current[activeDayId]) return current;
+      const next = { ...current };
+      delete next[activeDayId];
+      return next;
+    });
     setTodayOffsetMinutes(0);
     setTransitLegProgress({});
   }
@@ -493,7 +581,13 @@ export function PilgrimageApp({
 
   const handleRouteResult = useCallback((result: RouteResult) => {
     setRouteResult(result);
-  }, []);
+    if (routeRequest && result.state === "success") {
+      setDayRouteCache((current) => ({
+        ...current,
+        [activeDayId]: { request: routeRequest, result },
+      }));
+    }
+  }, [activeDayId, routeRequest]);
 
   function searchRoute() {
     if (itinerarySpots.length < 2) {
@@ -531,10 +625,15 @@ export function PilgrimageApp({
           current[leg.id] ?? { date: leg.date, time: leg.time, confirmed: false },
         ]),
       ));
-      setRouteResult({
+      const externalResult: RouteResult = {
         state: "external",
         message: "訪問順にYahoo!乗換案内の区間検索を用意しました。",
-      });
+      };
+      setRouteResult(externalResult);
+      setDayRouteCache((current) => ({
+        ...current,
+        [activeDayId]: { request, result: externalResult },
+      }));
     }
     setSelectedId(itinerarySpots.at(-1)!.id);
   }
@@ -612,6 +711,81 @@ export function PilgrimageApp({
   function changeStayMinutes(id: string, value: number) {
     setStayMinutes((current) => ({ ...current, [id]: Math.max(0, Math.min(480, value || 0)) }));
     if (travelMode === "TRANSIT" && routeRequest) invalidateRoute();
+  }
+
+  function selectPlannerDay(index: number) {
+    if (index < 0 || index >= plannerDays.length || index === activeDayIndex) return;
+    setActiveDayIndex(index);
+    const cachedRoute = dayRouteCache[plannerDays[index].id];
+    setRouteRequest(cachedRoute?.request ?? null);
+    setRouteResult(cachedRoute?.result ?? { state: "idle" });
+    const nextSpotId = plannerDays[index].itineraryIds[0];
+    if (nextSpotId) setSelectedId(nextSpotId);
+    setTodayOffsetMinutes(0);
+    setTransitLegProgress({});
+  }
+
+  function addPlannerDay() {
+    if (plannerDays.length >= 7) return;
+    const previousDay = plannerDays.at(-1)!;
+    const nextDay = createPlannerDay(plannerDays.length, dateAfter(previousDay.visitDate, 1));
+    setPlannerDays((current) => [...current, nextDay]);
+    setActiveDayIndex(plannerDays.length);
+    setPlannerStep(1);
+    setRouteRequest(null);
+    setRouteResult({ state: "idle" });
+    setTodayOffsetMinutes(0);
+    setTransitLegProgress({});
+  }
+
+  function removeActivePlannerDay() {
+    if (plannerDays.length <= 1) return;
+    const removedDayId = plannerDays[activeDayIndex].id;
+    const nextIndex = Math.max(0, activeDayIndex - 1);
+    const remainingDays = plannerDays.filter((_, index) => index !== activeDayIndex);
+    setPlannerDays(remainingDays);
+    setDayRouteCache((current) => {
+      const next = { ...current };
+      delete next[removedDayId];
+      return next;
+    });
+    setActiveDayIndex(nextIndex);
+    const nextSpotId = remainingDays[nextIndex]?.itineraryIds[0];
+    if (nextSpotId) setSelectedId(nextSpotId);
+    setPlannerStep(1);
+    setRouteRequest(null);
+    setRouteResult({ state: "idle" });
+    setTodayOffsetMinutes(0);
+    setTransitLegProgress({});
+  }
+
+  function addAppointment() {
+    const appointment: PlannerAppointment = {
+      id: `appointment-${Date.now()}`,
+      title: "予定を入力",
+      time: "12:00",
+      durationMinutes: 60,
+    };
+    updateActivePlannerDay((day) => ({
+      ...day,
+      appointments: [...day.appointments, appointment],
+    }));
+  }
+
+  function updateAppointment(id: string, update: Partial<PlannerAppointment>) {
+    updateActivePlannerDay((day) => ({
+      ...day,
+      appointments: day.appointments.map((appointment) => appointment.id === id
+        ? { ...appointment, ...update }
+        : appointment),
+    }));
+  }
+
+  function removeAppointment(id: string) {
+    updateActivePlannerDay((day) => ({
+      ...day,
+      appointments: day.appointments.filter((appointment) => appointment.id !== id),
+    }));
   }
 
   return (
@@ -741,7 +915,7 @@ export function PilgrimageApp({
             onClick={(event) => { event.preventDefault(); navigateToPage(page); }}
           >
             <span>{appPageLabels[page]}</span>
-            {page === "planner" && itineraryIds.length ? <b>{itineraryIds.length}</b> : null}
+            {page === "planner" && allPlannedSpotCount ? <b>{allPlannedSpotCount}</b> : null}
           </a>
         ))}
       </nav>
@@ -844,6 +1018,46 @@ export function PilgrimageApp({
               : "ピンを選択すると、スポット情報の確認と予定への追加ができます。"}
           </p>
         </div>
+
+        {activePage === "planner" ? (
+          <section className="planner-days" aria-labelledby="planner-days-title">
+            <div className="planner-days__heading">
+              <div>
+                <strong id="planner-days-title">旅行日程</strong>
+                <span>{plannerDays.length}日間</span>
+              </div>
+              <button type="button" onClick={addPlannerDay} disabled={plannerDays.length >= 7}>
+                日程を追加
+              </button>
+            </div>
+            <div className="planner-days__tabs" role="tablist" aria-label="編集する日を選択">
+              {plannerDays.map((day, index) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={day.id}
+                  aria-selected={index === activeDayIndex}
+                  className={index === activeDayIndex ? "is-current" : undefined}
+                  onClick={() => selectPlannerDay(index)}
+                >
+                  <strong>{index + 1}日目</strong>
+                  <span>{day.visitDate.replaceAll("-", "/")}</span>
+                  <small>{day.itineraryIds.length}か所</small>
+                </button>
+              ))}
+            </div>
+            <div className="planner-days__active-note">
+              <span>
+                {previousHotelName
+                  ? `開始地点メモ：前日の宿泊地「${previousHotelName}」`
+                  : `${activeDayIndex + 1}日目を編集中`}
+              </span>
+              <button type="button" onClick={removeActivePlannerDay} disabled={plannerDays.length <= 1}>
+                この日を削除
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {activePage === "planner" ? (
           <nav className="planner-steps" aria-label="予定作成の手順">
@@ -1048,6 +1262,92 @@ export function PilgrimageApp({
                   />
                 </label>
               </div>
+              <div className="day-boundaries">
+                <label>
+                  <span>その日の終了目安</span>
+                  <input
+                    type="time"
+                    value={activePlannerDay.endTime}
+                    onChange={(event) => updateActivePlannerDay({ endTime: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>宿泊地（任意）</span>
+                  <input
+                    type="text"
+                    maxLength={120}
+                    value={activePlannerDay.hotelName}
+                    placeholder="ホテル名・宿泊施設名"
+                    onChange={(event) => updateActivePlannerDay({ hotelName: event.target.value })}
+                  />
+                </label>
+                <p>
+                  宿泊地はこの日の終了地点と翌日の開始地点のメモとして表示します。位置検索や移動時間の計算は行わないため、APIは使用しません。
+                </p>
+              </div>
+
+              <section className="planner-appointments" aria-labelledby="planner-appointments-title">
+                <div className="planner-appointments__heading">
+                  <div>
+                    <strong id="planner-appointments-title">時間を固定する予定</strong>
+                    <span>予約・待ち合わせ・食事など</span>
+                  </div>
+                  <button type="button" onClick={addAppointment} disabled={activePlannerDay.appointments.length >= 12}>
+                    予定を追加
+                  </button>
+                </div>
+                {activePlannerDay.appointments.length ? (
+                  <ol>
+                    {activePlannerDay.appointments.map((appointment) => (
+                      <li key={appointment.id}>
+                        <label className="planner-appointment__title">
+                          <span>予定名</span>
+                          <input
+                            type="text"
+                            maxLength={80}
+                            value={appointment.title}
+                            onChange={(event) => updateAppointment(appointment.id, { title: event.target.value })}
+                          />
+                        </label>
+                        <label>
+                          <span>開始</span>
+                          <input
+                            type="time"
+                            value={appointment.time}
+                            onChange={(event) => updateAppointment(appointment.id, { time: event.target.value })}
+                          />
+                        </label>
+                        <label>
+                          <span>所要</span>
+                          <span className="planner-appointment__duration">
+                            <input
+                              type="number"
+                              min="0"
+                              max="720"
+                              step="5"
+                              value={appointment.durationMinutes}
+                              onChange={(event) => updateAppointment(appointment.id, {
+                                durationMinutes: Math.max(0, Math.min(720, Number(event.target.value) || 0)),
+                              })}
+                            />
+                            分
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          className="planner-appointment__remove"
+                          onClick={() => removeAppointment(appointment.id)}
+                          aria-label={`${appointment.title || "予定"}を削除`}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p>時間が決まっている予定があれば追加してください。</p>
+                )}
+              </section>
               <div className="planner-step-actions">
                 <button type="button" className="is-secondary" onClick={() => setPlannerStep(1)}>場所へ戻る</button>
                 <button type="button" onClick={() => setPlannerStep(3)}>確認へ進む</button>
@@ -1057,9 +1357,35 @@ export function PilgrimageApp({
             <div className="route-workspace__options" hidden={plannerStep !== 3}>
 
             <div className="planner-review">
+              <span>{activeDayIndex + 1}日目 / {plannerDays.length}日間</span>
               <span>{itineraryIds.length}か所</span>
               <span>{visitDate.replaceAll("-", "/")} {startTime}開始</span>
+              <span>{activePlannerDay.endTime}まで</span>
+              {previousHotelName ? <span>開始：{previousHotelName}</span> : null}
+              {activePlannerDay.hotelName ? <span>宿泊：{activePlannerDay.hotelName}</span> : null}
             </div>
+
+            {fixedAppointments.length ? (
+              <section className="planner-fixed-review" aria-label="時間を固定した予定">
+                <strong>時間を固定した予定</strong>
+                <ol>
+                  {fixedAppointments.map((appointment) => (
+                    <li key={appointment.id} className={appointmentConflictIds.has(appointment.id) ? "has-conflict" : undefined}>
+                      <time>{appointment.time}</time>
+                      <span>{appointment.title || "名称未入力"}</span>
+                      <small>{appointment.durationMinutes}分</small>
+                      {appointmentConflictIds.has(appointment.id) ? <em>計算した訪問予定と時間が重なります</em> : null}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
+
+            {dayTimeWindowInvalid ? (
+              <p className="planner-window-warning">
+                終了目安は出発時刻より後に設定してください。
+              </p>
+            ) : null}
 
             <details className="planner-advanced">
               <summary>詳細設定</summary>
@@ -1110,9 +1436,11 @@ export function PilgrimageApp({
               className="route-search-button"
               type="button"
               onClick={searchRoute}
-              disabled={routeResult.state === "loading" || routeIsCurrent}
+              disabled={dayTimeWindowInvalid || routeResult.state === "loading" || routeIsCurrent}
             >
-              {routeResult.state === "loading"
+              {dayTimeWindowInvalid
+                ? "日時を修正してください"
+                : routeResult.state === "loading"
                 ? "計算しています…"
                 : routeIsCurrent
                   ? travelMode === "TRANSIT" ? "検索リンクを作成済みです" : "この内容は計算済みです"
@@ -1290,6 +1618,12 @@ export function PilgrimageApp({
                   </div>
                   <span>{displayClock(schedule.finish)} 終了予定</span>
                 </div>
+                {scheduleOverrunMinutes ? (
+                  <p className="day-schedule__warning">
+                    終了目安の{activePlannerDay.endTime}を約{formatDuration(scheduleOverrunMinutes)}超えます。
+                    滞在時間、訪問先、出発時刻を調整してください。
+                  </p>
+                ) : null}
                 {routeRequest?.accessOrigin && (
                   <div className="access-schedule">
                     <time>{displayClock(schedule.start)}</time>
@@ -1297,6 +1631,23 @@ export function PilgrimageApp({
                     <small>公共交通 約{formatDuration(schedule.accessDuration)}</small>
                   </div>
                 )}
+                {fixedAppointments.length ? (
+                  <div className="day-schedule__fixed">
+                    <strong>時間を固定した予定</strong>
+                    <ol>
+                      {fixedAppointments.map((appointment) => (
+                        <li key={appointment.id} className={appointmentConflictIds.has(appointment.id) ? "has-conflict" : undefined}>
+                          <time>{appointment.time}</time>
+                          <div>
+                            <strong>{appointment.title || "名称未入力"}</strong>
+                            <small>{appointment.durationMinutes}分</small>
+                            {appointmentConflictIds.has(appointment.id) ? <span>訪問予定と重なるため調整が必要です</span> : null}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ) : null}
                 <ol>
                   {schedule.entries.map((entry, index) => {
                     const hoursStatus = openingHoursStatus(entry.spot, visitDate, entry.arrival);
@@ -1317,6 +1668,15 @@ export function PilgrimageApp({
                     );
                   })}
                 </ol>
+                {activePlannerDay.hotelName ? (
+                  <div className="day-schedule__hotel">
+                    <time>{displayClock(schedule.finish)}</time>
+                    <div>
+                      <strong>宿泊地：{activePlannerDay.hotelName}</strong>
+                      <small>宿泊地までの移動時間は計算に含まれていません</small>
+                    </div>
+                  </div>
+                ) : null}
                 <p>
                   滞在込み <strong>{formatDuration(schedule.finish - schedule.start)}</strong>
                   {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · 最適化した順で表示" : ""}
@@ -1790,6 +2150,22 @@ export function PilgrimageApp({
 
       {activePage === "today" ? (
         <div className="today-mode today-mode--page">
+          {plannerDays.length > 1 ? (
+            <nav className="today-day-switch" aria-label="確認する日を選択">
+              {plannerDays.map((day, index) => (
+                <button
+                  type="button"
+                  key={day.id}
+                  className={index === activeDayIndex ? "is-current" : undefined}
+                  aria-current={index === activeDayIndex ? "date" : undefined}
+                  onClick={() => selectPlannerDay(index)}
+                >
+                  <strong>{index + 1}日目</strong>
+                  <span>{day.visitDate.replaceAll("-", "/")}</span>
+                </button>
+              ))}
+            </nav>
+          ) : null}
           {schedule ? (
           <section
             className="today-mode__dialog"
@@ -1797,7 +2173,7 @@ export function PilgrimageApp({
           >
             <header className="today-mode__header">
               <div>
-                <h2 id="today-mode-title">当日の予定</h2>
+                <h2 id="today-mode-title">{activeDayIndex + 1}日目の予定</h2>
                 <p>
                   {visitDate === japanDate()
                     ? `${visitDate.replaceAll("-", ".")} · 現在 ${displayClock(currentJapanMinutes)}`
@@ -1813,6 +2189,21 @@ export function PilgrimageApp({
               </div>
               <progress value={completedScheduledSpotIds.length} max={schedule.entries.length} />
             </div>
+
+            {fixedAppointments.length ? (
+              <section className="today-mode__fixed" aria-label="時間を固定した予定">
+                <strong>時間を固定した予定</strong>
+                <ol>
+                  {fixedAppointments.map((appointment) => (
+                    <li key={appointment.id}>
+                      <time>{appointment.time}</time>
+                      <span>{appointment.title || "名称未入力"}</span>
+                      <small>{appointment.durationMinutes}分</small>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
 
             {nextTodayEntry ? (
               <article className="today-mode__next">
@@ -1888,6 +2279,12 @@ export function PilgrimageApp({
               営業時間・交通状況は変わる場合があります。現地と公式案内を優先してください。
               進捗と時刻補正はこの端末へ自動保存されます。
             </p>
+            {activePlannerDay.hotelName ? (
+              <p className="today-mode__hotel">
+                宿泊地：<strong>{activePlannerDay.hotelName}</strong>
+                <span>宿泊地までの移動時間は予定に含まれていません。</span>
+              </p>
+            ) : null}
           </section>
           ) : (
             <section className="today-page__empty" aria-labelledby="today-page-empty-title">

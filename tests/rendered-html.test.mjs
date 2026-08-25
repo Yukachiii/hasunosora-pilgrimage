@@ -420,9 +420,17 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.doesNotMatch(app, /localStorage\.setItem\(PLANNER_DRAFT/);
   assert.match(storage, /transitLegProgress/);
   assert.match(storage, /sanitizeTransitLegProgress/);
+  assert.match(storage, /plannerDays/);
+  assert.match(storage, /PlannerDaySnapshot/);
+  assert.match(storage, /activeDayIndex/);
+  assert.match(storage, /v:\s*3/);
   assert.match(app, /sanitizePlannerSnapshot/);
   assert.match(app, /この内容は計算済みです/);
   assert.match(app, /当日の予定/);
+  assert.match(app, /日程を追加/);
+  assert.match(app, /宿泊地（任意）/);
+  assert.match(app, /時間を固定する予定/);
+  assert.match(app, /終了目安/);
   assert.match(app, /現在地からGoogle Mapsで向かう/);
   assert.doesNotMatch(app, /LOCAL SAVE/);
   assert.doesNotMatch(app, /旅程をこの端末に保存/);
