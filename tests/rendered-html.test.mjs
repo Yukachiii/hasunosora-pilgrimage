@@ -209,10 +209,9 @@ test("collaboration locations can fill a route plan without an API request", asy
     readFile(new URL("../content/collaborations.json", import.meta.url), "utf8").then(JSON.parse),
   ]);
 
-  assert.match(app, /コラボから訪問スポットを自動入力/);
   assert.match(app, /fillItineraryFromCollaboration/);
   assert.match(app, /このコラボで予定を作る/);
-  assert.match(app, /対象地点を訪問リストへまとめて追加します/);
+  assert.doesNotMatch(app, /コラボから訪問スポットを自動入力/);
   assert.doesNotMatch(app, /料金区分|API不使用|Google API|サーバー計算|ブラウザ計算/);
   assert.match(planner, /maximumItineraryStops = 27/);
   assert.equal(
@@ -222,10 +221,6 @@ test("collaboration locations can fill a route plan without an API request", asy
   assert.equal(
     collaborations.find((item) => item.id === "kaga-onsen-2026").locations.length,
     9,
-  );
-  assert.ok(
-    app.indexOf("02 — LIMITED COLLABORATIONS")
-      < app.indexOf("コラボから訪問スポットを自動入力"),
   );
 });
 
@@ -439,6 +434,13 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.doesNotMatch(app, /LOCAL SAVE/);
   assert.doesNotMatch(app, /旅程をこの端末に保存/);
   assert.match(app, /スマートフォン用メニュー/);
+  assert.match(app, /isEditingItineraryOrder/);
+  assert.match(app, /順序を変更/);
+  assert.match(app, /className="transit-search-panel"/);
+  assert.match(app, /className="today-mode__tools"/);
+  assert.doesNotMatch(app, /className="selection-tray"/);
+  assert.doesNotMatch(app, /同意画面をもう一度確認する/);
+  assert.match(app, /className="hero-stats"/);
   assert.match(app, /href=\{`#\/\$\{page\}`\}/);
   assert.match(routePlanner, /openingHoursStatus/);
   assert.match(routePlanner, /営業時間は公式情報を確認/);
