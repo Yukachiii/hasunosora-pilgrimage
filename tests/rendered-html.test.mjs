@@ -88,6 +88,7 @@ test("publishes the complete reviewed location lists", async () => {
   assert.equal(cardModels.filter((card) => card.spotId).length, 20);
   assert.equal(cardModels.filter((card) => !card.spotId).length, 11);
   assert.ok(cardModels.every((card) => /］.+/.test(card.card)));
+  assert.ok(cardModels.every((card) => !/重複|第1部 No\./.test(card.note)));
   assert.equal(collaborations.length, 2);
   const fifthCollaboration = collaborations.find((item) => item.id === "ishikawa-dai-kanko-2");
   assert.equal(fifthCollaboration.locations.filter((location) => location.members?.length).length, 12);
