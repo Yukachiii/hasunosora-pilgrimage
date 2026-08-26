@@ -444,7 +444,10 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /mapReturnSection/);
   assert.match(app, /スポット一覧へ戻る/);
   assert.match(app, /カードモデル地へ戻る/);
+  assert.match(app, /この枠内を上下にスクロール/);
   assert.match(css, /\.map-return-link/);
+  assert.match(css, /\.list-scroll-hint/);
+  assert.match(css, /:is\(\.spot-grid, \.card-model-grid\)::\-webkit-scrollbar\s*\{[^}]*width:\s*12px/s);
   assert.match(app, /href=\{`#\/\$\{page\}`\}/);
   assert.match(routePlanner, /openingHoursStatus/);
   assert.match(routePlanner, /営業時間は公式情報を確認/);

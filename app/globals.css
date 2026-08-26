@@ -2073,12 +2073,63 @@ button {
   font-weight: 500;
 }
 
+.list-scroll-hint {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 0 0 8px;
+  border: 1px solid rgba(125, 185, 196, 0.38);
+  border-radius: 6px;
+  background: rgba(217, 239, 242, 0.32);
+  color: var(--ink-soft);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.list-scroll-hint b {
+  color: var(--ice-deep);
+  font-size: 14px;
+}
+
+.spot-grid,
+.card-model-grid {
+  border: 1px solid rgba(125, 185, 196, 0.34);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.34);
+  scrollbar-color: var(--ice-deep) rgba(125, 185, 196, 0.14);
+  scrollbar-width: auto;
+}
+
+.spot-grid:focus-visible,
+.card-model-grid:focus-visible {
+  border-color: var(--ice-deep);
+  box-shadow: 0 0 0 3px rgba(125, 185, 196, 0.16);
+}
+
+:is(.spot-grid, .card-model-grid)::-webkit-scrollbar {
+  width: 12px;
+}
+
+:is(.spot-grid, .card-model-grid)::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(125, 185, 196, 0.14);
+}
+
+:is(.spot-grid, .card-model-grid)::-webkit-scrollbar-thumb {
+  border: 3px solid rgba(237, 246, 246, 0.96);
+  border-radius: 999px;
+  background: var(--ice-deep);
+}
+
 .spot-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   max-height: min(72vh, 820px);
-  padding: 2px 10px 10px 2px;
+  padding: 8px 10px 10px 8px;
 }
 
 .spot-card {
@@ -2423,7 +2474,7 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   max-height: min(72vh, 820px);
-  padding: 2px 10px 10px 2px;
+  padding: 8px 10px 10px 8px;
 }
 
 .card-model {

@@ -1838,7 +1838,18 @@ export function PilgrimageApp({
           <p><strong>{filteredSpots.length}</strong> / {spots.length} SPOTS</p>
         </div>
 
-        <div className="spot-grid">
+        {filteredSpots.length > 4 ? (
+          <p className="list-scroll-hint" aria-hidden="true">
+            <span>この枠内を上下にスクロール</span>
+            <b>↓</b>
+          </p>
+        ) : null}
+        <div
+          className="spot-grid"
+          role="region"
+          aria-label={filteredSpots.length > 4 ? "スポット一覧。枠内を上下にスクロールできます" : "スポット一覧"}
+          tabIndex={filteredSpots.length > 4 ? 0 : undefined}
+        >
           {filteredSpots.map((spot) => {
             const index = spots.findIndex((item) => item.id === spot.id);
             const imageUrl = spotImages[spot.id] ?? spot.imageUrl;
@@ -1974,7 +1985,18 @@ export function PilgrimageApp({
           </label>
           <p><strong>{filteredCardModels.length}</strong> / {cardModels.length} CARDS</p>
         </div>
-        <div className="card-model-grid">
+        {filteredCardModels.length > 4 ? (
+          <p className="list-scroll-hint" aria-hidden="true">
+            <span>この枠内を上下にスクロール</span>
+            <b>↓</b>
+          </p>
+        ) : null}
+        <div
+          className="card-model-grid"
+          role="region"
+          aria-label={filteredCardModels.length > 4 ? "カードモデル地一覧。枠内を上下にスクロールできます" : "カードモデル地一覧"}
+          tabIndex={filteredCardModels.length > 4 ? 0 : undefined}
+        >
           {filteredCardModels.map((card) => {
             const index = cardModels.findIndex((item) => item.id === card.id);
             return (
