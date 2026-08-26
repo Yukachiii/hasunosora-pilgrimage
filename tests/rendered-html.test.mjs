@@ -441,6 +441,10 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.doesNotMatch(app, /className="selection-tray"/);
   assert.doesNotMatch(app, /同意画面をもう一度確認する/);
   assert.match(app, /className="hero-stats"/);
+  assert.match(app, /mapReturnSection/);
+  assert.match(app, /スポット一覧へ戻る/);
+  assert.match(app, /カードモデル地へ戻る/);
+  assert.match(css, /\.map-return-link/);
   assert.match(app, /href=\{`#\/\$\{page\}`\}/);
   assert.match(routePlanner, /openingHoursStatus/);
   assert.match(routePlanner, /営業時間は公式情報を確認/);

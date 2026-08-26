@@ -216,6 +216,7 @@ export function PilgrimageApp({
   const [activePage, setActivePage] = useState<AppPage>("explore");
   const [plannerStep, setPlannerStep] = useState<1 | 2 | 3>(1);
   const [isEditingItineraryOrder, setIsEditingItineraryOrder] = useState(false);
+  const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
   const visitDate = activePlannerDay.visitDate;
@@ -983,7 +984,10 @@ export function PilgrimageApp({
             <strong>コラボ</strong>
             <span>対象スポットをまとめて選ぶ</span>
           </button>
-          <button type="button" onClick={() => navigateToPage("explore", "map")}>
+          <button type="button" onClick={() => {
+            setMapReturnSection("explore-menu");
+            navigateToPage("explore", "map");
+          }}>
             <strong>地図</strong>
             <span>場所を確認しながら選ぶ</span>
           </button>
@@ -998,6 +1002,20 @@ export function PilgrimageApp({
         <div className="section-heading">
           <div>
             <h2>{activePage === "planner" ? "予定を作る" : "スポットを地図から探す"}</h2>
+            {activePage === "explore" ? (
+              <button
+                type="button"
+                className="map-return-link"
+                onClick={() => navigateToPage("explore", mapReturnSection)}
+              >
+                <span aria-hidden="true">←</span>
+                {mapReturnSection === "spots"
+                  ? "スポット一覧へ戻る"
+                  : mapReturnSection === "card-models"
+                    ? "カードモデル地へ戻る"
+                    : "探し方へ戻る"}
+              </button>
+            ) : null}
           </div>
           <p>
             {activePage === "planner"
@@ -1848,6 +1866,7 @@ export function PilgrimageApp({
                 className="spot-card__main"
                 onClick={() => {
                   setSelectedId(spot.id);
+                  setMapReturnSection("spots");
                   navigateToPage("explore", "map");
                 }}
               >
@@ -1979,6 +1998,7 @@ export function PilgrimageApp({
                     type="button"
                     onClick={() => {
                       setSelectedId(card.spotId!);
+                      setMapReturnSection("card-models");
                       navigateToPage("explore", "map");
                     }}
                   >
