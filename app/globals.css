@@ -3816,12 +3816,6 @@ footer > span {
   .card-model-grid {
     max-height: min(72dvh, 680px);
     gap: 8px;
-    scroll-snap-type: y proximity;
-  }
-
-  .spot-card,
-  .card-model {
-    scroll-snap-align: start;
   }
 
   .spot-card__main {
