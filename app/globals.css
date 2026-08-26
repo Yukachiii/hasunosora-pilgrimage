@@ -3642,19 +3642,21 @@ footer > span {
 
   .selected-spot-bar {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 10px 12px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
     padding: 14px;
   }
 
-  .spot-index {
-    width: 44px;
-    height: 44px;
+  .selected-spot-bar strong {
+    overflow: visible;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
   }
 
   .selected-spot-bar button {
     min-height: 46px;
-    grid-column: 1 / -1;
     justify-content: space-between;
     padding: 0 13px;
     border-radius: 5px;
