@@ -9,7 +9,11 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import type { PilgrimageSpot } from "@/app/spots";
+import {
+  cardModels,
+  type CardModelLocation,
+  type PilgrimageSpot,
+} from "@/app/spots";
 import type { TravelMode } from "@/app/route-planner";
 import type { RouteUsageResponse } from "./route-usage-types";
 
@@ -248,7 +252,7 @@ export function AdminApp({
   localToken = "",
   localNetworkUrl = "",
 }: Props) {
-  const [tab, setTab] = useState<"photos" | "spots" | "usage">("photos");
+  const [tab, setTab] = useState<"photos" | "spots" | "cards" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
   const [overrideIds, setOverrideIds] = useState(new Set(overriddenSpotIds));
   const [assets, setAssets] = useState(initialAssets);
@@ -433,10 +437,17 @@ export function AdminApp({
         </button>
         <button
           type="button"
+          className={tab === "cards" ? "is-active" : ""}
+          onClick={() => setTab("cards")}
+        >
+          <span>03</span>カードを確認
+        </button>
+        <button
+          type="button"
           className={tab === "usage" ? "is-active" : ""}
           onClick={() => setTab("usage")}
         >
-          <span>03</span>API使用状況
+          <span>04</span>API使用状況
         </button>
       </nav>
 
@@ -458,10 +469,101 @@ export function AdminApp({
           localMode={localMode}
           localToken={localToken}
         />
+      ) : tab === "cards" ? (
+        <CardModelDashboard cards={cardModels} />
       ) : (
         <ApiUsageDashboard localMode={localMode} />
       )}
     </main>
+  );
+}
+
+const confidenceDescriptions: Record<CardModelLocation["confidence"], string> = {
+  A: "複数資料、公式に近い資料、または現地比較で十分に確認できた地点",
+  B: "有力な候補だが、公式明記や複数の独立資料までは確認できていない地点",
+  C: "調査中。手掛かりとして保存している段階で、公開追加には再確認が必要な地点",
+};
+
+function CardModelDashboard({ cards }: { cards: CardModelLocation[] }) {
+  const [query, setQuery] = useState("");
+  const [confidence, setConfidence] = useState<CardModelLocation["confidence"] | "すべて">("すべて");
+  const normalizedQuery = query.trim().toLocaleLowerCase("ja");
+  const filteredCards = cards.filter((card) => {
+    const matchesConfidence = confidence === "すべて" || card.confidence === confidence;
+    const matchesQuery = !normalizedQuery || [card.card, card.model, card.address, card.note]
+      .join(" ")
+      .toLocaleLowerCase("ja")
+      .includes(normalizedQuery);
+    return matchesConfidence && matchesQuery;
+  });
+  const totals = cards.reduce<Record<CardModelLocation["confidence"], number>>(
+    (result, card) => ({ ...result, [card.confidence]: result[card.confidence] + 1 }),
+    { A: 0, B: 0, C: 0 },
+  );
+
+  return (
+    <section className="admin-cards admin-panel">
+      <div className="admin-panel__heading">
+        <div><span>CARD SOURCES</span><h2>カードモデル地の確認</h2></div>
+        <small>{cards.length}件</small>
+      </div>
+      <p className="admin-cards__intro">
+        信頼度は管理用です。公開ページには表示しません。出典を開き、追加・修正時の判断材料にしてください。
+      </p>
+      <div className="admin-confidence-guide" aria-label="信頼度の基準">
+        {(["A", "B", "C"] as const).map((rank) => (
+          <div key={rank}>
+            <b className={`admin-confidence admin-confidence--${rank.toLocaleLowerCase()}`}>{rank}</b>
+            <span>{confidenceDescriptions[rank]}</span>
+            <small>{totals[rank]}件</small>
+          </div>
+        ))}
+      </div>
+      <div className="admin-card-filters">
+        <label className="admin-field">
+          <span>カード・場所を検索</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="カード名、メンバー、施設名"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <label className="admin-field">
+          <span>信頼度</span>
+          <select
+            value={confidence}
+            onChange={(event) => setConfidence(event.target.value as CardModelLocation["confidence"] | "すべて")}
+          >
+            <option value="すべて">すべて</option>
+            <option value="A">Aのみ</option>
+            <option value="B">Bのみ</option>
+            <option value="C">Cのみ</option>
+          </select>
+        </label>
+      </div>
+      <p className="admin-card-count"><strong>{filteredCards.length}</strong> / {cards.length}件</p>
+      <div className="admin-card-list">
+        {filteredCards.map((card) => (
+          <article key={card.id}>
+            <div className="admin-card-list__topline">
+              <span>C{String(cards.indexOf(card) + 1).padStart(2, "0")}</span>
+              <b className={`admin-confidence admin-confidence--${card.confidence.toLocaleLowerCase()}`}>
+                信頼度 {card.confidence}
+              </b>
+            </div>
+            <h3>{card.card}</h3>
+            <strong>{card.model}</strong>
+            <p>{card.address}</p>
+            {card.note ? <small>{card.note}</small> : null}
+            <a href={card.sourceUrl} target="_blank" rel="noreferrer">
+              出典を確認 <span aria-hidden="true">↗</span>
+            </a>
+          </article>
+        ))}
+        {!filteredCards.length ? <p className="admin-card-empty">条件に合うカードがありません。</p> : null}
+      </div>
+    </section>
   );
 }
 

@@ -83,7 +83,7 @@ export type CardModelLocation = {
   card: string;
   model: string;
   address: string;
-  confidence: "A" | "B";
+  confidence: "A" | "B" | "C";
   note: string;
   spotId: string | null;
   sourceUrl: string;

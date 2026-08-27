@@ -53,7 +53,8 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);
-  assert.match(html, /カードモデル地（.*31.*件）/);
+  assert.match(html, /カードモデル地（.*45.*件）/);
+  assert.doesNotMatch(html, /判定 [ABC]/);
   assert.match(html, /すべてのキャラクター/);
   assert.match(html, /等身パネル：.*百生吟子、安養寺姫芽/);
   assert.match(html, /蓮ノ空歌留多/);
@@ -84,8 +85,8 @@ test("publishes the complete reviewed location lists", async () => {
   );
   assert.ok(spots.every((spot) => !spot.description.startsWith("登場情報：")));
   assert.equal(spots.find((spot) => spot.id === "higashide-coffee").activityRecords, undefined);
-  assert.equal(cardModels.length, 31);
-  assert.equal(cardModels.filter((card) => card.spotId).length, 20);
+  assert.equal(cardModels.length, 45);
+  assert.equal(cardModels.filter((card) => card.spotId).length, 34);
   assert.equal(cardModels.filter((card) => !card.spotId).length, 11);
   assert.ok(cardModels.every((card) => /］.+/.test(card.card)));
   assert.ok(cardModels.every((card) => !/重複|第1部 No\./.test(card.note)));
@@ -293,6 +294,8 @@ test("Routes API usage is private and available in the admin dashboard", async (
   ]);
 
   assert.match(adminApp, /API使用状況/);
+  assert.match(adminApp, /カードモデル地の確認/);
+  assert.match(adminApp, /信頼度は管理用です/);
   assert.match(adminApp, /Google Cloud側の請求確定値/);
   assert.match(adminApp, /直近14日間のAPIリクエスト数/);
   assert.match(adminApi, /hasRouteUsageAdminToken/);

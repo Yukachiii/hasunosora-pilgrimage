@@ -2501,24 +2501,6 @@ button {
   font-size: 18px;
 }
 
-.confidence {
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.confidence--a {
-  background: rgba(125, 185, 196, 0.18);
-  color: var(--ice-deep);
-}
-
-.confidence--b {
-  background: rgba(202, 164, 103, 0.16);
-  color: #876b3f;
-}
-
 .card-model h3,
 .card-model__characters,
 .card-model strong,
@@ -4337,6 +4319,167 @@ footer > span {
   font-weight: 800;
 }
 
+.admin-cards {
+  width: min(100% - 48px, 1180px);
+  margin: 0 auto;
+}
+
+.admin-cards__intro {
+  margin: -6px 0 20px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.8;
+}
+
+.admin-confidence-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.admin-confidence-guide > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #f8faf8;
+}
+
+.admin-confidence-guide span {
+  color: var(--ink-soft);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.admin-confidence-guide small {
+  color: var(--ink-soft);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.admin-confidence {
+  display: inline-flex;
+  min-width: 28px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.admin-confidence--a {
+  background: rgba(125, 185, 196, 0.2);
+  color: var(--ice-deep);
+}
+
+.admin-confidence--b {
+  background: rgba(202, 164, 103, 0.18);
+  color: #876b3f;
+}
+
+.admin-confidence--c {
+  background: rgba(184, 93, 99, 0.14);
+  color: #963f45;
+}
+
+.admin-card-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 12px;
+}
+
+.admin-card-count {
+  margin: 16px 0 9px;
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.admin-card-count strong {
+  color: var(--ink);
+  font-family: Georgia, serif;
+  font-size: 17px;
+}
+
+.admin-card-list {
+  display: grid;
+  max-height: 680px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  overflow: auto;
+  padding: 3px 8px 3px 3px;
+  scrollbar-color: var(--ice-deep) rgba(38, 52, 70, 0.08);
+  scrollbar-width: thin;
+}
+
+.admin-card-list article {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fbfcfa;
+}
+
+.admin-card-list__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-card-list__topline > span {
+  font-family: Georgia, serif;
+  font-size: 14px;
+}
+
+.admin-card-list h3,
+.admin-card-list p {
+  margin: 0;
+}
+
+.admin-card-list h3 {
+  font-family: "Yu Mincho", serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.admin-card-list article > strong {
+  font-size: 10px;
+}
+
+.admin-card-list article > p,
+.admin-card-list article > small {
+  color: var(--ink-soft);
+  font-size: 8px;
+  line-height: 1.65;
+}
+
+.admin-card-list article > a {
+  width: fit-content;
+  margin-top: 3px;
+  color: var(--ice-deep);
+  font-size: 9px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-card-empty {
+  grid-column: 1 / -1;
+  padding: 30px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  text-align: center;
+}
+
 .upload-dropzone {
   display: grid;
   min-height: 145px;
@@ -5041,6 +5184,7 @@ footer > span {
 @media (max-width: 900px) {
   .admin-workspace,
   .spot-editor-layout,
+  .admin-confidence-guide,
   .usage-grid {
     grid-template-columns: 1fr;
   }
@@ -5072,6 +5216,7 @@ footer > span {
   .admin-tabs,
   .admin-workspace,
   .spot-editor-layout,
+  .admin-cards,
   .admin-usage {
     width: calc(100% - 28px);
   }
@@ -5125,9 +5270,13 @@ footer > span {
     grid-column: auto;
   }
 
+  .admin-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
   .admin-tabs button {
     min-width: 0;
-    flex: 1;
     justify-content: center;
     padding: 14px 9px;
   }
@@ -5138,6 +5287,15 @@ footer > span {
 
   .usage-periods {
     grid-template-columns: 1fr;
+  }
+
+  .admin-card-filters,
+  .admin-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-card-list {
+    max-height: 70dvh;
   }
 
   .usage-heading {

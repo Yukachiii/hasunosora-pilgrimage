@@ -1967,7 +1967,6 @@ export function PilgrimageApp({
           </div>
           <p>
             現実の地点まで特定できたカードイラストを整理しています。
-            B判定は公式明記を確認できていない候補地です。
           </p>
         </div>
         <div className="card-model-filter" aria-label="カードイラストのキャラクター絞り込み">
@@ -2003,9 +2002,6 @@ export function PilgrimageApp({
             <article className="card-model" key={card.id}>
               <div className="card-model__topline">
                 <span>C{String(index + 1).padStart(2, "0")}</span>
-                <small className={`confidence confidence--${card.confidence.toLocaleLowerCase()}`}>
-                  判定 {card.confidence}
-                </small>
               </div>
               <h3>{card.card}</h3>
               <div className="card-model__characters" aria-label="登場キャラクター">
