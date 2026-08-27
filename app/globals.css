@@ -1090,6 +1090,19 @@ button {
   background: #fafaf7;
 }
 
+.itinerary-editor li.itinerary-editor__empty {
+  min-height: 96px;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  padding: 20px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.7;
+  text-align: center;
+  white-space: normal;
+  writing-mode: horizontal-tb;
+}
+
 .itinerary-editor li > div:nth-child(2) {
   display: grid;
   min-width: 0;
@@ -3413,6 +3426,10 @@ footer > span {
 
   .itinerary-editor li {
     grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .itinerary-editor li.itinerary-editor__empty {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .itinerary-editor > ol {

@@ -138,14 +138,17 @@ test("Mapbox map and route integration stays guarded", async () => {
 });
 
 test("day planner supports multiple stops without a server dependency", async () => {
-  const [app, planner, map, yahooTransit] = await Promise.all([
+  const [app, planner, map, yahooTransit, css] = await Promise.all([
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/yahoo-transit.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /訪問するスポット/);
+  assert.match(app, /itinerary-editor__empty/);
+  assert.match(css, /\.itinerary-editor li\.itinerary-editor__empty\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);
   assert.match(app, /訪問順を自動で最適化/);
   assert.match(app, /移動時間と訪問順を計算し、一日の予定として表示します/);
   assert.match(app, /cardCharacterFilter/);
