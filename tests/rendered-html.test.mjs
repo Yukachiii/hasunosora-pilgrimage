@@ -68,8 +68,8 @@ test("publishes the complete reviewed location lists", async () => {
     readFile(new URL("../content/collaborations.json", import.meta.url), "utf8").then(JSON.parse),
   ]);
 
-  assert.equal(spots.length, 94);
-  assert.equal(new Set(spots.map((spot) => spot.id)).size, 94);
+  assert.equal(spots.length, 97);
+  assert.equal(new Set(spots.map((spot) => spot.id)).size, 97);
   assert.ok(spots.every((spot) => Number.isFinite(spot.lat) && Number.isFinite(spot.lng)));
   assert.equal(
     spots.filter((spot) => spot.activityRecords?.length || spot.sehasEpisodes?.length).length,
@@ -86,8 +86,23 @@ test("publishes the complete reviewed location lists", async () => {
   assert.ok(spots.every((spot) => !spot.description.startsWith("登場情報：")));
   assert.equal(spots.find((spot) => spot.id === "higashide-coffee").activityRecords, undefined);
   assert.equal(cardModels.length, 45);
-  assert.equal(cardModels.filter((card) => card.spotId).length, 34);
-  assert.equal(cardModels.filter((card) => !card.spotId).length, 11);
+  assert.equal(cardModels.filter((card) => card.spotId).length, 37);
+  assert.equal(cardModels.filter((card) => !card.spotId).length, 8);
+  assert.equal(cardModels.find((card) => card.id === "card-13").spotId, "kingyoan");
+  assert.equal(
+    cardModels.find((card) => card.id === "card-14").spotId,
+    "koko-hotel-kanazawa-korinbo",
+  );
+  assert.equal(cardModels.find((card) => card.id === "card-21").spotId, "mameda-ground");
+  assert.equal(
+    spots.find((spot) => spot.id === "koko-hotel-kanazawa-korinbo").name,
+    "KOKO HOTEL Premier 金沢香林坊",
+  );
+  assert.ok(
+    ["card-24", "card-25", "card-26", "card-27", "card-28", "card-29", "card-30", "card-31"].every(
+      (cardId) => cardModels.find((card) => card.id === cardId).spotId === null,
+    ),
+  );
   assert.ok(cardModels.every((card) => /］.+/.test(card.card)));
   assert.ok(cardModels.every((card) => !/重複|第1部 No\./.test(card.note)));
   assert.equal(collaborations.length, 2);

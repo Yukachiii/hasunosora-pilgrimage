@@ -1560,5 +1560,60 @@
     "accessNote": "開館時間・休館日を確認",
     "sourceUrl": "https://www.google.com/maps/search/?api=1&query=石川県立航空プラザ%20石川県小松市安宅新町丙92",
     "recommendedStayMinutes": 90
+  },
+  {
+    "id": "kingyoan",
+    "name": "大正浪漫喫茶 金魚庵",
+    "shortName": "大正浪漫喫茶 金魚庵",
+    "area": "東山・卯辰山",
+    "category": "飲食",
+    "address": "石川県金沢市東山1-10-4",
+    "lat": 36.573581,
+    "lng": 136.665278,
+    "description": "カード［喫茶ハスノソラ］のモデル候補として整理している喫茶店です。店内の撮影や席の利用は、混雑状況と店舗の案内を優先してください。",
+    "accessNote": "営業時間・定休日を公式サイトで確認。店内撮影は店舗の案内を優先",
+    "sourceUrl": "https://kingyoan.jp/",
+    "recommendedStayMinutes": 60,
+    "openingTime": "11:00",
+    "closingTime": "17:00",
+    "openingHoursNote": "食事メニューは14:00まで。定休日は偶数週水曜日（訪問前に公式サイトで再確認）",
+    "openingHoursCheckedAt": "2026-08-27",
+    "appearances": [
+      "カード：［喫茶ハスノソラ］村野さやか・夕霧綴理（モデル候補）"
+    ]
+  },
+  {
+    "id": "koko-hotel-kanazawa-korinbo",
+    "name": "KOKO HOTEL Premier 金沢香林坊",
+    "shortName": "KOKO HOTEL Premier 金沢香林坊",
+    "area": "香林坊・長町",
+    "category": "宿泊",
+    "address": "石川県金沢市香林坊1-2-16",
+    "lat": 36.563916,
+    "lng": 136.65395,
+    "description": "カード［プチパティシエール］の背景に描かれた旧ホテルトラスティ金沢香林坊の現在の施設です。外観を確認する際も、宿泊者や歩行者の通行を妨げないよう配慮してください。",
+    "accessNote": "カード当時とは施設名が異なる。現在はKOKO HOTEL Premier 金沢香林坊",
+    "sourceUrl": "https://koko-hotels.com/kanazawa_korinbo/",
+    "recommendedStayMinutes": 15,
+    "appearances": [
+      "カード：［プチパティシエール］大沢瑠璃乃（旧ホテルトラスティ金沢香林坊前）"
+    ]
+  },
+  {
+    "id": "mameda-ground",
+    "name": "石川県営まめだ簡易グラウンド",
+    "shortName": "まめだ簡易グラウンド",
+    "area": "金沢西・港",
+    "category": "レジャー",
+    "address": "石川県金沢市大豆田本町地内（北國花火2025金沢大会会場周辺）",
+    "lat": 36.570735,
+    "lng": 136.633873,
+    "description": "カード［太陽であれ！］の背景となった北國花火2025金沢大会の会場周辺です。花火や観覧席はイベント開催時のみで、通常時は花火開催時の景観を再現できません。",
+    "accessNote": "イベント開催日は交通規制・入場条件を当年の公式案内で確認。通常時はグラウンド利用者を優先",
+    "sourceUrl": "https://www.pref.ishikawa.lg.jp/shisetsu/02/0020.html",
+    "recommendedStayMinutes": 20,
+    "appearances": [
+      "カード：［太陽であれ！］村野さやか（北國花火2025金沢大会開催時）"
+    ]
   }
 ]
