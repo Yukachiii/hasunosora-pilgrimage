@@ -1,6 +1,7 @@
 "use client";
 
 import { gps as readGps } from "exifr/dist/mini.esm.mjs";
+import mapboxgl from "mapbox-gl";
 import {
   useEffect,
   useMemo,
@@ -1194,6 +1195,12 @@ function SpotManager({
           <label className="admin-field admin-field--wide"><span>住所</span><input value={draft.address} maxLength={160} onChange={(event) => update("address", event.target.value)} /></label>
           <label className="admin-field"><span>緯度</span><input type="number" step="any" value={draft.lat} onChange={(event) => update("lat", Number(event.target.value))} /></label>
           <label className="admin-field"><span>経度</span><input type="number" step="any" value={draft.lng} onChange={(event) => update("lng", Number(event.target.value))} /></label>
+          <AdminCoordinatePicker
+            name={draft.name}
+            lat={draft.lat}
+            lng={draft.lng}
+            onChange={(lat, lng) => setDraft((current) => ({ ...current, lat, lng }))}
+          />
           <label className="admin-field"><span>推奨滞在時間（分）</span><input type="number" min="0" max="480" step="5" value={draft.recommendedStayMinutes ?? ""} placeholder="カテゴリ既定値" onChange={(event) => update("recommendedStayMinutes", event.target.value === "" ? undefined : Number(event.target.value))} /><small>未入力の場合はカテゴリごとの既定値を使います。</small></label>
           <label className="admin-field"><span>営業・開館時刻</span><input type="time" value={draft.openingTime ?? ""} onChange={(event) => update("openingTime", event.target.value || undefined)} /><small>公式情報を確認できた場合だけ入力してください。</small></label>
           <label className="admin-field"><span>営業・閉館時刻</span><input type="time" value={draft.closingTime ?? ""} onChange={(event) => update("closingTime", event.target.value || undefined)} /><small>最終入場は下の補足欄へ記載してください。</small></label>
@@ -1233,6 +1240,98 @@ function SpotManager({
         </div>
         {message && <p className="admin-message" role="status">{message}</p>}
       </form>
+    </section>
+  );
+}
+
+function AdminCoordinatePicker({
+  name,
+  lat,
+  lng,
+  onChange,
+}: {
+  name: string;
+  lat: number;
+  lng: number;
+  onChange: (lat: number, lng: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const onChangeRef = useRef(onChange);
+  const initialPositionRef = useRef({ lat, lng });
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const map = new mapboxgl.Map({
+      container: containerRef.current,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution: "© OpenStreetMap contributors",
+          },
+        },
+        layers: [{ id: "osm", type: "raster", source: "osm" }],
+      },
+      center: [initialPositionRef.current.lng, initialPositionRef.current.lat],
+      zoom: 16,
+      attributionControl: true,
+    });
+    const marker = new mapboxgl.Marker({ color: "#7f6084", draggable: true })
+      .setLngLat([initialPositionRef.current.lng, initialPositionRef.current.lat])
+      .addTo(map);
+
+    const applyPosition = (nextLng: number, nextLat: number) => {
+      const roundedLat = Number(nextLat.toFixed(7));
+      const roundedLng = Number(nextLng.toFixed(7));
+      marker.setLngLat([roundedLng, roundedLat]);
+      onChangeRef.current(roundedLat, roundedLng);
+    };
+    marker.on("dragend", () => {
+      const position = marker.getLngLat();
+      applyPosition(position.lng, position.lat);
+    });
+    map.on("click", (event) => applyPosition(event.lngLat.lng, event.lngLat.lat));
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+    mapRef.current = map;
+    markerRef.current = marker;
+
+    return () => {
+      marker.remove();
+      map.remove();
+      markerRef.current = null;
+      mapRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    markerRef.current?.setLngLat([lng, lat]);
+    mapRef.current?.easeTo({ center: [lng, lat], duration: 280 });
+  }, [lat, lng]);
+
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+
+  return (
+    <section className="admin-coordinate-picker admin-field--wide" aria-label={`${name}のピン位置`}>
+      <div className="admin-coordinate-picker__heading">
+        <div>
+          <strong>地図でピン位置を修正</strong>
+          <small>地図をクリックするか、紫のピンをドラッグしてください。</small>
+        </div>
+        <a href={googleMapsUrl} target="_blank" rel="noreferrer">Googleマップで確認 ↗</a>
+      </div>
+      <div ref={containerRef} className="admin-coordinate-picker__map" />
+      <p>保存される座標：{lat.toFixed(7)}, {lng.toFixed(7)}</p>
     </section>
   );
 }

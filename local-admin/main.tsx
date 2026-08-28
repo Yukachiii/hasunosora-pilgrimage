@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AdminApp, type AdminAsset } from "../app/admin/AdminApp";
 import type { PilgrimageSpot } from "../app/spots";
+import "mapbox-gl/dist/mapbox-gl.css";
 import "../app/globals.css";
 
 type AdminState = {
