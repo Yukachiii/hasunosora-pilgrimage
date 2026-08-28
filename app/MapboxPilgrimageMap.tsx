@@ -228,6 +228,7 @@ export function MapboxPilgrimageMap({
       center: [136.6562, 36.5708],
       zoom: 12.4,
       attributionControl: true,
+      cooperativeGestures: true,
     });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
     map.on("load", () => {
