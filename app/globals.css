@@ -2086,26 +2086,6 @@ button {
   font-weight: 500;
 }
 
-.list-scroll-hint {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  margin: 0 0 8px;
-  border: 1px solid rgba(125, 185, 196, 0.38);
-  border-radius: 6px;
-  background: rgba(217, 239, 242, 0.32);
-  color: var(--ink-soft);
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.list-scroll-hint b {
-  color: var(--ice-deep);
-  font-size: 14px;
-}
-
 .spot-grid,
 .card-model-grid {
   border: 1px solid rgba(125, 185, 196, 0.34);
@@ -5496,6 +5476,199 @@ footer > span {
 .explore-menu__grid span {
   color: var(--ink-soft);
   font-size: 10px;
+}
+
+.explore-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: grid;
+  padding: 24px;
+  align-items: end;
+  background: rgba(18, 29, 43, 0.52);
+  backdrop-filter: blur(8px);
+}
+
+.explore-sheet__panel {
+  display: grid;
+  width: min(1180px, 100%);
+  height: min(88dvh, 900px);
+  margin: 0 auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(125, 185, 196, 0.4);
+  border-radius: 18px 18px 10px 10px;
+  background: #f7f7f2;
+  box-shadow: 0 -24px 70px rgba(9, 18, 30, 0.28);
+  animation: explore-sheet-enter 220ms ease-out both;
+}
+
+@keyframes explore-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.explore-sheet__handle {
+  width: 48px;
+  height: 5px;
+  margin: 10px auto 2px;
+  border-radius: 999px;
+  background: rgba(38, 52, 70, 0.24);
+}
+
+.explore-sheet__header {
+  display: flex;
+  min-height: 58px;
+  padding: 8px 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.explore-sheet__header > strong {
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.explore-sheet__header button {
+  display: inline-flex;
+  min-height: 42px;
+  padding: 0 14px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.explore-sheet__header button span {
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.explore-sheet__tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.explore-sheet__tabs button {
+  min-height: 54px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.explore-sheet__tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ice-deep);
+  color: var(--ink);
+}
+
+.explore-sheet__tabs small {
+  margin-left: 7px;
+  color: var(--ice-deep);
+  font-size: 9px;
+}
+
+.explore-sheet__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-color: var(--ice-deep) rgba(125, 185, 196, 0.14);
+  scrollbar-gutter: stable;
+}
+
+.explore-sheet :is(.spots-section, .card-models-section) {
+  padding: 34px 34px 54px;
+}
+
+.explore-sheet .section-heading {
+  gap: 32px;
+  margin-bottom: 28px;
+}
+
+.explore-sheet .section-heading h2 {
+  font-size: clamp(26px, 3vw, 38px);
+}
+
+.explore-sheet :is(.spot-grid, .card-model-grid) {
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  scrollbar-gutter: auto;
+}
+
+@media (max-width: 760px) {
+  .explore-sheet {
+    padding: 0;
+    background: rgba(18, 29, 43, 0.42);
+    backdrop-filter: blur(5px);
+  }
+
+  .explore-sheet__panel {
+    width: 100%;
+    height: min(94dvh, 960px);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .explore-sheet__header {
+    min-height: 52px;
+    padding: 5px 14px 7px;
+  }
+
+  .explore-sheet__header > strong {
+    font-size: 21px;
+  }
+
+  .explore-sheet__header button {
+    min-height: 40px;
+  }
+
+  .explore-sheet__tabs {
+    padding: 0 14px;
+  }
+
+  .explore-sheet__tabs button {
+    min-height: 50px;
+  }
+
+  .explore-sheet :is(.spots-section, .card-models-section) {
+    padding: 22px 14px calc(44px + env(safe-area-inset-bottom));
+  }
+
+  .explore-sheet .section-heading {
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .explore-sheet .section-heading h2 {
+    font-size: 26px;
+  }
 }
 
 .planner-days {

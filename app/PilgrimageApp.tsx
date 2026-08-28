@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type SetStateAction,
@@ -52,6 +53,7 @@ const LEGACY_PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1
 const PLANNER_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 type AppPage = "explore" | "planner" | "today" | "guide";
+type ExplorePanel = "spots" | "card-models";
 
 const appPageLabels: Record<AppPage, string> = {
   explore: "探す",
@@ -217,6 +219,8 @@ export function PilgrimageApp({
   const [plannerStep, setPlannerStep] = useState<1 | 2 | 3>(1);
   const [isEditingItineraryOrder, setIsEditingItineraryOrder] = useState(false);
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
+  const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
+  const exploreSheetCloseButtonRef = useRef<HTMLButtonElement>(null);
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
   const visitDate = activePlannerDay.visitDate;
@@ -252,10 +256,15 @@ export function PilgrimageApp({
       const nextPage = pageFromHash(window.location.hash);
       setActivePage(nextPage);
       const sectionId = window.location.hash.replace(/^#\/?[^/]+\/?/, "");
+      setActiveExplorePanel(
+        nextPage === "explore" && (sectionId === "spots" || sectionId === "card-models")
+          ? sectionId
+          : null,
+      );
       window.setTimeout(() => {
-        if (sectionId) {
+        if (sectionId && sectionId !== "spots" && sectionId !== "card-models") {
           document.getElementById(sectionId)?.scrollIntoView({ block: "start" });
-        } else {
+        } else if (!sectionId) {
           window.scrollTo({ top: 0 });
         }
         if (nextPage === "explore") window.dispatchEvent(new Event("resize"));
@@ -288,6 +297,22 @@ export function PilgrimageApp({
       document.body.style.overflow = previousOverflow;
     };
   }, [hasAcceptedVisitorNotice]);
+
+  useEffect(() => {
+    if (!activeExplorePanel) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => exploreSheetCloseButtonRef.current?.focus(), 0);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActiveExplorePanel(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activeExplorePanel]);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -556,6 +581,12 @@ export function PilgrimageApp({
   }
 
   function navigateToPage(page: AppPage, sectionId?: string) {
+    if (page === "explore" && (sectionId === "spots" || sectionId === "card-models")) {
+      setActivePage("explore");
+      setActiveExplorePanel(sectionId);
+      return;
+    }
+    setActiveExplorePanel(null);
     const hash = `#/${page}${sectionId ? `/${sectionId}` : ""}`;
     setActivePage(page);
     if (window.location.hash === hash) {
@@ -1795,7 +1826,51 @@ export function PilgrimageApp({
         </div>
       </section>
 
-      <section className="spots-section" id="spots" hidden={activePage !== "explore"}>
+        <div
+          className="explore-sheet"
+          hidden={!activeExplorePanel}
+          role="presentation"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) setActiveExplorePanel(null);
+          }}
+        >
+          <div
+            className="explore-sheet__panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="explore-sheet-title"
+          >
+            <div className="explore-sheet__handle" aria-hidden="true" />
+            <header className="explore-sheet__header">
+              <strong id="explore-sheet-title">探す</strong>
+              <button
+                type="button"
+                ref={exploreSheetCloseButtonRef}
+                onClick={() => setActiveExplorePanel(null)}
+              >
+                閉じる <span aria-hidden="true">×</span>
+              </button>
+            </header>
+            <nav className="explore-sheet__tabs" role="tablist" aria-label="一覧を切り替える">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeExplorePanel === "spots"}
+                onClick={() => setActiveExplorePanel("spots")}
+              >
+                スポット <small>{spots.length}</small>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeExplorePanel === "card-models"}
+                onClick={() => setActiveExplorePanel("card-models")}
+              >
+                カード <small>{cardModels.length}</small>
+              </button>
+            </nav>
+            <div className="explore-sheet__body">
+      <section className="spots-section" id="spots" hidden={activeExplorePanel !== "spots"}>
         <div className="section-heading">
           <div>
             <h2>スポット一覧（{spots.length}件）</h2>
@@ -1838,17 +1913,10 @@ export function PilgrimageApp({
           <p><strong>{filteredSpots.length}</strong> / {spots.length} SPOTS</p>
         </div>
 
-        {filteredSpots.length > 4 ? (
-          <p className="list-scroll-hint" aria-hidden="true">
-            <span>この枠内を上下にスクロール</span>
-            <b>↓</b>
-          </p>
-        ) : null}
         <div
           className="spot-grid"
           role="region"
-          aria-label={filteredSpots.length > 4 ? "スポット一覧。枠内を上下にスクロールできます" : "スポット一覧"}
-          tabIndex={filteredSpots.length > 4 ? 0 : undefined}
+          aria-label="スポット一覧"
         >
           {filteredSpots.map((spot) => {
             const index = spots.findIndex((item) => item.id === spot.id);
@@ -1960,7 +2028,7 @@ export function PilgrimageApp({
         )}
       </section>
 
-      <section className="card-models-section" id="card-models" hidden={activePage !== "explore"}>
+      <section className="card-models-section" id="card-models" hidden={activeExplorePanel !== "card-models"}>
         <div className="section-heading">
           <div>
             <h2>カードモデル地（{cardModels.length}件）</h2>
@@ -1984,17 +2052,10 @@ export function PilgrimageApp({
           </label>
           <p><strong>{filteredCardModels.length}</strong> / {cardModels.length} CARDS</p>
         </div>
-        {filteredCardModels.length > 4 ? (
-          <p className="list-scroll-hint" aria-hidden="true">
-            <span>この枠内を上下にスクロール</span>
-            <b>↓</b>
-          </p>
-        ) : null}
         <div
           className="card-model-grid"
           role="region"
-          aria-label={filteredCardModels.length > 4 ? "カードモデル地一覧。枠内を上下にスクロールできます" : "カードモデル地一覧"}
-          tabIndex={filteredCardModels.length > 4 ? 0 : undefined}
+          aria-label="カードモデル地一覧"
         >
           {filteredCardModels.map((card) => {
             const index = cardModels.findIndex((item) => item.id === card.id);
@@ -2055,6 +2116,9 @@ export function PilgrimageApp({
           )})}
         </div>
       </section>
+            </div>
+          </div>
+        </div>
 
       <section className="guide-section" id="guide" hidden={activePage !== "guide"}>
         <div className="guide-intro">
