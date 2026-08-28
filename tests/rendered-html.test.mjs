@@ -86,6 +86,15 @@ test("publishes the complete reviewed location lists", async () => {
   assert.ok(spots.every((spot) => !spot.description.startsWith("登場情報：")));
   assert.equal(spots.find((spot) => spot.id === "higashide-coffee").activityRecords, undefined);
   assert.equal(cardModels.length, 45);
+  assert.equal(cardModels.filter((card) => card.imageUrl).length, 11);
+  assert.equal(cardModels.find((card) => card.id === "card-10").imageUrl, "./card-images/hasunosora-karuta/seras-yanagida-lilienfeld.jpg");
+  assert.equal(cardModels.find((card) => card.id === "card-11").imageUrl, "./card-images/hasunosora-karuta/katsuragi-izumi.jpg");
+  assert.equal(cardModels.find((card) => card.id === "card-06").imageUrl, "./card-images/hasunosora-karuta/fujishima-megumi.jpg");
+  await Promise.all(
+    cardModels
+      .filter((card) => card.imageUrl)
+      .map((card) => access(new URL(`../public/${card.imageUrl.replace(/^\.\//, "")}`, import.meta.url))),
+  );
   assert.equal(cardModels.filter((card) => card.spotId).length, 37);
   assert.equal(cardModels.filter((card) => !card.spotId).length, 8);
   assert.equal(cardModels.find((card) => card.id === "card-13").spotId, "kingyoan");

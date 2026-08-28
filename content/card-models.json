@@ -1,6 +1,7 @@
 [
   {
     "id": "card-01",
+    "imageUrl": "./card-images/hasunosora-karuta/hinoshita-kaho.jpg",
     "card": "［蓮ノ空歌留多］日野下花帆",
     "model": "石川県立歴史博物館（館内階段）",
     "address": "石川県金沢市出羽町3-1",
@@ -11,6 +12,7 @@
   },
   {
     "id": "card-02",
+    "imageUrl": "./card-images/hasunosora-karuta/murano-sayaka.jpg",
     "card": "［蓮ノ空歌留多］村野さやか",
     "model": "兼六園（徽軫灯籠・霞ヶ池付近）",
     "address": "石川県金沢市兼六町1",
@@ -21,6 +23,7 @@
   },
   {
     "id": "card-03",
+    "imageUrl": "./card-images/hasunosora-karuta/otomune-kozue.jpg",
     "card": "［蓮ノ空歌留多］乙宗梢",
     "model": "（公財）大野からくり記念館",
     "address": "石川県金沢市大野町4丁目甲2番29",
@@ -31,6 +34,7 @@
   },
   {
     "id": "card-04",
+    "imageUrl": "./card-images/hasunosora-karuta/yugiri-tsuzuri.jpg",
     "card": "［蓮ノ空歌留多］夕霧綴理",
     "model": "長町武家屋敷跡（長町二の橋から東向き）",
     "address": "石川県金沢市長町2丁目付近",
@@ -41,6 +45,7 @@
   },
   {
     "id": "card-05",
+    "imageUrl": "./card-images/hasunosora-karuta/osawa-rurino.jpg",
     "card": "［蓮ノ空歌留多］大沢瑠璃乃",
     "model": "金沢城 石川門・石川橋",
     "address": "石川県金沢市丸の内1-1／石川県金沢市丸の内・兼六町間",
@@ -51,6 +56,7 @@
   },
   {
     "id": "card-06",
+    "imageUrl": "./card-images/hasunosora-karuta/fujishima-megumi.jpg",
     "card": "［蓮ノ空歌留多］藤島慈",
     "model": "懐華樓（ひがし茶屋街）",
     "address": "石川県金沢市東山1-14-8",
@@ -61,6 +67,7 @@
   },
   {
     "id": "card-07",
+    "imageUrl": "./card-images/hasunosora-karuta/momose-ginko.jpg",
     "card": "［蓮ノ空歌留多］百生吟子",
     "model": "尾山神社",
     "address": "石川県金沢市尾山町11-1",
@@ -71,6 +78,7 @@
   },
   {
     "id": "card-08",
+    "imageUrl": "./card-images/hasunosora-karuta/kachimachi-kosuzu.jpg",
     "card": "［蓮ノ空歌留多］徒町小鈴",
     "model": "主計町茶屋街（浅野川沿い）",
     "address": "石川県金沢市主計町",
@@ -81,6 +89,7 @@
   },
   {
     "id": "card-09",
+    "imageUrl": "./card-images/hasunosora-karuta/anyoji-hime.jpg",
     "card": "［蓮ノ空歌留多］安養寺姫芽",
     "model": "自遊花人水引ミュージアム",
     "address": "石川県金沢市清川町7-9",
@@ -91,6 +100,7 @@
   },
   {
     "id": "card-10",
+    "imageUrl": "./card-images/hasunosora-karuta/seras-yanagida-lilienfeld.jpg",
     "card": "［蓮ノ空歌留多］セラス 柳田 リリエンフェルト",
     "model": "尾張町町民文化館",
     "address": "石川県金沢市尾張町1-11-8",
@@ -101,6 +111,7 @@
   },
   {
     "id": "card-11",
+    "imageUrl": "./card-images/hasunosora-karuta/katsuragi-izumi.jpg",
     "card": "［蓮ノ空歌留多］桂城泉",
     "model": "願掛け寺 香林寺",
     "address": "石川県金沢市野町1-3-15",

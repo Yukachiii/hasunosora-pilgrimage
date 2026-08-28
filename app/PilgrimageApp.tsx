@@ -1999,7 +1999,22 @@ export function PilgrimageApp({
           {filteredCardModels.map((card) => {
             const index = cardModels.findIndex((item) => item.id === card.id);
             return (
-            <article className="card-model" key={card.id}>
+            <article className={`card-model${card.imageUrl ? " has-image" : ""}`} key={card.id}>
+              {card.imageUrl ? (
+                <figure className="card-model__image">
+                  {/* Static GitHub Pages assets avoid an external image-optimization request. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={card.imageUrl}
+                    alt={`${card.card}のカードイラスト`}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <figcaption>
+                    画像：<a href="https://www.lovelive-anime.jp/hasunosora/" target="_blank" rel="noreferrer">『Link！Like！ラブライブ！』</a>
+                  </figcaption>
+                </figure>
+              ) : null}
               <div className="card-model__topline">
                 <span>C{String(index + 1).padStart(2, "0")}</span>
               </div>

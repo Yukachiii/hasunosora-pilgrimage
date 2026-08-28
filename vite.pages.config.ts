@@ -6,7 +6,7 @@ export default defineConfig({
   root: "github-pages",
   base: "/hasunosora-pilgrimage/",
   envDir: "..",
-  publicDir: false,
+  publicDir: resolve("public"),
   plugins: [react()],
   build: {
     outDir: "../pages-dist",

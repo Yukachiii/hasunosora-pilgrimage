@@ -80,6 +80,7 @@ export type CardCharacter = (typeof cardCharacters)[number];
 
 export type CardModelLocation = {
   id: string;
+  imageUrl?: string;
   card: string;
   model: string;
   address: string;

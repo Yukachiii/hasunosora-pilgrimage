@@ -2501,6 +2501,39 @@ button {
   background: rgba(255, 255, 255, 0.82);
 }
 
+.card-model.has-image {
+  overflow: hidden;
+  padding-top: 0;
+}
+
+.card-model__image {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 0;
+  margin: 0 -24px 12px;
+  background: #edf2f4;
+}
+
+.card-model__image img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1280 / 829;
+  object-fit: cover;
+}
+
+.card-model__image figcaption {
+  padding: 7px 24px 0;
+  color: var(--ink-soft);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.card-model__image a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .card-model__topline {
   display: flex;
   grid-column: 1 / -1;
@@ -4002,6 +4035,19 @@ footer > span {
 
   .card-model {
     padding: 12px;
+  }
+
+  .card-model.has-image {
+    padding-top: 0;
+  }
+
+  .card-model__image {
+    margin: 0 -12px 12px;
+  }
+
+  .card-model__image figcaption {
+    padding-right: 12px;
+    padding-left: 12px;
   }
 
   .card-model__topline > span {
