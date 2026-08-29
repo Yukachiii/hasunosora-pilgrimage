@@ -60,22 +60,19 @@ const YELLOW_MARKER_IMAGE_ID = "pilgrimage-yellow-marker";
 const BLUE_MARKER_IMAGE_ID = "pilgrimage-blue-marker";
 const GREEN_MARKER_IMAGE_ID = "pilgrimage-green-marker";
 
-function markerIconSize(desktop: boolean) {
-  const scale = desktop ? 1.25 : 1;
+function markerIconSize() {
   return [
     "interpolate",
     ["linear"],
     ["zoom"],
-    6, 0.045 * scale,
-    10, 0.07 * scale,
-    14, 0.1 * scale,
+    6, 0.045,
+    10, 0.07,
+    14, 0.1,
   ] as mapboxgl.Expression;
 }
 
-function markerTextSize(desktop: boolean) {
-  const sizes = desktop
-    ? { compact: [6, 8, 9], standard: [7, 9, 11] }
-    : { compact: [5, 7, 8], standard: [6, 8, 10] };
+function markerTextSize() {
+  const sizes = { compact: [5, 7, 8], standard: [6, 8, 10] };
   const threeDigits = [">=", ["length", ["get", "indexLabel"]], 3];
   return [
     "interpolate",
@@ -87,12 +84,12 @@ function markerTextSize(desktop: boolean) {
   ] as mapboxgl.Expression;
 }
 
-function selectedMarkerTextSize(desktop: boolean) {
+function selectedMarkerTextSize() {
   return [
     "case",
     [">=", ["length", ["get", "indexLabel"]], 3],
-    desktop ? 10 : 9,
-    desktop ? 12 : 11,
+    9,
+    11,
   ] as mapboxgl.Expression;
 }
 
@@ -219,7 +216,6 @@ export function MapboxPilgrimageMap({
   const onSelectRef = useRef(onSelect);
   const plannedSpotIdSet = useMemo(() => new Set(plannedSpotIds), [plannedSpotIds]);
   const cardModelSpotIdSet = useMemo(() => new Set(cardModelSpotIds), [cardModelSpotIds]);
-  const [desktopMarkers, setDesktopMarkers] = useState(false);
   const [token, setToken] = useState(accessToken.trim());
   const [mapState, setMapState] = useState<"fallback" | "loading" | "ready" | "error">(
     accessToken.trim() ? "loading" : "fallback",
@@ -228,14 +224,6 @@ export function MapboxPilgrimageMap({
   useEffect(() => {
     onSelectRef.current = onSelect;
   }, [onSelect]);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 1081px)");
-    const updateMarkerSize = () => setDesktopMarkers(mediaQuery.matches);
-    updateMarkerSize();
-    mediaQuery.addEventListener("change", updateMarkerSize);
-    return () => mediaQuery.removeEventListener("change", updateMarkerSize);
-  }, []);
 
   useEffect(() => {
     if (accessToken.trim()) return;
@@ -376,8 +364,8 @@ export function MapboxPilgrimageMap({
       ] as mapboxgl.Expression;
 
       if (map.getLayer(SPOT_LAYER_ID)) {
-        map.setLayoutProperty(SPOT_LAYER_ID, "icon-size", markerIconSize(desktopMarkers));
-        map.setLayoutProperty(SPOT_LAYER_ID, "text-size", markerTextSize(desktopMarkers));
+        map.setLayoutProperty(SPOT_LAYER_ID, "icon-size", markerIconSize());
+        map.setLayoutProperty(SPOT_LAYER_ID, "text-size", markerTextSize());
       } else {
         map.addLayer({
           id: SPOT_LAYER_ID,
@@ -386,12 +374,12 @@ export function MapboxPilgrimageMap({
           filter: ["!=", ["get", "spotId"], selectedId],
           layout: {
             "icon-image": markerImage,
-            "icon-size": markerIconSize(desktopMarkers),
+            "icon-size": markerIconSize(),
             "icon-anchor": "bottom",
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
             "text-field": ["get", "indexLabel"],
-            "text-size": markerTextSize(desktopMarkers),
+            "text-size": markerTextSize(),
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
             "text-offset": [0, -2.1],
             "text-allow-overlap": true,
@@ -406,11 +394,11 @@ export function MapboxPilgrimageMap({
       }
 
       if (map.getLayer(SELECTED_SPOT_LAYER_ID)) {
-        map.setLayoutProperty(SELECTED_SPOT_LAYER_ID, "icon-size", desktopMarkers ? 0.16 : 0.13);
+        map.setLayoutProperty(SELECTED_SPOT_LAYER_ID, "icon-size", 0.13);
         map.setLayoutProperty(
           SELECTED_SPOT_LAYER_ID,
           "text-size",
-          selectedMarkerTextSize(desktopMarkers),
+          selectedMarkerTextSize(),
         );
       } else {
         map.addLayer({
@@ -420,12 +408,12 @@ export function MapboxPilgrimageMap({
           filter: ["==", ["get", "spotId"], selectedId],
           layout: {
             "icon-image": markerImage,
-            "icon-size": desktopMarkers ? 0.16 : 0.13,
+            "icon-size": 0.13,
             "icon-anchor": "bottom",
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
             "text-field": ["get", "indexLabel"],
-            "text-size": selectedMarkerTextSize(desktopMarkers),
+            "text-size": selectedMarkerTextSize(),
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
             "text-offset": [0, -2.55],
             "text-allow-overlap": true,
@@ -454,7 +442,7 @@ export function MapboxPilgrimageMap({
         map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
       }
     };
-  }, [cardModelSpotIdSet, desktopMarkers, mapState, plannedSpotIdSet, selectedId, spots]);
+  }, [cardModelSpotIdSet, mapState, plannedSpotIdSet, selectedId, spots]);
 
   useEffect(() => {
     const map = mapRef.current;

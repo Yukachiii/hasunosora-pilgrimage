@@ -183,9 +183,10 @@ test("starter preview is fully replaced", async () => {
 });
 
 test("Mapbox map and route integration stays guarded", async () => {
-  const [page, map] = await Promise.all([
+  const [page, map, css] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
@@ -198,8 +199,9 @@ test("Mapbox map and route integration stays guarded", async () => {
   assert.match(map, /"planned", GREEN_MARKER_IMAGE_ID/);
   assert.match(map, /"card", BLUE_MARKER_IMAGE_ID/);
   assert.match(map, /"collaboration", YELLOW_MARKER_IMAGE_ID/);
-  assert.match(map, /min-width: 1081px/);
   assert.match(map, /\["zoom"\][\s\S]+\["length", \["get", "indexLabel"\]\]/);
+  assert.match(css, /@media \(min-width: 1081px\)[\s\S]+\.selected-map-detail__heading strong \{[\s\S]+font-size: 24px;/);
+  assert.match(css, /@media \(min-width: 1081px\)[\s\S]+\.selected-map-detail__card-grid \{[\s\S]+grid-template-columns: minmax\(0, 1fr\);/);
   await Promise.all(["red", "yellow", "blue", "green"].map((color) =>
     access(new URL(`../public/map-markers/${color}.png`, import.meta.url)),
   ));
