@@ -93,7 +93,7 @@ test("publishes the complete reviewed location lists", async () => {
   assert.ok(cardModels.every((card) => (
     cardCharacterNames.filter((character) => card.card.includes(character)).length === 1
   )));
-  assert.equal(cardModels.filter((card) => card.imageUrl).length, 11);
+  assert.equal(cardModels.filter((card) => card.imageUrl).length, 24);
   assert.equal(cardModels.find((card) => card.id === "card-10").imageUrl, "./card-images/hasunosora-karuta/seras-yanagida-lilienfeld.jpg");
   assert.equal(cardModels.find((card) => card.id === "card-11").imageUrl, "./card-images/hasunosora-karuta/katsuragi-izumi.jpg");
   assert.equal(cardModels.find((card) => card.id === "card-06").imageUrl, "./card-images/hasunosora-karuta/fujishima-megumi.jpg");

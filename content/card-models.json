@@ -122,6 +122,7 @@
   },
   {
     "id": "card-12",
+    "imageUrl": "./card-images/model-cards/cafe-hasunosora-osawa-rurino.jpeg",
     "card": "［喫茶ハスノソラ］大沢瑠璃乃",
     "model": "金沢城公園 百間堀園地（石川門・石川橋下付近）",
     "address": "石川県金沢市丸の内1-1 周辺",
@@ -132,6 +133,7 @@
   },
   {
     "id": "card-13",
+    "imageUrl": "./card-images/model-cards/cafe-hasunosora-murano-sayaka.jpeg",
     "card": "［喫茶ハスノソラ］村野さやか",
     "model": "大正浪漫喫茶 金魚庵",
     "address": "石川県金沢市東山1-10-4",
@@ -142,6 +144,7 @@
   },
   {
     "id": "card-46",
+    "imageUrl": "./card-images/model-cards/cafe-hasunosora-yugiri-tsuzuri.jpeg",
     "card": "［喫茶ハスノソラ］夕霧綴理",
     "model": "大正浪漫喫茶 金魚庵",
     "address": "石川県金沢市東山1-10-4",
@@ -152,6 +155,7 @@
   },
   {
     "id": "card-14",
+    "imageUrl": "./card-images/model-cards/petit-patissiere-osawa-rurino.jpeg",
     "card": "［プチパティシエール］大沢瑠璃乃",
     "model": "香林坊・旧ホテルトラスティ金沢香林坊前",
     "address": "石川県金沢市香林坊1-2-16",
@@ -162,6 +166,7 @@
   },
   {
     "id": "card-15",
+    "imageUrl": "./card-images/model-cards/trick-and-cute-hinoshita-kaho.jpeg",
     "card": "［Trick & Cute］日野下花帆",
     "model": "ひがし茶屋街（金沢市眺望点「ひがし茶屋街広見側」付近）",
     "address": "石川県金沢市東山1丁目",
@@ -172,6 +177,7 @@
   },
   {
     "id": "card-16",
+    "imageUrl": "./card-images/model-cards/sugao-no-pixel-hinoshita-kaho.jpeg",
     "card": "［素顔のピクセル］日野下花帆",
     "model": "ひがし茶屋街・宇多須神社／東山菅原神社付近の通り",
     "address": "石川県金沢市東山1丁目",
@@ -182,6 +188,7 @@
   },
   {
     "id": "card-17",
+    "imageUrl": "./card-images/model-cards/aokuharuka-momose-ginko.jpeg",
     "card": "［アオクハルカ］百生吟子",
     "model": "八百萬本舗",
     "address": "石川県金沢市尾張町2-14-20",
@@ -272,6 +279,7 @@
   },
   {
     "id": "card-52",
+    "imageUrl": "./card-images/model-cards/tsukiyomi-kurage-momose-ginko.jpeg",
     "card": "［月夜見海月］百生吟子",
     "model": "のとじま水族館",
     "address": "石川県七尾市能登島曲町15部40",
@@ -322,6 +330,7 @@
   },
   {
     "id": "card-53",
+    "imageUrl": "./card-images/model-cards/wawo-anyoji-hime.jpeg",
     "card": "［WAWO!］安養寺姫芽",
     "model": "神田明神",
     "address": "東京都千代田区外神田2-16-2",
@@ -382,6 +391,7 @@
   },
   {
     "id": "card-30",
+    "imageUrl": "./card-images/model-cards/baadokeji-kachimachi-kosuzu.jpeg",
     "card": "［バアドケージ］徒町小鈴",
     "model": "HEP FIVE前",
     "address": "大阪府大阪市北区角田町5-15",
@@ -392,6 +402,7 @@
   },
   {
     "id": "card-31",
+    "imageUrl": "./card-images/model-cards/aurora-flower-kachimachi-kosuzu.jpeg",
     "card": "［AURORA FLOWER］徒町小鈴",
     "model": "アルピコ交通 上高地線 波田駅前",
     "address": "長野県松本市波田（波田駅前）",
@@ -512,6 +523,7 @@
   },
   {
     "id": "card-43",
+    "imageUrl": "./card-images/model-cards/compass-kachimachi-kosuzu.jpeg",
     "card": "［COMPASS］徒町小鈴",
     "model": "近江町市場 金沢おでん いっぷくや",
     "address": "石川県金沢市青草町88 近江町いちば館1F",
@@ -532,6 +544,7 @@
   },
   {
     "id": "card-45",
+    "imageUrl": "./card-images/model-cards/issho-ni-yume-ga-saku-kachimachi-kosuzu.jpeg",
     "card": "［一生に夢が咲くように］徒町小鈴",
     "model": "加賀てまり 毬屋",
     "address": "石川県金沢市南町5-7",
