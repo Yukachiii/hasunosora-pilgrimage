@@ -53,7 +53,25 @@ const ROUTE_LAYER_ID = "pilgrimage-route-line";
 const SPOT_SOURCE_ID = "pilgrimage-spots";
 const SPOT_LAYER_ID = "pilgrimage-spot-points";
 const SELECTED_SPOT_LAYER_ID = "pilgrimage-selected-spot";
-const SPOT_LABEL_LAYER_ID = "pilgrimage-spot-labels";
+const SPOT_MARKER_IMAGE_ID = "pilgrimage-spot-marker";
+const COLLABORATION_MARKER_IMAGE_ID = "pilgrimage-collaboration-marker";
+
+function ensureMapImage(map: mapboxgl.Map, id: string, url: string) {
+  return new Promise<void>((resolve, reject) => {
+    if (map.hasImage(id)) {
+      resolve();
+      return;
+    }
+    map.loadImage(url, (error, image) => {
+      if (error || !image) {
+        reject(error ?? new Error(`地図ピン画像を読み込めませんでした: ${url}`));
+        return;
+      }
+      if (!map.hasImage(id)) map.addImage(id, image);
+      resolve();
+    });
+  });
+}
 
 function buildGoogleMapsUrl(request: RouteRequest) {
   const params = new URLSearchParams({
@@ -256,53 +274,8 @@ export function MapboxPilgrimageMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapState !== "ready") return;
+    let cancelled = false;
     const data = spotFeatureCollection(spots);
-    const existingSource = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
-    if (existingSource) {
-      existingSource.setData(data);
-    } else {
-      map.addSource(SPOT_SOURCE_ID, {
-        type: "geojson",
-        data,
-      });
-      map.addLayer({
-        id: SPOT_LAYER_ID,
-        type: "circle",
-        source: SPOT_SOURCE_ID,
-        paint: {
-          "circle-color": ["case", ["==", ["get", "collaboration"], 1], "#9b789d", "#263446"],
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 6, 10, 9, 14, 14],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 6, 1.5, 14, 3],
-          "circle-opacity": 0.96,
-        },
-      });
-      map.addLayer({
-        id: SELECTED_SPOT_LAYER_ID,
-        type: "circle",
-        source: SPOT_SOURCE_ID,
-        filter: ["==", ["get", "spotId"], ""],
-        paint: {
-          "circle-color": "#7f6084",
-          "circle-radius": 18,
-          "circle-stroke-color": "#eee8f4",
-          "circle-stroke-width": 5,
-        },
-      });
-      map.addLayer({
-        id: SPOT_LABEL_LAYER_ID,
-        type: "symbol",
-        source: SPOT_SOURCE_ID,
-        layout: {
-          "text-field": ["get", "indexLabel"],
-          "text-size": ["interpolate", ["linear"], ["zoom"], 6, 5, 10, 7, 14, 9],
-          "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-          "text-allow-overlap": true,
-        },
-        paint: { "text-color": "#ffffff" },
-      });
-    }
-
     const handleSpotClick = (event: mapboxgl.MapLayerMouseEvent) => {
       const spotId = event.features?.[0]?.properties?.spotId;
       if (typeof spotId === "string") onSelectRef.current(spotId);
@@ -310,16 +283,87 @@ export function MapboxPilgrimageMap({
     const showPointer = () => { map.getCanvas().style.cursor = "pointer"; };
     const clearPointer = () => { map.getCanvas().style.cursor = ""; };
 
-    map.on("click", SPOT_LAYER_ID, handleSpotClick);
-    map.on("mouseenter", SPOT_LAYER_ID, showPointer);
-    map.on("mouseleave", SPOT_LAYER_ID, clearPointer);
+    void Promise.all([
+      ensureMapImage(map, SPOT_MARKER_IMAGE_ID, "./map-markers/spot.png"),
+      ensureMapImage(map, COLLABORATION_MARKER_IMAGE_ID, "./map-markers/collaboration.png"),
+    ]).then(() => {
+      if (cancelled) return;
+      const existingSource = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+      if (existingSource) {
+        existingSource.setData(data);
+      } else {
+        map.addSource(SPOT_SOURCE_ID, { type: "geojson", data });
+        const markerImage = [
+          "case",
+          ["==", ["get", "collaboration"], 1],
+          COLLABORATION_MARKER_IMAGE_ID,
+          SPOT_MARKER_IMAGE_ID,
+        ] as mapboxgl.Expression;
+        map.addLayer({
+          id: SPOT_LAYER_ID,
+          type: "symbol",
+          source: SPOT_SOURCE_ID,
+          layout: {
+            "icon-image": markerImage,
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.09, 10, 0.13, 14, 0.18],
+            "icon-anchor": "bottom",
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "text-field": ["get", "indexLabel"],
+            "text-size": ["interpolate", ["linear"], ["zoom"], 6, 5, 10, 7, 14, 9],
+            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+            "text-offset": [0, -2],
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: {
+            "text-color": "#ffffff",
+            "text-halo-color": "#263446",
+            "text-halo-width": 1.5,
+          },
+        });
+        map.addLayer({
+          id: SELECTED_SPOT_LAYER_ID,
+          type: "symbol",
+          source: SPOT_SOURCE_ID,
+          filter: ["==", ["get", "spotId"], selectedId],
+          layout: {
+            "icon-image": markerImage,
+            "icon-size": 0.23,
+            "icon-anchor": "bottom",
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "text-field": ["get", "indexLabel"],
+            "text-size": 10,
+            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+            "text-offset": [0, -2.2],
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: {
+            "text-color": "#ffffff",
+            "text-halo-color": "#263446",
+            "text-halo-width": 1.8,
+          },
+        });
+      }
+
+      map.on("click", SPOT_LAYER_ID, handleSpotClick);
+      map.on("mouseenter", SPOT_LAYER_ID, showPointer);
+      map.on("mouseleave", SPOT_LAYER_ID, clearPointer);
+    }).catch(() => {
+      if (!cancelled) setMapState("error");
+    });
 
     return () => {
-      map.off("click", SPOT_LAYER_ID, handleSpotClick);
-      map.off("mouseenter", SPOT_LAYER_ID, showPointer);
-      map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
+      cancelled = true;
+      if (map.getLayer(SPOT_LAYER_ID)) {
+        map.off("click", SPOT_LAYER_ID, handleSpotClick);
+        map.off("mouseenter", SPOT_LAYER_ID, showPointer);
+        map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
+      }
     };
-  }, [mapState, spots]);
+  }, [mapState, selectedId, spots]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -688,47 +688,53 @@ button {
 }
 
 .fallback-pin {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border: 3px solid white;
-  border-radius: 50% 50% 50% 14%;
-  background: var(--ink);
-  color: white;
-  font-family: Georgia, serif;
-  font-size: 10px;
-  box-shadow: 0 6px 18px rgba(38, 52, 70, 0.28);
-}
-
-.fallback-pin {
   position: absolute;
   z-index: 2;
+  display: block;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  background: url("/map-markers/spot.png") center / contain no-repeat;
+  color: white;
   cursor: pointer;
-  transform: translate(-50%, -50%) rotate(-45deg);
+  filter: drop-shadow(0 6px 8px rgba(38, 52, 70, 0.3));
+  transform: translate(-50%, -88%);
   transition:
-    background 150ms ease,
+    filter 150ms ease,
     transform 150ms ease;
 }
 
 .fallback-pin > span {
-  transform: rotate(45deg);
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  font-family: Georgia, serif;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow:
+    -1px -1px 0 #263446,
+    1px -1px 0 #263446,
+    -1px 1px 0 #263446,
+    1px 1px 0 #263446;
+  transform: translate(-50%, -50%);
 }
 
 .fallback-pin.is-active {
-  background: #9b789d;
-  transform: translate(-50%, -50%) rotate(-45deg) scale(1.18);
+  z-index: 3;
+  filter:
+    drop-shadow(0 0 5px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 8px 10px rgba(38, 52, 70, 0.38));
+  transform: translate(-50%, -88%) scale(1.24);
 }
 
 .fallback-pin--collaboration {
-  background: var(--lavender-deep);
-  box-shadow:
-    0 0 0 4px rgba(230, 224, 240, 0.8),
-    0 7px 20px rgba(71, 53, 90, 0.3);
-}
-
-.fallback-pin--collaboration.is-active {
-  background: #7f6084;
+  background-image: url("/map-markers/collaboration.png");
 }
 
 .mapboxgl-ctrl-logo,
