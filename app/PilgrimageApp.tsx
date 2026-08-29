@@ -2206,7 +2206,15 @@ export function PilgrimageApp({
                     decoding="async"
                   />
                   <figcaption>
-                    画像：<a href="https://www.lovelive-anime.jp/hasunosora/" target="_blank" rel="noreferrer">『Link！Like！ラブライブ！』</a>
+                    画像：<a
+                      href="https://www.lovelive-anime.jp/hasunosora/"
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="©プロジェクトラブライブ！蓮ノ空女学院スクールアイドルクラブ"
+                      title="©プロジェクトラブライブ！蓮ノ空女学院スクールアイドルクラブ"
+                    >
+                      ©PL!HS
+                    </a>
                   </figcaption>
                 </figure>
               ) : null}
@@ -2361,7 +2369,7 @@ export function PilgrimageApp({
         </div>
 
         <p className="guide-source-note">
-          画面内のカード画像：<a href="https://www.lovelive-anime.jp/hasunosora/" target="_blank" rel="noreferrer">『Link！Like！ラブライブ！』</a>
+          画面内のカード画像：<a href="https://www.lovelive-anime.jp/hasunosora/" target="_blank" rel="noreferrer">©プロジェクトラブライブ！蓮ノ空女学院スクールアイドルクラブ</a>
         </p>
       </section>
 
