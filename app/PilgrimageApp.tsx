@@ -206,6 +206,8 @@ export function PilgrimageApp({
     result: RouteResult;
   }>>({});
   const [spotQuery, setSpotQuery] = useState("");
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+  const [selectedCardModelId, setSelectedCardModelId] = useState<string | null>(null);
   const [areaFilter, setAreaFilter] = useState("すべて");
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
   const [itineraryCollaborationId, setItineraryCollaborationId] = useState<CollaborationId | "">("");
@@ -440,6 +442,45 @@ export function PilgrimageApp({
 
   const spotById = (id: string) => spots.find((spot) => spot.id === id);
   const selectedSpot = spotById(selectedId) ?? spots[0];
+  const selectedCardModel = selectedCardModelId
+    ? cardModels.find((card) => card.id === selectedCardModelId) ?? null
+    : null;
+  const selectedSpotCards = useMemo(() => {
+    const relatedCards = cardModels.filter((card) => card.spotId === selectedSpot.id);
+    if (!selectedCardModel || selectedCardModel.spotId !== selectedSpot.id) return relatedCards;
+    return [selectedCardModel, ...relatedCards.filter((card) => card.id !== selectedCardModel.id)];
+  }, [selectedCardModel, selectedSpot.id]);
+  const mapSearchResults = useMemo(() => {
+    const query = mapSearchQuery.trim().toLocaleLowerCase("ja");
+    if (!query) return [];
+
+    const matchingSpots = spots.flatMap((spot) => {
+      const values = [
+        spot.name,
+        spot.shortName,
+        spot.address,
+        spot.area,
+        spot.category,
+        spot.description,
+        ...(spot.activityRecords ?? []),
+        ...(spot.sehasEpisodes ?? []),
+        ...(spot.appearances ?? []),
+      ];
+      return values.some((value) => value.toLocaleLowerCase("ja").includes(query))
+        ? [{ kind: "spot" as const, id: spot.id, spot, card: null }]
+        : [];
+    });
+    const matchingCards = cardModels.flatMap((card) => {
+      if (!card.spotId) return [];
+      const spot = spots.find((item) => item.id === card.spotId);
+      if (!spot) return [];
+      const values = [card.card, card.model, card.address, card.note, ...card.characters];
+      return values.some((value) => value.toLocaleLowerCase("ja").includes(query))
+        ? [{ kind: "card" as const, id: card.id, spot, card }]
+        : [];
+    });
+    return [...matchingSpots, ...matchingCards].slice(0, 12);
+  }, [mapSearchQuery, spots]);
   const itinerarySpots = useMemo(
     () => itineraryIds.map((id) => spots.find((spot) => spot.id === id)).filter((spot): spot is PilgrimageSpot => Boolean(spot)),
     [itineraryIds, spots],
@@ -1111,34 +1152,109 @@ export function PilgrimageApp({
 
         <div className="map-layout">
           <div className="map-column" hidden={activePage !== "explore"}>
+            <div className="map-search">
+              <label htmlFor="map-freeword-search">地図から検索</label>
+              <div className="map-search__field">
+                <span aria-hidden="true">⌕</span>
+                <input
+                  id="map-freeword-search"
+                  type="search"
+                  value={mapSearchQuery}
+                  onChange={(event) => setMapSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setMapSearchQuery("");
+                  }}
+                  placeholder="施設名・住所・カード・キャラクターで検索"
+                  autoComplete="off"
+                />
+              </div>
+              {mapSearchQuery.trim() ? (
+                <div className="map-search__results" role="listbox" aria-label="地図の検索結果">
+                  {mapSearchResults.length ? mapSearchResults.map((result) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={result.kind === "card" && selectedCardModelId === result.id}
+                      key={`${result.kind}-${result.id}`}
+                      onClick={() => {
+                        setSelectedId(result.spot.id);
+                        setSelectedCardModelId(result.card?.id ?? null);
+                        setMapSearchQuery("");
+                      }}
+                    >
+                      <span>{result.kind === "card" ? "カード" : "スポット"}</span>
+                      <strong>{result.kind === "card" ? result.card.card : result.spot.name}</strong>
+                      <small>{result.kind === "card" ? result.card.model : result.spot.address}</small>
+                    </button>
+                  )) : (
+                    <p>登録済みのスポット・カードに一致する場所がありません。</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
             <MapboxPilgrimageMap
               spots={spots}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={(id) => {
+                setSelectedId(id);
+                setSelectedCardModelId(null);
+              }}
               routeRequest={routeRequest}
               onRouteResult={handleRouteResult}
               accessToken={mapboxConfig.accessToken}
               routeServiceUrl={routeServiceUrl}
             />
-            <div className="selected-spot-bar">
-              <div>
-                <small>
-                  {selectedSpot.area} · {selectedSpot.category}
-                </small>
-                <strong>{selectedSpot.name}</strong>
+            <div className="selected-map-detail">
+              <div className="selected-map-detail__heading">
+                <div>
+                  <small>
+                    {selectedSpot.area} · {selectedSpot.category}
+                  </small>
+                  <strong>{selectedSpot.name}</strong>
+                  <span>{selectedSpot.address}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!itineraryIds.includes(selectedSpot.id) && itineraryIds.length >= maximumItineraryStops}
+                  onClick={() => {
+                    const selectedIndex = itineraryIds.indexOf(selectedSpot.id);
+                    if (selectedIndex >= 0) removeSpot(selectedIndex);
+                    else addSpot(selectedSpot.id);
+                  }}
+                >
+                  {itineraryIds.includes(selectedSpot.id) ? "予定から外す" : "予定に追加する"}
+                  <span aria-hidden="true">→</span>
+                </button>
               </div>
-              <button
-                type="button"
-                disabled={!itineraryIds.includes(selectedSpot.id) && itineraryIds.length >= maximumItineraryStops}
-                onClick={() => {
-                  const selectedIndex = itineraryIds.indexOf(selectedSpot.id);
-                  if (selectedIndex >= 0) removeSpot(selectedIndex);
-                  else addSpot(selectedSpot.id);
-                }}
-              >
-                {itineraryIds.includes(selectedSpot.id) ? "予定から外す" : "予定に追加する"}
-                <span aria-hidden="true">→</span>
-              </button>
+              {selectedSpot.description ? (
+                <p className="selected-map-detail__description">{selectedSpot.description}</p>
+              ) : null}
+              {selectedSpotCards.length ? (
+                <div className="selected-map-detail__cards">
+                  <div className="selected-map-detail__cards-heading">
+                    <strong>この場所に関連するカード</strong>
+                    <span>{selectedSpotCards.length}件</span>
+                  </div>
+                  <div className="selected-map-detail__card-grid">
+                    {selectedSpotCards.map((card) => (
+                      <article
+                        key={card.id}
+                        className={`${card.imageUrl ? "has-image" : ""}${selectedCardModel?.id === card.id ? " is-selected" : ""}`.trim() || undefined}
+                      >
+                        {card.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={card.imageUrl} alt="" loading="lazy" decoding="async" />
+                        ) : null}
+                        <div>
+                          <small>カードモデル地</small>
+                          <strong>{card.card}</strong>
+                          <span>{card.model}</span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -2092,6 +2208,7 @@ export function PilgrimageApp({
                     type="button"
                     onClick={() => {
                       setSelectedId(card.spotId!);
+                      setSelectedCardModelId(card.id);
                       setMapReturnSection("card-models");
                       navigateToPage("explore", "map");
                     }}

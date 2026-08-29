@@ -236,7 +236,7 @@ export function MapboxPilgrimageMap({
       attributionControl: true,
       cooperativeGestures: true,
     });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), "top-right");
     map.on("load", () => {
       if (!cancelled) setMapState("ready");
     });
