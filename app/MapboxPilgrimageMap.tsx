@@ -51,8 +51,6 @@ const ROUTE_SOURCE_ID = "pilgrimage-route";
 const ROUTE_SHADOW_LAYER_ID = "pilgrimage-route-shadow";
 const ROUTE_LAYER_ID = "pilgrimage-route-line";
 const SPOT_SOURCE_ID = "pilgrimage-spots";
-const SPOT_CLUSTER_LAYER_ID = "pilgrimage-spot-clusters";
-const SPOT_CLUSTER_COUNT_LAYER_ID = "pilgrimage-spot-cluster-count";
 const SPOT_LAYER_ID = "pilgrimage-spot-points";
 const SELECTED_SPOT_LAYER_ID = "pilgrimage-selected-spot";
 const SPOT_LABEL_LAYER_ID = "pilgrimage-spot-labels";
@@ -266,45 +264,16 @@ export function MapboxPilgrimageMap({
       map.addSource(SPOT_SOURCE_ID, {
         type: "geojson",
         data,
-        cluster: true,
-        clusterMaxZoom: 15,
-        clusterRadius: 52,
-      });
-      map.addLayer({
-        id: SPOT_CLUSTER_LAYER_ID,
-        type: "circle",
-        source: SPOT_SOURCE_ID,
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": ["step", ["get", "point_count"], "#6eb7c6", 10, "#4e7482", 30, "#7f6084"],
-          "circle-radius": ["step", ["get", "point_count"], 18, 10, 22, 30, 27],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 3,
-          "circle-opacity": 0.94,
-        },
-      });
-      map.addLayer({
-        id: SPOT_CLUSTER_COUNT_LAYER_ID,
-        type: "symbol",
-        source: SPOT_SOURCE_ID,
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": ["get", "point_count_abbreviated"],
-          "text-size": 11,
-          "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-        },
-        paint: { "text-color": "#ffffff" },
       });
       map.addLayer({
         id: SPOT_LAYER_ID,
         type: "circle",
         source: SPOT_SOURCE_ID,
-        filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-color": ["case", ["==", ["get", "collaboration"], 1], "#9b789d", "#263446"],
-          "circle-radius": 14,
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 6, 10, 9, 14, 14],
           "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 3,
+          "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 6, 1.5, 14, 3],
           "circle-opacity": 0.96,
         },
       });
@@ -312,7 +281,7 @@ export function MapboxPilgrimageMap({
         id: SELECTED_SPOT_LAYER_ID,
         type: "circle",
         source: SPOT_SOURCE_ID,
-        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "spotId"], ""]],
+        filter: ["==", ["get", "spotId"], ""],
         paint: {
           "circle-color": "#7f6084",
           "circle-radius": 18,
@@ -324,10 +293,9 @@ export function MapboxPilgrimageMap({
         id: SPOT_LABEL_LAYER_ID,
         type: "symbol",
         source: SPOT_SOURCE_ID,
-        filter: ["!", ["has", "point_count"]],
         layout: {
           "text-field": ["get", "indexLabel"],
-          "text-size": 9,
+          "text-size": ["interpolate", ["linear"], ["zoom"], 6, 5, 10, 7, 14, 9],
           "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
           "text-allow-overlap": true,
         },
@@ -335,21 +303,6 @@ export function MapboxPilgrimageMap({
       });
     }
 
-    const handleClusterClick = (event: mapboxgl.MapLayerMouseEvent) => {
-      const feature = event.features?.[0];
-      if (!feature || feature.geometry.type !== "Point") return;
-      const clusterId = Number(feature.properties?.cluster_id);
-      const source = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
-      if (!source || !Number.isFinite(clusterId)) return;
-      source.getClusterExpansionZoom(clusterId, (error, zoom) => {
-        if (error) return;
-        map.easeTo({
-          center: feature.geometry.coordinates as [number, number],
-          zoom,
-          duration: 450,
-        });
-      });
-    };
     const handleSpotClick = (event: mapboxgl.MapLayerMouseEvent) => {
       const spotId = event.features?.[0]?.properties?.spotId;
       if (typeof spotId === "string") onSelectRef.current(spotId);
@@ -357,18 +310,12 @@ export function MapboxPilgrimageMap({
     const showPointer = () => { map.getCanvas().style.cursor = "pointer"; };
     const clearPointer = () => { map.getCanvas().style.cursor = ""; };
 
-    map.on("click", SPOT_CLUSTER_LAYER_ID, handleClusterClick);
     map.on("click", SPOT_LAYER_ID, handleSpotClick);
-    map.on("mouseenter", SPOT_CLUSTER_LAYER_ID, showPointer);
-    map.on("mouseleave", SPOT_CLUSTER_LAYER_ID, clearPointer);
     map.on("mouseenter", SPOT_LAYER_ID, showPointer);
     map.on("mouseleave", SPOT_LAYER_ID, clearPointer);
 
     return () => {
-      map.off("click", SPOT_CLUSTER_LAYER_ID, handleClusterClick);
       map.off("click", SPOT_LAYER_ID, handleSpotClick);
-      map.off("mouseenter", SPOT_CLUSTER_LAYER_ID, showPointer);
-      map.off("mouseleave", SPOT_CLUSTER_LAYER_ID, clearPointer);
       map.off("mouseenter", SPOT_LAYER_ID, showPointer);
       map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
     };
@@ -377,11 +324,7 @@ export function MapboxPilgrimageMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapState !== "ready" || !map.getLayer(SELECTED_SPOT_LAYER_ID)) return;
-    map.setFilter(SELECTED_SPOT_LAYER_ID, [
-      "all",
-      ["!", ["has", "point_count"]],
-      ["==", ["get", "spotId"], selectedId],
-    ]);
+    map.setFilter(SELECTED_SPOT_LAYER_ID, ["==", ["get", "spotId"], selectedId]);
   }, [mapState, selectedId]);
 
   useEffect(() => {
