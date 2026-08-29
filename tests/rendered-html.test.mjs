@@ -195,6 +195,12 @@ test("Mapbox map and route integration stays guarded", async () => {
   assert.match(map, /optimized-trips\/v1/);
   assert.match(map, /directions\/v5/);
   assert.match(map, /optimizeWaypointOrder/);
+  assert.match(map, /"planned", GREEN_MARKER_IMAGE_ID/);
+  assert.match(map, /"card", BLUE_MARKER_IMAGE_ID/);
+  assert.match(map, /"collaboration", YELLOW_MARKER_IMAGE_ID/);
+  await Promise.all(["red", "yellow", "blue", "green"].map((color) =>
+    access(new URL(`../public/map-markers/${color}.png`, import.meta.url)),
+  ));
 });
 
 test("day planner supports multiple stops without a server dependency", async () => {

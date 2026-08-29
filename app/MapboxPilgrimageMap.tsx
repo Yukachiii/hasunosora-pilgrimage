@@ -1,7 +1,7 @@
 "use client";
 
 import mapboxgl from "mapbox-gl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ServerRoutePlanError, ServerRoutePlanResponse } from "./route-api";
 import type { PilgrimageSpot } from "./spots";
 import type { RouteLocation, TravelMode } from "./route-planner";
@@ -32,6 +32,8 @@ export type RouteResult = {
 type Props = {
   spots: PilgrimageSpot[];
   selectedId: string;
+  plannedSpotIds: string[];
+  cardModelSpotIds: string[];
   onSelect: (id: string) => void;
   routeRequest: RouteRequest | null;
   onRouteResult: (result: RouteResult) => void;
@@ -53,8 +55,10 @@ const ROUTE_LAYER_ID = "pilgrimage-route-line";
 const SPOT_SOURCE_ID = "pilgrimage-spots";
 const SPOT_LAYER_ID = "pilgrimage-spot-points";
 const SELECTED_SPOT_LAYER_ID = "pilgrimage-selected-spot";
-const SPOT_MARKER_IMAGE_ID = "pilgrimage-spot-marker";
-const COLLABORATION_MARKER_IMAGE_ID = "pilgrimage-collaboration-marker";
+const RED_MARKER_IMAGE_ID = "pilgrimage-red-marker";
+const YELLOW_MARKER_IMAGE_ID = "pilgrimage-yellow-marker";
+const BLUE_MARKER_IMAGE_ID = "pilgrimage-blue-marker";
+const GREEN_MARKER_IMAGE_ID = "pilgrimage-green-marker";
 
 function ensureMapImage(map: mapboxgl.Map, id: string, url: string) {
   return new Promise<void>((resolve, reject) => {
@@ -131,7 +135,24 @@ function mapboxProfile(mode: TravelMode) {
   return "mapbox/walking";
 }
 
-function spotFeatureCollection(spots: PilgrimageSpot[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
+type MarkerKind = "standard" | "collaboration" | "card" | "planned";
+
+function markerKindForSpot(
+  spot: PilgrimageSpot,
+  plannedSpotIds: ReadonlySet<string>,
+  cardModelSpotIds: ReadonlySet<string>,
+): MarkerKind {
+  if (plannedSpotIds.has(spot.id)) return "planned";
+  if (cardModelSpotIds.has(spot.id)) return "card";
+  if (spot.collaborationIds?.length) return "collaboration";
+  return "standard";
+}
+
+function spotFeatureCollection(
+  spots: PilgrimageSpot[],
+  plannedSpotIds: ReadonlySet<string>,
+  cardModelSpotIds: ReadonlySet<string>,
+): GeoJSON.FeatureCollection<GeoJSON.Point> {
   return {
     type: "FeatureCollection",
     features: spots.map((spot, index) => ({
@@ -140,7 +161,7 @@ function spotFeatureCollection(spots: PilgrimageSpot[]): GeoJSON.FeatureCollecti
       properties: {
         spotId: spot.id,
         indexLabel: String(index + 1).padStart(2, "0"),
-        collaboration: spot.collaborationIds?.length ? 1 : 0,
+        markerKind: markerKindForSpot(spot, plannedSpotIds, cardModelSpotIds),
       },
     })),
   };
@@ -149,6 +170,8 @@ function spotFeatureCollection(spots: PilgrimageSpot[]): GeoJSON.FeatureCollecti
 export function MapboxPilgrimageMap({
   spots,
   selectedId,
+  plannedSpotIds,
+  cardModelSpotIds,
   onSelect,
   routeRequest,
   onRouteResult,
@@ -158,6 +181,8 @@ export function MapboxPilgrimageMap({
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const onSelectRef = useRef(onSelect);
+  const plannedSpotIdSet = useMemo(() => new Set(plannedSpotIds), [plannedSpotIds]);
+  const cardModelSpotIdSet = useMemo(() => new Set(cardModelSpotIds), [cardModelSpotIds]);
   const [token, setToken] = useState(accessToken.trim());
   const [mapState, setMapState] = useState<"fallback" | "loading" | "ready" | "error">(
     accessToken.trim() ? "loading" : "fallback",
@@ -275,7 +300,7 @@ export function MapboxPilgrimageMap({
     const map = mapRef.current;
     if (!map || mapState !== "ready") return;
     let cancelled = false;
-    const data = spotFeatureCollection(spots);
+    const data = spotFeatureCollection(spots, plannedSpotIdSet, cardModelSpotIdSet);
     const handleSpotClick = (event: mapboxgl.MapLayerMouseEvent) => {
       const spotId = event.features?.[0]?.properties?.spotId;
       if (typeof spotId === "string") onSelectRef.current(spotId);
@@ -284,8 +309,10 @@ export function MapboxPilgrimageMap({
     const clearPointer = () => { map.getCanvas().style.cursor = ""; };
 
     void Promise.all([
-      ensureMapImage(map, SPOT_MARKER_IMAGE_ID, "./map-markers/spot.png"),
-      ensureMapImage(map, COLLABORATION_MARKER_IMAGE_ID, "./map-markers/collaboration.png"),
+      ensureMapImage(map, RED_MARKER_IMAGE_ID, "./map-markers/red.png"),
+      ensureMapImage(map, YELLOW_MARKER_IMAGE_ID, "./map-markers/yellow.png"),
+      ensureMapImage(map, BLUE_MARKER_IMAGE_ID, "./map-markers/blue.png"),
+      ensureMapImage(map, GREEN_MARKER_IMAGE_ID, "./map-markers/green.png"),
     ]).then(() => {
       if (cancelled) return;
       const existingSource = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
@@ -294,15 +321,18 @@ export function MapboxPilgrimageMap({
       } else {
         map.addSource(SPOT_SOURCE_ID, { type: "geojson", data });
         const markerImage = [
-          "case",
-          ["==", ["get", "collaboration"], 1],
-          COLLABORATION_MARKER_IMAGE_ID,
-          SPOT_MARKER_IMAGE_ID,
+          "match",
+          ["get", "markerKind"],
+          "planned", GREEN_MARKER_IMAGE_ID,
+          "card", BLUE_MARKER_IMAGE_ID,
+          "collaboration", YELLOW_MARKER_IMAGE_ID,
+          RED_MARKER_IMAGE_ID,
         ] as mapboxgl.Expression;
         map.addLayer({
           id: SPOT_LAYER_ID,
           type: "symbol",
           source: SPOT_SOURCE_ID,
+          filter: ["!=", ["get", "spotId"], selectedId],
           layout: {
             "icon-image": markerImage,
             "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.09, 10, 0.13, 14, 0.18],
@@ -312,13 +342,13 @@ export function MapboxPilgrimageMap({
             "text-field": ["get", "indexLabel"],
             "text-size": ["interpolate", ["linear"], ["zoom"], 6, 5, 10, 7, 14, 9],
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-offset": [0, -2],
+            "text-offset": [0, -4],
             "text-allow-overlap": true,
             "text-ignore-placement": true,
           },
           paint: {
             "text-color": "#ffffff",
-            "text-halo-color": "#263446",
+            "text-halo-color": "#6b3815",
             "text-halo-width": 1.5,
           },
         });
@@ -336,13 +366,13 @@ export function MapboxPilgrimageMap({
             "text-field": ["get", "indexLabel"],
             "text-size": 10,
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-offset": [0, -2.2],
+            "text-offset": [0, -5.2],
             "text-allow-overlap": true,
             "text-ignore-placement": true,
           },
           paint: {
             "text-color": "#ffffff",
-            "text-halo-color": "#263446",
+            "text-halo-color": "#6b3815",
             "text-halo-width": 1.8,
           },
         });
@@ -363,11 +393,12 @@ export function MapboxPilgrimageMap({
         map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
       }
     };
-  }, [mapState, selectedId, spots]);
+  }, [cardModelSpotIdSet, mapState, plannedSpotIdSet, selectedId, spots]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapState !== "ready" || !map.getLayer(SELECTED_SPOT_LAYER_ID)) return;
+    map.setFilter(SPOT_LAYER_ID, ["!=", ["get", "spotId"], selectedId]);
     map.setFilter(SELECTED_SPOT_LAYER_ID, ["==", ["get", "spotId"], selectedId]);
   }, [mapState, selectedId]);
 
@@ -538,11 +569,12 @@ export function MapboxPilgrimageMap({
           {spots.map((spot, index) => {
             const x = 12 + ((spot.lng - 136.34) / 0.36) * 76;
             const y = 84 - ((spot.lat - 36.27) / 0.37) * 70;
+            const markerKind = markerKindForSpot(spot, plannedSpotIdSet, cardModelSpotIdSet);
             return (
               <button
                 type="button"
                 key={spot.id}
-                className={`fallback-pin${spot.collaborationIds?.length ? " fallback-pin--collaboration" : ""}${selectedId === spot.id ? " is-active" : ""}`}
+                className={`fallback-pin fallback-pin--${markerKind}${selectedId === spot.id ? " is-active" : ""}`}
                 style={{
                   left: `${Math.max(8, Math.min(90, x))}%`,
                   top: `${Math.max(10, Math.min(86, y))}%`,

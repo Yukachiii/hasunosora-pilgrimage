@@ -51,6 +51,9 @@ import {
 const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v2";
 const LEGACY_PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1";
 const PLANNER_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const CARD_MODEL_SPOT_IDS = Array.from(new Set(
+  cardModels.flatMap((card) => card.spotId ? [card.spotId] : []),
+));
 
 type AppPage = "explore" | "planner" | "today" | "guide";
 type ExplorePanel = "spots" | "card-models";
@@ -1243,6 +1246,8 @@ export function PilgrimageApp({
             <MapboxPilgrimageMap
               spots={spots}
               selectedId={selectedId}
+              plannedSpotIds={itineraryIds}
+              cardModelSpotIds={CARD_MODEL_SPOT_IDS}
               onSelect={(id) => {
                 setSelectedId(id);
                 setSelectedCardModelId(null);
