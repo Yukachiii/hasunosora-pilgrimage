@@ -132,7 +132,17 @@
   },
   {
     "id": "card-13",
-    "card": "［喫茶ハスノソラ］村野さやか・夕霧綴理",
+    "card": "［喫茶ハスノソラ］村野さやか",
+    "model": "大正浪漫喫茶 金魚庵",
+    "address": "石川県金沢市東山1-10-4",
+    "confidence": "B",
+    "note": "（ファンによる内観比較。店舗撮影は必ず許可を確認）",
+    "spotId": "kingyoan",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E6%AD%A3%E6%B5%AA%E6%BC%AB%E5%96%AB%E8%8C%B6%20%E9%87%91%E9%AD%9A%E5%BA%B5%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%9D%B1%E5%B1%B11-10-4"
+  },
+  {
+    "id": "card-46",
+    "card": "［喫茶ハスノソラ］夕霧綴理",
     "model": "大正浪漫喫茶 金魚庵",
     "address": "石川県金沢市東山1-10-4",
     "confidence": "B",
@@ -182,7 +192,37 @@
   },
   {
     "id": "card-18",
-    "card": "［ゆのくにガールズ！］日野下花帆・村野さやか・大沢瑠璃乃・藤島慈",
+    "card": "［ゆのくにガールズ！］日野下花帆",
+    "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
+    "address": "石川県加賀市山代温泉19-49-1",
+    "confidence": "A",
+    "note": "宿泊者以外の館内撮影・見学は要確認",
+    "spotId": "yunokuni-tensyo",
+    "sourceUrl": "https://yunokunitensyo.jp/0/"
+  },
+  {
+    "id": "card-47",
+    "card": "［ゆのくにガールズ！］村野さやか",
+    "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
+    "address": "石川県加賀市山代温泉19-49-1",
+    "confidence": "A",
+    "note": "宿泊者以外の館内撮影・見学は要確認",
+    "spotId": "yunokuni-tensyo",
+    "sourceUrl": "https://yunokunitensyo.jp/0/"
+  },
+  {
+    "id": "card-48",
+    "card": "［ゆのくにガールズ！］大沢瑠璃乃",
+    "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
+    "address": "石川県加賀市山代温泉19-49-1",
+    "confidence": "A",
+    "note": "宿泊者以外の館内撮影・見学は要確認",
+    "spotId": "yunokuni-tensyo",
+    "sourceUrl": "https://yunokunitensyo.jp/0/"
+  },
+  {
+    "id": "card-49",
+    "card": "［ゆのくにガールズ！］藤島慈",
     "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
     "address": "石川県加賀市山代温泉19-49-1",
     "confidence": "A",
@@ -192,7 +232,17 @@
   },
   {
     "id": "card-19",
-    "card": "［宇宙演舞☆うさぴょん］日野下花帆・藤島慈",
+    "card": "［宇宙演舞☆うさぴょん］日野下花帆",
+    "model": "ゆのくに天祥（売店・和室）",
+    "address": "石川県加賀市山代温泉19-49-1",
+    "confidence": "A",
+    "note": "館内の立入・撮影条件に注意",
+    "spotId": "yunokuni-tensyo",
+    "sourceUrl": "https://yunokunitensyo.jp/0/"
+  },
+  {
+    "id": "card-50",
+    "card": "［宇宙演舞☆うさぴょん］藤島慈",
     "model": "ゆのくに天祥（売店・和室）",
     "address": "石川県加賀市山代温泉19-49-1",
     "confidence": "A",
@@ -202,7 +252,27 @@
   },
   {
     "id": "card-20",
-    "card": "［月夜見海月］日野下花帆・乙宗梢・百生吟子",
+    "card": "［月夜見海月］日野下花帆",
+    "model": "のとじま水族館",
+    "address": "石川県七尾市能登島曲町15部40",
+    "confidence": "A",
+    "note": "",
+    "spotId": "noto-aquarium",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%AE%E3%81%A8%E3%81%98%E3%81%BE%E6%B0%B4%E6%97%8F%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E4%B8%83%E5%B0%BE%E5%B8%82%E8%83%BD%E7%99%BB%E5%B3%B6%E6%9B%B2%E7%94%BA15%E9%83%A840"
+  },
+  {
+    "id": "card-51",
+    "card": "［月夜見海月］乙宗梢",
+    "model": "のとじま水族館",
+    "address": "石川県七尾市能登島曲町15部40",
+    "confidence": "A",
+    "note": "",
+    "spotId": "noto-aquarium",
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E3%81%AE%E3%81%A8%E3%81%98%E3%81%BE%E6%B0%B4%E6%97%8F%E9%A4%A8%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E4%B8%83%E5%B0%BE%E5%B8%82%E8%83%BD%E7%99%BB%E5%B3%B6%E6%9B%B2%E7%94%BA15%E9%83%A840"
+  },
+  {
+    "id": "card-52",
+    "card": "［月夜見海月］百生吟子",
     "model": "のとじま水族館",
     "address": "石川県七尾市能登島曲町15部40",
     "confidence": "A",
@@ -242,7 +312,17 @@
   },
   {
     "id": "card-24",
-    "card": "［365 Days］乙宗梢／［WAWO!］安養寺姫芽",
+    "card": "［365 Days］乙宗梢",
+    "model": "神田明神",
+    "address": "東京都千代田区外神田2-16-2",
+    "confidence": "A",
+    "note": "",
+    "spotId": null,
+    "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E7%A5%9E%E7%94%B0%E6%98%8E%E7%A5%9E%20%E6%9D%B1%E4%BA%AC%E9%83%BD%E5%8D%83%E4%BB%A3%E7%94%B0%E5%8C%BA%E5%A4%96%E7%A5%9E%E7%94%B02-16-2"
+  },
+  {
+    "id": "card-53",
+    "card": "［WAWO!］安養寺姫芽",
     "model": "神田明神",
     "address": "東京都千代田区外神田2-16-2",
     "confidence": "A",

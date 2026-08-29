@@ -53,7 +53,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
   assert.match(html, /大野からくり記念館/);
-  assert.match(html, /カードモデル地（.*45.*件）/);
+  assert.match(html, /カードモデル地（.*53.*件）/);
   assert.doesNotMatch(html, /判定 [ABC]/);
   assert.match(html, /すべてのキャラクター/);
   assert.match(html, /等身パネル：.*百生吟子、安養寺姫芽/);
@@ -85,7 +85,14 @@ test("publishes the complete reviewed location lists", async () => {
   );
   assert.ok(spots.every((spot) => !spot.description.startsWith("登場情報：")));
   assert.equal(spots.find((spot) => spot.id === "higashide-coffee").activityRecords, undefined);
-  assert.equal(cardModels.length, 45);
+  assert.equal(cardModels.length, 53);
+  const cardCharacterNames = [
+    "日野下花帆", "村野さやか", "乙宗梢", "夕霧綴理", "大沢瑠璃乃", "藤島慈",
+    "百生吟子", "徒町小鈴", "安養寺姫芽", "セラス 柳田 リリエンフェルト", "桂城泉",
+  ];
+  assert.ok(cardModels.every((card) => (
+    cardCharacterNames.filter((character) => card.card.includes(character)).length === 1
+  )));
   assert.equal(cardModels.filter((card) => card.imageUrl).length, 11);
   assert.equal(cardModels.find((card) => card.id === "card-10").imageUrl, "./card-images/hasunosora-karuta/seras-yanagida-lilienfeld.jpg");
   assert.equal(cardModels.find((card) => card.id === "card-11").imageUrl, "./card-images/hasunosora-karuta/katsuragi-izumi.jpg");
@@ -95,8 +102,8 @@ test("publishes the complete reviewed location lists", async () => {
       .filter((card) => card.imageUrl)
       .map((card) => access(new URL(`../public/${card.imageUrl.replace(/^\.\//, "")}`, import.meta.url))),
   );
-  assert.equal(cardModels.filter((card) => card.spotId).length, 37);
-  assert.equal(cardModels.filter((card) => !card.spotId).length, 8);
+  assert.equal(cardModels.filter((card) => card.spotId).length, 44);
+  assert.equal(cardModels.filter((card) => !card.spotId).length, 9);
   assert.equal(cardModels.find((card) => card.id === "card-13").spotId, "kingyoan");
   assert.equal(
     cardModels.find((card) => card.id === "card-14").spotId,
