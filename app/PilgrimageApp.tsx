@@ -656,6 +656,36 @@ export function PilgrimageApp({
     window.location.hash = hash;
   }
 
+  function navigateToMapSpot(
+    spotId: string,
+    returnSection: "spots" | "card-models",
+    cardModelId: string | null = null,
+  ) {
+    setSelectedId(spotId);
+    setSelectedCardModelId(cardModelId);
+    setMapReturnSection(returnSection);
+    navigateToPage("explore", "map");
+
+    if (window.matchMedia("(max-width: 1080px)").matches) {
+      window.setTimeout(() => {
+        const detailHeading = document.querySelector<HTMLElement>(".selected-map-detail__heading");
+        if (!detailHeading) return;
+
+        const mobileNav = document.querySelector<HTMLElement>(".mobile-nav");
+        const navIsVisible = mobileNav && window.getComputedStyle(mobileNav).display !== "none";
+        const visibleBottom = navIsVisible
+          ? mobileNav.getBoundingClientRect().top - 16
+          : window.innerHeight - 24;
+        const detailRect = detailHeading.getBoundingClientRect();
+        const scrollOffset = detailRect.bottom - visibleBottom;
+
+        if (scrollOffset > 0) {
+          window.scrollBy({ top: scrollOffset, behavior: "smooth" });
+        }
+      }, 360);
+    }
+  }
+
   const handleRouteResult = useCallback((result: RouteResult) => {
     setRouteResult(result);
     if (routeRequest && result.state === "success") {
@@ -1222,7 +1252,8 @@ export function PilgrimageApp({
               accessToken={mapboxConfig.accessToken}
               routeServiceUrl={routeServiceUrl}
             />
-            <div className="selected-map-detail">
+          </div>
+          <div className="selected-map-detail" hidden={activePage !== "explore"}>
               <div className="selected-map-detail__heading">
                 <div>
                   <small>
@@ -1273,7 +1304,6 @@ export function PilgrimageApp({
                   </div>
                 </div>
               ) : null}
-            </div>
           </div>
 
           <aside className="route-planner" aria-label="訪問するスポット" hidden={activePage !== "planner" || plannerStep !== 1}>
@@ -2077,11 +2107,7 @@ export function PilgrimageApp({
               <button
                 type="button"
                 className="spot-card__main"
-                onClick={() => {
-                  setSelectedId(spot.id);
-                  setMapReturnSection("spots");
-                  navigateToPage("explore", "map");
-                }}
+                onClick={() => navigateToMapSpot(spot.id, "spots")}
               >
                 <div className="spot-card__topline">
                   <span>{String(index + 1).padStart(2, "0")}</span>
@@ -2139,7 +2165,9 @@ export function PilgrimageApp({
                 ) : null}
                 <div className="spot-card__meta">
                   <span>{spot.accessNote}</span>
-                  <span aria-hidden="true">↗</span>
+                  <strong>
+                    地図で表示 <span aria-hidden="true">→</span>
+                  </strong>
                 </div>
               </button>
               <button
@@ -2232,12 +2260,7 @@ export function PilgrimageApp({
                 <div className="card-model__actions">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedId(card.spotId!);
-                      setSelectedCardModelId(card.id);
-                      setMapReturnSection("card-models");
-                      navigateToPage("explore", "map");
-                    }}
+                    onClick={() => navigateToMapSpot(card.spotId!, "card-models", card.id)}
                   >
                     地図で見る <span aria-hidden="true">→</span>
                   </button>

@@ -597,7 +597,7 @@ button {
   height: 560px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   background: #dfe9e6;
 }
 
@@ -913,11 +913,13 @@ button {
 
 .selected-map-detail {
   display: grid;
+  align-content: start;
   gap: 14px;
+  max-height: 660px;
   padding: 18px;
+  overflow-y: auto;
   border: 1px solid var(--line);
-  border-top: 0;
-  border-radius: 0 0 8px 8px;
+  border-radius: 8px;
   background: white;
 }
 
@@ -2647,10 +2649,30 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-top: auto;
   padding-top: 22px;
   font-size: 10px;
   font-weight: 700;
+}
+
+.spot-card__meta > strong {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.spot-card.has-image .spot-card__meta > strong {
+  color: white;
+}
+
+.selected-map-detail__heading {
+  scroll-margin-bottom: 24px;
 }
 
 .spot-card > a {
@@ -3702,6 +3724,17 @@ footer > span {
 
   .map-layout {
     grid-template-columns: 1fr;
+  }
+
+  .map-shell {
+    border-radius: 8px 8px 0 0;
+  }
+
+  .selected-map-detail {
+    max-height: none;
+    overflow-y: visible;
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
   }
 
   .route-planner {
@@ -6161,6 +6194,27 @@ footer > span {
   font-size: clamp(26px, 3vw, 38px);
 }
 
+.explore-sheet :is(.spot-filters, .card-model-filter) {
+  position: sticky;
+  z-index: 12;
+  top: 0;
+  margin-top: 0;
+  padding: 14px;
+  border: 1px solid rgba(125, 185, 196, 0.42);
+  border-radius: 0 0 10px 10px;
+  background: rgba(247, 247, 242, 0.96);
+  box-shadow: 0 14px 28px rgba(28, 43, 59, 0.1);
+  backdrop-filter: blur(16px);
+}
+
+.explore-sheet .spot-filters {
+  margin-bottom: 28px;
+}
+
+.explore-sheet .card-model-filter {
+  margin-bottom: 30px;
+}
+
 .explore-sheet :is(.spot-grid, .card-model-grid) {
   max-height: none;
   padding: 0;
@@ -6219,6 +6273,25 @@ footer > span {
 
   .explore-sheet .section-heading h2 {
     font-size: 26px;
+  }
+
+  .explore-sheet :is(.spot-filters, .card-model-filter) {
+    padding: 10px;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .explore-sheet .spot-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .explore-sheet .spot-filters label:first-child,
+  .explore-sheet .spot-filters > p {
+    grid-column: 1 / -1;
+  }
+
+  .explore-sheet .spot-filters > p {
+    padding-top: 0;
   }
 }
 
@@ -7163,6 +7236,7 @@ footer > span {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
+    scroll-margin-bottom: calc(88px + env(safe-area-inset-bottom));
   }
 
   .selected-map-detail__heading > button {
