@@ -3363,8 +3363,14 @@ button {
   position: relative;
   display: block;
   min-width: 0;
+  padding: 0;
   overflow: hidden;
+  border: 0;
   background: #e9ece9;
+  color: inherit;
+  cursor: zoom-in;
+  font: inherit;
+  text-align: left;
 }
 
 .guide-step__screen img {
@@ -3410,6 +3416,89 @@ button {
   color: rgba(255, 255, 255, 0.72);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.guide-image-modal {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  padding: 18px;
+  place-items: center;
+  background: rgba(10, 19, 31, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.guide-image-modal__dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(820px, 100%);
+  max-height: calc(100dvh - 36px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+  color: var(--ink);
+}
+
+.guide-image-modal__dialog > header {
+  display: flex;
+  min-height: 58px;
+  padding: 10px 12px 10px 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  background: white;
+}
+
+.guide-image-modal__dialog > header strong {
+  min-width: 0;
+  overflow: hidden;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-image-modal__dialog > header button {
+  display: inline-flex;
+  min-height: 38px;
+  padding: 0 14px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.guide-image-modal__dialog > header button span {
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.guide-image-modal__dialog figure {
+  display: grid;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  place-items: center;
+  background: #dfe5e5;
+}
+
+.guide-image-modal__dialog figure img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: calc(100dvh - 96px);
+  object-fit: contain;
 }
 
 .site-disclaimer {
@@ -3883,6 +3972,33 @@ footer > span {
 
   .guide-step__screens:not(.guide-step__screens--double) .guide-step__screen img {
     aspect-ratio: 5 / 6;
+  }
+
+  .guide-image-modal {
+    padding: 8px;
+  }
+
+  .guide-image-modal__dialog {
+    max-height: calc(100dvh - 16px);
+    border-radius: 9px;
+  }
+
+  .guide-image-modal__dialog > header {
+    min-height: 52px;
+    padding: 7px 8px 7px 14px;
+  }
+
+  .guide-image-modal__dialog > header strong {
+    font-size: 12px;
+  }
+
+  .guide-image-modal__dialog > header button {
+    min-height: 36px;
+    padding: 0 11px;
+  }
+
+  .guide-image-modal__dialog figure img {
+    max-height: calc(100dvh - 68px);
   }
 
   .visitor-notice {

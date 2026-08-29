@@ -73,10 +73,20 @@ test("illustrated user guide ships every referenced screenshot", async () => {
     "06-plan-check.png",
     "07-card-search.png",
   ];
+  const [app, css] = await Promise.all([
+    readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
 
   await Promise.all(
     guideImages.map((image) => access(new URL(`../public/guide/${image}`, import.meta.url))),
   );
+  assert.match(app, /setActiveGuideImage/);
+  assert.match(app, /event\.target === event\.currentTarget\) setActiveGuideImage\(null\)/);
+  assert.match(app, /event\.key === "Escape"\) setActiveGuideImage\(null\)/);
+  assert.match(app, /className="guide-image-modal"/);
+  assert.doesNotMatch(app, /href="\.\/guide\/[^\"]+" target="_blank"/);
+  assert.match(css, /\.guide-image-modal\s*\{/);
 });
 
 test("publishes the complete reviewed location lists", async () => {

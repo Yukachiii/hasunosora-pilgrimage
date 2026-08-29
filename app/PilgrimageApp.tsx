@@ -222,7 +222,9 @@ export function PilgrimageApp({
   const [isEditingItineraryOrder, setIsEditingItineraryOrder] = useState(false);
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
+  const [activeGuideImage, setActiveGuideImage] = useState<{ src: string; alt: string } | null>(null);
   const exploreSheetCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
   const visitDate = activePlannerDay.visitDate;
@@ -315,6 +317,22 @@ export function PilgrimageApp({
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [activeExplorePanel]);
+
+  useEffect(() => {
+    if (!activeGuideImage) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => guideImageCloseButtonRef.current?.focus(), 0);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActiveGuideImage(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activeGuideImage]);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -2254,11 +2272,15 @@ export function PilgrimageApp({
               <p>「探す」では、定番スポット、開催中のコラボ、地図、カードの4種類から選べます。</p>
             </div>
             <div className="guide-step__screens">
-              <a className="guide-step__screen" href="./guide/02-choose-method.png" target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                className="guide-step__screen"
+                onClick={() => setActiveGuideImage({ src: "./guide/02-choose-method.png", alt: "探し方を選ぶ画面" })}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/02-choose-method.png" alt="探し方を選ぶ画面" loading="lazy" decoding="async" />
-                <span>大きく見る ↗</span>
-              </a>
+                <span>大きく見る</span>
+              </button>
             </div>
           </article>
 
@@ -2269,16 +2291,24 @@ export function PilgrimageApp({
               <p>スポットまたはカードを開き、「予定に追加」を押します。追加した件数は下の「予定」に表示されます。</p>
             </div>
             <div className="guide-step__screens guide-step__screens--double">
-              <a className="guide-step__screen guide-step__screen--spots" href="./guide/03-add-spots.png" target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                className="guide-step__screen guide-step__screen--spots"
+                onClick={() => setActiveGuideImage({ src: "./guide/03-add-spots.png", alt: "スポット一覧から場所を選ぶ画面" })}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/03-add-spots.png" alt="スポット一覧から場所を選ぶ画面" loading="lazy" decoding="async" />
-                <span>スポット ↗</span>
-              </a>
-              <a className="guide-step__screen" href="./guide/07-card-search.png" target="_blank" rel="noreferrer">
+                <span>スポット</span>
+              </button>
+              <button
+                type="button"
+                className="guide-step__screen"
+                onClick={() => setActiveGuideImage({ src: "./guide/07-card-search.png", alt: "カードからモデル地を選ぶ画面" })}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/07-card-search.png" alt="カードからモデル地を選ぶ画面" loading="lazy" decoding="async" />
-                <span>カード ↗</span>
-              </a>
+                <span>カード</span>
+              </button>
             </div>
           </article>
 
@@ -2289,16 +2319,24 @@ export function PilgrimageApp({
               <p>「予定」で訪問順と滞在時間を調整し、移動手段、訪問日、出発時刻を設定します。</p>
             </div>
             <div className="guide-step__screens guide-step__screens--double">
-              <a className="guide-step__screen" href="./guide/04-plan-stops.png" target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                className="guide-step__screen"
+                onClick={() => setActiveGuideImage({ src: "./guide/04-plan-stops.png", alt: "訪問するスポットと滞在時間を編集する画面" })}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/04-plan-stops.png" alt="訪問するスポットと滞在時間を編集する画面" loading="lazy" decoding="async" />
-                <span>場所 ↗</span>
-              </a>
-              <a className="guide-step__screen" href="./guide/05-plan-time.png" target="_blank" rel="noreferrer">
+                <span>場所</span>
+              </button>
+              <button
+                type="button"
+                className="guide-step__screen"
+                onClick={() => setActiveGuideImage({ src: "./guide/05-plan-time.png", alt: "移動手段と訪問日時を設定する画面" })}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/05-plan-time.png" alt="移動手段と訪問日時を設定する画面" loading="lazy" decoding="async" />
-                <span>日時 ↗</span>
-              </a>
+                <span>日時</span>
+              </button>
             </div>
           </article>
 
@@ -2309,11 +2347,15 @@ export function PilgrimageApp({
               <p>内容を確認して予定を計算します。計算後は「当日」で次の訪問先、時刻、進捗を確認できます。</p>
             </div>
             <div className="guide-step__screens">
-              <a className="guide-step__screen" href="./guide/06-plan-check.png" target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                className="guide-step__screen"
+                onClick={() => setActiveGuideImage({ src: "./guide/06-plan-check.png", alt: "予定内容を確認して計算する画面" })}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/06-plan-check.png" alt="予定内容を確認して計算する画面" loading="lazy" decoding="async" />
-                <span>大きく見る ↗</span>
-              </a>
+                <span>大きく見る</span>
+              </button>
             </div>
           </article>
         </div>
@@ -2365,6 +2407,39 @@ export function PilgrimageApp({
         <span>© 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
+
+      {activeGuideImage ? (
+        <div
+          className="guide-image-modal"
+          role="presentation"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) setActiveGuideImage(null);
+          }}
+        >
+          <section
+            className="guide-image-modal__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guide-image-modal-title"
+          >
+            <header>
+              <strong id="guide-image-modal-title">{activeGuideImage.alt}</strong>
+              <button
+                type="button"
+                ref={guideImageCloseButtonRef}
+                onClick={() => setActiveGuideImage(null)}
+                aria-label="画像を閉じる"
+              >
+                閉じる <span aria-hidden="true">×</span>
+              </button>
+            </header>
+            <figure>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={activeGuideImage.src} alt={activeGuideImage.alt} />
+            </figure>
+          </section>
+        </div>
+      ) : null}
 
       {activePage === "today" ? (
         <div className="today-mode today-mode--page">
