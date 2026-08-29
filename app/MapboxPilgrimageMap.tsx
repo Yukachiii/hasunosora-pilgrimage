@@ -340,16 +340,27 @@ export function MapboxPilgrimageMap({
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
             "text-field": ["get", "indexLabel"],
-            "text-size": ["interpolate", ["linear"], ["zoom"], 6, 4, 10, 5, 14, 7],
+            "text-size": [
+              "case",
+              [">=", ["length", ["get", "indexLabel"]], 3],
+              ["interpolate", ["linear"], ["zoom"], 6, 5, 10, 7, 14, 8],
+              ["interpolate", ["linear"], ["zoom"], 6, 6, 10, 8, 14, 10],
+            ],
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-offset": [0, -3.2],
+            "text-letter-spacing": [
+              "case",
+              [">=", ["length", ["get", "indexLabel"]], 3],
+              -0.12,
+              -0.08,
+            ],
+            "text-offset": [0, -2.1],
             "text-allow-overlap": true,
             "text-ignore-placement": true,
           },
           paint: {
-            "text-color": "#ffffff",
-            "text-halo-color": "#6b3815",
-            "text-halo-width": 1.5,
+            "text-color": "#4b270e",
+            "text-halo-color": "#fffdf7",
+            "text-halo-width": 2,
           },
         });
         map.addLayer({
@@ -364,16 +375,27 @@ export function MapboxPilgrimageMap({
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
             "text-field": ["get", "indexLabel"],
-            "text-size": 8,
+            "text-size": [
+              "case",
+              [">=", ["length", ["get", "indexLabel"]], 3],
+              9,
+              11,
+            ],
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-offset": [0, -3.5],
+            "text-letter-spacing": [
+              "case",
+              [">=", ["length", ["get", "indexLabel"]], 3],
+              -0.12,
+              -0.08,
+            ],
+            "text-offset": [0, -2.55],
             "text-allow-overlap": true,
             "text-ignore-placement": true,
           },
           paint: {
-            "text-color": "#ffffff",
-            "text-halo-color": "#6b3815",
-            "text-halo-width": 1.8,
+            "text-color": "#4b270e",
+            "text-halo-color": "#fffdf7",
+            "text-halo-width": 2.2,
           },
         });
       }
@@ -574,7 +596,7 @@ export function MapboxPilgrimageMap({
               <button
                 type="button"
                 key={spot.id}
-                className={`fallback-pin fallback-pin--${markerKind}${selectedId === spot.id ? " is-active" : ""}`}
+                className={`fallback-pin fallback-pin--${markerKind}${index >= 99 ? " is-three-digits" : ""}${selectedId === spot.id ? " is-active" : ""}`}
                 style={{
                   left: `${Math.max(8, Math.min(90, x))}%`,
                   top: `${Math.max(10, Math.min(86, y))}%`,

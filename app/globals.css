@@ -713,16 +713,24 @@ button {
   width: 16px;
   height: 16px;
   place-items: center;
-  font-family: Georgia, serif;
-  font-size: 8px;
+  color: #4b270e;
+  font-family: Arial, sans-serif;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: -0.08em;
   line-height: 1;
   text-shadow:
-    -1px -1px 0 #6b3815,
-    1px -1px 0 #6b3815,
-    -1px 1px 0 #6b3815,
-    1px 1px 0 #6b3815;
+    -1px -1px 0 #fffdf7,
+    1px -1px 0 #fffdf7,
+    -1px 1px 0 #fffdf7,
+    1px 1px 0 #fffdf7,
+    0 0 2px #fffdf7;
   transform: translate(-50%, -50%);
+}
+
+.fallback-pin.is-three-digits > span {
+  font-size: 8px;
+  letter-spacing: -0.12em;
 }
 
 .fallback-pin.is-active {

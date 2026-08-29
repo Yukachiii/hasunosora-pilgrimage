@@ -198,6 +198,7 @@ test("Mapbox map and route integration stays guarded", async () => {
   assert.match(map, /"planned", GREEN_MARKER_IMAGE_ID/);
   assert.match(map, /"card", BLUE_MARKER_IMAGE_ID/);
   assert.match(map, /"collaboration", YELLOW_MARKER_IMAGE_ID/);
+  assert.match(map, /\["length", \["get", "indexLabel"\]\]/);
   await Promise.all(["red", "yellow", "blue", "green"].map((color) =>
     access(new URL(`../public/map-markers/${color}.png`, import.meta.url)),
   ));
