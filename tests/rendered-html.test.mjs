@@ -123,9 +123,9 @@ test("publishes the complete reviewed location lists", async () => {
   )));
   assert.equal(cardModels.filter((card) => card.imageUrl).length, 53);
   assert.ok(cardModels.some((card) => card.card.includes("［宇宙演舞☆うさぴょん］")));
-  assert.equal(cardModels.find((card) => card.id === "card-10").imageUrl, "./card-images/hasunosora-karuta/seras-yanagida-lilienfeld.jpg");
-  assert.equal(cardModels.find((card) => card.id === "card-11").imageUrl, "./card-images/hasunosora-karuta/katsuragi-izumi.jpg");
-  assert.equal(cardModels.find((card) => card.id === "card-06").imageUrl, "./card-images/hasunosora-karuta/fujishima-megumi.jpg");
+  assert.equal(cardModels.find((card) => card.id === "card-10").imageUrl, "./card-images/model-cards/seras-yanagida-lilienfeld.jpg");
+  assert.equal(cardModels.find((card) => card.id === "card-11").imageUrl, "./card-images/model-cards/katsuragi-izumi.jpg");
+  assert.equal(cardModels.find((card) => card.id === "card-06").imageUrl, "./card-images/model-cards/fujishima-megumi.jpg");
   await Promise.all(
     cardModels
       .filter((card) => card.imageUrl)
