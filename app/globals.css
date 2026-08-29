@@ -691,8 +691,8 @@ button {
   position: absolute;
   z-index: 2;
   display: block;
-  width: 36px;
-  height: 56px;
+  width: 22px;
+  height: 35px;
   padding: 0;
   border: 0;
   background: url("/map-markers/red.png") center / contain no-repeat;
@@ -710,11 +710,11 @@ button {
   top: 35%;
   left: 50%;
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   place-items: center;
   font-family: Georgia, serif;
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 700;
   line-height: 1;
   text-shadow:
@@ -730,7 +730,7 @@ button {
   filter:
     drop-shadow(0 0 5px rgba(255, 255, 255, 0.95))
     drop-shadow(0 8px 10px rgba(38, 52, 70, 0.38));
-  transform: translate(-50%, -100%) scale(1.24);
+  transform: translate(-50%, -100%) scale(1.2);
 }
 
 .fallback-pin--collaboration {
