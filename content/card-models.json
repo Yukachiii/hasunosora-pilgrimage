@@ -199,6 +199,7 @@
   },
   {
     "id": "card-18",
+    "imageUrl": "./card-images/model-cards/card-18.jpeg",
     "card": "［ゆのくにガールズ！］日野下花帆",
     "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
     "address": "石川県加賀市山代温泉19-49-1",
@@ -209,6 +210,7 @@
   },
   {
     "id": "card-47",
+    "imageUrl": "./card-images/model-cards/card-47.jpeg",
     "card": "［ゆのくにガールズ！］村野さやか",
     "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
     "address": "石川県加賀市山代温泉19-49-1",
@@ -219,6 +221,7 @@
   },
   {
     "id": "card-48",
+    "imageUrl": "./card-images/model-cards/card-48.jpeg",
     "card": "［ゆのくにガールズ！］大沢瑠璃乃",
     "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
     "address": "石川県加賀市山代温泉19-49-1",
@@ -229,6 +232,7 @@
   },
   {
     "id": "card-49",
+    "imageUrl": "./card-images/model-cards/card-49.jpeg",
     "card": "［ゆのくにガールズ！］藤島慈",
     "model": "ゆのくに天祥（客室・厨房・フロント・温泉）",
     "address": "石川県加賀市山代温泉19-49-1",
@@ -239,6 +243,7 @@
   },
   {
     "id": "card-19",
+    "imageUrl": "./card-images/model-cards/card-19.jpeg",
     "card": "［宇宙演舞☆うさぴょん］日野下花帆",
     "model": "ゆのくに天祥（売店・和室）",
     "address": "石川県加賀市山代温泉19-49-1",
@@ -249,6 +254,7 @@
   },
   {
     "id": "card-50",
+    "imageUrl": "./card-images/model-cards/card-50.jpeg",
     "card": "［宇宙演舞☆うさぴょん］藤島慈",
     "model": "ゆのくに天祥（売店・和室）",
     "address": "石川県加賀市山代温泉19-49-1",
@@ -259,6 +265,7 @@
   },
   {
     "id": "card-20",
+    "imageUrl": "./card-images/model-cards/card-20.jpeg",
     "card": "［月夜見海月］日野下花帆",
     "model": "のとじま水族館",
     "address": "石川県七尾市能登島曲町15部40",
@@ -269,6 +276,7 @@
   },
   {
     "id": "card-51",
+    "imageUrl": "./card-images/model-cards/card-51.jpeg",
     "card": "［月夜見海月］乙宗梢",
     "model": "のとじま水族館",
     "address": "石川県七尾市能登島曲町15部40",
@@ -290,6 +298,7 @@
   },
   {
     "id": "card-21",
+    "imageUrl": "./card-images/model-cards/card-21.jpeg",
     "card": "［太陽であれ！］村野さやか",
     "model": "北國花火2025金沢大会会場（石川県営まめだ簡易グラウンド周辺）",
     "address": "石川県金沢市大豆田本町の犀川緑地周辺（イベント会場／エリア）",
@@ -300,6 +309,7 @@
   },
   {
     "id": "card-22",
+    "imageUrl": "./card-images/model-cards/card-22.jpeg",
     "card": "［夏めきペイン］乙宗梢",
     "model": "徳光海岸",
     "address": "石川県白山市徳光町2665-1 周辺",
@@ -310,6 +320,7 @@
   },
   {
     "id": "card-23",
+    "imageUrl": "./card-images/model-cards/card-23.jpeg",
     "card": "［にゅーかまー！］大沢瑠璃乃",
     "model": "小松空港・国際線到着口付近の横断歩道",
     "address": "石川県小松市浮柳町ヨ50",
@@ -320,6 +331,7 @@
   },
   {
     "id": "card-24",
+    "imageUrl": "./card-images/model-cards/card-24.jpeg",
     "card": "［365 Days］乙宗梢",
     "model": "神田明神",
     "address": "東京都千代田区外神田2-16-2",
@@ -341,6 +353,7 @@
   },
   {
     "id": "card-25",
+    "imageUrl": "./card-images/model-cards/card-25.jpeg",
     "card": "［365 Days］夕霧綴理",
     "model": "食品サンプル専門店 佐藤サンプル",
     "address": "東京都台東区松が谷3-1-14 坂東ビル1F（現店舗）",
@@ -351,6 +364,7 @@
   },
   {
     "id": "card-26",
+    "imageUrl": "./card-images/model-cards/card-26.jpeg",
     "card": "［365 Days］藤島慈",
     "model": "ラフォーレ原宿（裏口側）",
     "address": "東京都渋谷区神宮前1-11-6",
@@ -361,6 +375,7 @@
   },
   {
     "id": "card-27",
+    "imageUrl": "./card-images/model-cards/card-27.jpeg",
     "card": "［Her-bath-rium］日野下花帆（同シリーズ修学旅行組）",
     "model": "SHIBUYA SKY",
     "address": "東京都渋谷区渋谷2-24-12 渋谷スクランブルスクエア",
@@ -371,6 +386,7 @@
   },
   {
     "id": "card-28",
+    "imageUrl": "./card-images/model-cards/card-28.jpeg",
     "card": "［ハナムスビ］日野下花帆",
     "model": "久屋大通公園（Hisaya-odori Park）",
     "address": "愛知県名古屋市中区久屋大通公園（錦3丁目周辺）",
@@ -381,6 +397,7 @@
   },
   {
     "id": "card-29",
+    "imageUrl": "./card-images/model-cards/card-29.jpeg",
     "card": "［ジョーショーキリュー］大沢瑠璃乃",
     "model": "立川駅北口",
     "address": "東京都立川市曙町2丁目",
@@ -413,6 +430,7 @@
   },
   {
     "id": "card-32",
+    "imageUrl": "./card-images/model-cards/card-32.jpeg",
     "card": "［Special Thanks］日野下花帆",
     "model": "石川県立図書館",
     "address": "石川県金沢市小立野2-43-1",
@@ -423,6 +441,7 @@
   },
   {
     "id": "card-33",
+    "imageUrl": "./card-images/model-cards/card-33.jpeg",
     "card": "［Special Thanks］乙宗梢",
     "model": "石川県立図書館",
     "address": "石川県金沢市小立野2-43-1",
@@ -433,6 +452,7 @@
   },
   {
     "id": "card-34",
+    "imageUrl": "./card-images/model-cards/card-34.jpeg",
     "card": "［青とシャボン］村野さやか",
     "model": "石川県立図書館",
     "address": "石川県金沢市小立野2-43-1",
@@ -443,6 +463,7 @@
   },
   {
     "id": "card-35",
+    "imageUrl": "./card-images/model-cards/card-35.jpeg",
     "card": "［青とシャボン］夕霧綴理",
     "model": "石川県立図書館",
     "address": "石川県金沢市小立野2-43-1",
@@ -453,6 +474,7 @@
   },
   {
     "id": "card-36",
+    "imageUrl": "./card-images/model-cards/card-36.jpeg",
     "card": "［ミルク］大沢瑠璃乃",
     "model": "石川県立図書館",
     "address": "石川県金沢市小立野2-43-1",
@@ -463,6 +485,7 @@
   },
   {
     "id": "card-37",
+    "imageUrl": "./card-images/model-cards/card-37.jpeg",
     "card": "［ミルク］藤島慈",
     "model": "石川県立図書館",
     "address": "石川県金沢市小立野2-43-1",
@@ -473,6 +496,7 @@
   },
   {
     "id": "card-38",
+    "imageUrl": "./card-images/model-cards/card-38.jpeg",
     "card": "［Pleasure Feather］乙宗梢",
     "model": "金沢蓄音器館",
     "address": "石川県金沢市尾張町2-11-21",
@@ -483,6 +507,7 @@
   },
   {
     "id": "card-39",
+    "imageUrl": "./card-images/model-cards/card-39.jpeg",
     "card": "［AWOKE］夕霧綴理",
     "model": "近江町市場 金沢おでん いっぷくや",
     "address": "石川県金沢市青草町88 近江町いちば館1F",
@@ -493,6 +518,7 @@
   },
   {
     "id": "card-40",
+    "imageUrl": "./card-images/model-cards/card-40.jpeg",
     "card": "［ユメワズライ］日野下花帆",
     "model": "卯辰山公園 見晴らし台",
     "address": "石川県金沢市末広町地内",
@@ -503,6 +529,7 @@
   },
   {
     "id": "card-41",
+    "imageUrl": "./card-images/model-cards/card-41.jpeg",
     "card": "［春風ブランコ］日野下花帆",
     "model": "茜やアーカイブギャラリー",
     "address": "石川県金沢市里見町53-1",
@@ -513,6 +540,7 @@
   },
   {
     "id": "card-42",
+    "imageUrl": "./card-images/model-cards/card-42.jpeg",
     "card": "［いつでも、いつまでも］藤島慈",
     "model": "手取フィッシュランド（大観覧車）",
     "address": "石川県能美市粟生町ツ58",
@@ -534,6 +562,7 @@
   },
   {
     "id": "card-44",
+    "imageUrl": "./card-images/model-cards/card-44.jpeg",
     "card": "［抱きしめる花びら］村野さやか",
     "model": "近江町市場（買物通り口）",
     "address": "石川県金沢市上近江町50 周辺",
