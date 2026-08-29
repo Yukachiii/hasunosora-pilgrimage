@@ -753,6 +753,21 @@ button {
   background-image: url("/map-markers/green.png");
 }
 
+@media (min-width: 1081px) {
+  .fallback-pin {
+    width: 28px;
+    height: 44px;
+  }
+
+  .fallback-pin > span {
+    font-size: 11px;
+  }
+
+  .fallback-pin.is-three-digits > span {
+    font-size: 9px;
+  }
+}
+
 .mapboxgl-ctrl-logo,
 .mapboxgl-ctrl-attrib {
   opacity: 0.78;

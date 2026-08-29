@@ -60,6 +60,42 @@ const YELLOW_MARKER_IMAGE_ID = "pilgrimage-yellow-marker";
 const BLUE_MARKER_IMAGE_ID = "pilgrimage-blue-marker";
 const GREEN_MARKER_IMAGE_ID = "pilgrimage-green-marker";
 
+function markerIconSize(desktop: boolean) {
+  const scale = desktop ? 1.25 : 1;
+  return [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    6, 0.045 * scale,
+    10, 0.07 * scale,
+    14, 0.1 * scale,
+  ] as mapboxgl.Expression;
+}
+
+function markerTextSize(desktop: boolean) {
+  const sizes = desktop
+    ? { compact: [6, 8, 9], standard: [7, 9, 11] }
+    : { compact: [5, 7, 8], standard: [6, 8, 10] };
+  const threeDigits = [">=", ["length", ["get", "indexLabel"]], 3];
+  return [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    6, ["case", threeDigits, sizes.compact[0], sizes.standard[0]],
+    10, ["case", threeDigits, sizes.compact[1], sizes.standard[1]],
+    14, ["case", threeDigits, sizes.compact[2], sizes.standard[2]],
+  ] as mapboxgl.Expression;
+}
+
+function selectedMarkerTextSize(desktop: boolean) {
+  return [
+    "case",
+    [">=", ["length", ["get", "indexLabel"]], 3],
+    desktop ? 10 : 9,
+    desktop ? 12 : 11,
+  ] as mapboxgl.Expression;
+}
+
 function ensureMapImage(map: mapboxgl.Map, id: string, url: string) {
   return new Promise<void>((resolve, reject) => {
     if (map.hasImage(id)) {
@@ -183,6 +219,7 @@ export function MapboxPilgrimageMap({
   const onSelectRef = useRef(onSelect);
   const plannedSpotIdSet = useMemo(() => new Set(plannedSpotIds), [plannedSpotIds]);
   const cardModelSpotIdSet = useMemo(() => new Set(cardModelSpotIds), [cardModelSpotIds]);
+  const [desktopMarkers, setDesktopMarkers] = useState(false);
   const [token, setToken] = useState(accessToken.trim());
   const [mapState, setMapState] = useState<"fallback" | "loading" | "ready" | "error">(
     accessToken.trim() ? "loading" : "fallback",
@@ -191,6 +228,14 @@ export function MapboxPilgrimageMap({
   useEffect(() => {
     onSelectRef.current = onSelect;
   }, [onSelect]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1081px)");
+    const updateMarkerSize = () => setDesktopMarkers(mediaQuery.matches);
+    updateMarkerSize();
+    mediaQuery.addEventListener("change", updateMarkerSize);
+    return () => mediaQuery.removeEventListener("change", updateMarkerSize);
+  }, []);
 
   useEffect(() => {
     if (accessToken.trim()) return;
@@ -320,14 +365,20 @@ export function MapboxPilgrimageMap({
         existingSource.setData(data);
       } else {
         map.addSource(SPOT_SOURCE_ID, { type: "geojson", data });
-        const markerImage = [
-          "match",
-          ["get", "markerKind"],
-          "planned", GREEN_MARKER_IMAGE_ID,
-          "card", BLUE_MARKER_IMAGE_ID,
-          "collaboration", YELLOW_MARKER_IMAGE_ID,
-          RED_MARKER_IMAGE_ID,
-        ] as mapboxgl.Expression;
+      }
+      const markerImage = [
+        "match",
+        ["get", "markerKind"],
+        "planned", GREEN_MARKER_IMAGE_ID,
+        "card", BLUE_MARKER_IMAGE_ID,
+        "collaboration", YELLOW_MARKER_IMAGE_ID,
+        RED_MARKER_IMAGE_ID,
+      ] as mapboxgl.Expression;
+
+      if (map.getLayer(SPOT_LAYER_ID)) {
+        map.setLayoutProperty(SPOT_LAYER_ID, "icon-size", markerIconSize(desktopMarkers));
+        map.setLayoutProperty(SPOT_LAYER_ID, "text-size", markerTextSize(desktopMarkers));
+      } else {
         map.addLayer({
           id: SPOT_LAYER_ID,
           type: "symbol",
@@ -335,19 +386,12 @@ export function MapboxPilgrimageMap({
           filter: ["!=", ["get", "spotId"], selectedId],
           layout: {
             "icon-image": markerImage,
-            "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.045, 10, 0.07, 14, 0.1],
+            "icon-size": markerIconSize(desktopMarkers),
             "icon-anchor": "bottom",
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
             "text-field": ["get", "indexLabel"],
-            "text-size": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              6, ["case", [">=", ["length", ["get", "indexLabel"]], 3], 5, 6],
-              10, ["case", [">=", ["length", ["get", "indexLabel"]], 3], 7, 8],
-              14, ["case", [">=", ["length", ["get", "indexLabel"]], 3], 8, 10],
-            ],
+            "text-size": markerTextSize(desktopMarkers),
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
             "text-offset": [0, -2.1],
             "text-allow-overlap": true,
@@ -359,6 +403,16 @@ export function MapboxPilgrimageMap({
             "text-halo-width": 2,
           },
         });
+      }
+
+      if (map.getLayer(SELECTED_SPOT_LAYER_ID)) {
+        map.setLayoutProperty(SELECTED_SPOT_LAYER_ID, "icon-size", desktopMarkers ? 0.16 : 0.13);
+        map.setLayoutProperty(
+          SELECTED_SPOT_LAYER_ID,
+          "text-size",
+          selectedMarkerTextSize(desktopMarkers),
+        );
+      } else {
         map.addLayer({
           id: SELECTED_SPOT_LAYER_ID,
           type: "symbol",
@@ -366,17 +420,12 @@ export function MapboxPilgrimageMap({
           filter: ["==", ["get", "spotId"], selectedId],
           layout: {
             "icon-image": markerImage,
-            "icon-size": 0.13,
+            "icon-size": desktopMarkers ? 0.16 : 0.13,
             "icon-anchor": "bottom",
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
             "text-field": ["get", "indexLabel"],
-            "text-size": [
-              "case",
-              [">=", ["length", ["get", "indexLabel"]], 3],
-              9,
-              11,
-            ],
+            "text-size": selectedMarkerTextSize(desktopMarkers),
             "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
             "text-offset": [0, -2.55],
             "text-allow-overlap": true,
@@ -405,7 +454,7 @@ export function MapboxPilgrimageMap({
         map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
       }
     };
-  }, [cardModelSpotIdSet, mapState, plannedSpotIdSet, selectedId, spots]);
+  }, [cardModelSpotIdSet, desktopMarkers, mapState, plannedSpotIdSet, selectedId, spots]);
 
   useEffect(() => {
     const map = mapRef.current;
