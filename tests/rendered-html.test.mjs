@@ -58,7 +58,25 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /すべてのキャラクター/);
   assert.match(html, /等身パネル：.*百生吟子、安養寺姫芽/);
   assert.match(html, /蓮ノ空歌留多/);
+  assert.match(html, /このサイトの使い方/);
+  assert.match(html, /02-choose-method\.png/);
+  assert.match(html, /07-card-search\.png/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
+});
+
+test("illustrated user guide ships every referenced screenshot", async () => {
+  const guideImages = [
+    "02-choose-method.png",
+    "03-add-spots.png",
+    "04-plan-stops.png",
+    "05-plan-time.png",
+    "06-plan-check.png",
+    "07-card-search.png",
+  ];
+
+  await Promise.all(
+    guideImages.map((image) => access(new URL(`../public/guide/${image}`, import.meta.url))),
+  );
 });
 
 test("publishes the complete reviewed location lists", async () => {

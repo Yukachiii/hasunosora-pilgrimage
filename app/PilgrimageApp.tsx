@@ -2239,61 +2239,88 @@ export function PilgrimageApp({
 
       <section className="guide-section" id="guide" hidden={activePage !== "guide"}>
         <div className="guide-intro">
-          <h2>使い方と巡礼時の注意</h2>
+          <span>USER GUIDE</span>
+          <h2>このサイトの使い方</h2>
           <p>
-            スポットの選択から当日の確認までの流れと、訪問時に守っていただきたい内容をまとめています。
+            下のメニューを「探す」「予定」「当日」の順に使います。画像を押すと大きく表示できます。
           </p>
         </div>
-        <div className="guide-list">
-          <article>
-            <span>01</span>
-            <div>
-              <h3>スポットを選ぶ</h3>
-              <p>「探す」で定番・コラボ・地図・カードから訪問したい場所を予定へ追加します。</p>
+
+        <div className="guide-walkthrough" aria-label="基本的な使い方">
+          <article className="guide-step">
+            <div className="guide-step__copy">
+              <span className="guide-step__number">01</span>
+              <h3>探し方を選ぶ</h3>
+              <p>「探す」では、定番スポット、開催中のコラボ、地図、カードの4種類から選べます。</p>
+            </div>
+            <div className="guide-step__screens">
+              <a className="guide-step__screen" href="./guide/02-choose-method.png" target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="./guide/02-choose-method.png" alt="探し方を選ぶ画面" loading="lazy" decoding="async" />
+                <span>大きく見る ↗</span>
+              </a>
             </div>
           </article>
-          <article>
-            <span>02</span>
-            <div>
-              <h3>予定を作る</h3>
-              <p>「予定」で訪問順、滞在時間、訪問日と出発時刻を設定し、移動時間を計算します。</p>
+
+          <article className="guide-step">
+            <div className="guide-step__copy">
+              <span className="guide-step__number">02</span>
+              <h3>行きたい場所を追加する</h3>
+              <p>スポットまたはカードを開き、「予定に追加」を押します。追加した件数は下の「予定」に表示されます。</p>
+            </div>
+            <div className="guide-step__screens guide-step__screens--double">
+              <a className="guide-step__screen guide-step__screen--spots" href="./guide/03-add-spots.png" target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="./guide/03-add-spots.png" alt="スポット一覧から場所を選ぶ画面" loading="lazy" decoding="async" />
+                <span>スポット ↗</span>
+              </a>
+              <a className="guide-step__screen" href="./guide/07-card-search.png" target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="./guide/07-card-search.png" alt="カードからモデル地を選ぶ画面" loading="lazy" decoding="async" />
+                <span>カード ↗</span>
+              </a>
             </div>
           </article>
-          <article>
-            <span>03</span>
-            <div>
-              <h3>当日に確認する</h3>
-              <p>作成した予定は「当日」で順番に確認できます。進捗と時刻補正はこの端末に保存されます。</p>
+
+          <article className="guide-step">
+            <div className="guide-step__copy">
+              <span className="guide-step__number">03</span>
+              <h3>場所と日時を整える</h3>
+              <p>「予定」で訪問順と滞在時間を調整し、移動手段、訪問日、出発時刻を設定します。</p>
+            </div>
+            <div className="guide-step__screens guide-step__screens--double">
+              <a className="guide-step__screen" href="./guide/04-plan-stops.png" target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="./guide/04-plan-stops.png" alt="訪問するスポットと滞在時間を編集する画面" loading="lazy" decoding="async" />
+                <span>場所 ↗</span>
+              </a>
+              <a className="guide-step__screen" href="./guide/05-plan-time.png" target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="./guide/05-plan-time.png" alt="移動手段と訪問日時を設定する画面" loading="lazy" decoding="async" />
+                <span>日時 ↗</span>
+              </a>
             </div>
           </article>
-          <article>
-            <span>04</span>
-            <div>
-              <h3>通行を優先する</h3>
-              <p>
-                撮影のために道をふさいだり、私有地へ入ったりしないでください。
-              </p>
+
+          <article className="guide-step">
+            <div className="guide-step__copy">
+              <span className="guide-step__number">04</span>
+              <h3>計算して当日に使う</h3>
+              <p>内容を確認して予定を計算します。計算後は「当日」で次の訪問先、時刻、進捗を確認できます。</p>
             </div>
-          </article>
-          <article>
-            <span>05</span>
-            <div>
-              <h3>撮影前に確認する</h3>
-              <p>
-                店内や施設では撮影ルールを確認し、人物の写り込みにも配慮しましょう。
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>06</span>
-            <div>
-              <h3>最新情報を確かめる</h3>
-              <p>
-                営業時間・交通・天候は変わります。出発前に公式情報を確認してください。
-              </p>
+            <div className="guide-step__screens">
+              <a className="guide-step__screen" href="./guide/06-plan-check.png" target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="./guide/06-plan-check.png" alt="予定内容を確認して計算する画面" loading="lazy" decoding="async" />
+                <span>大きく見る ↗</span>
+              </a>
             </div>
           </article>
         </div>
+
+        <p className="guide-source-note">
+          画面内のカード画像：<a href="https://www.lovelive-anime.jp/hasunosora/" target="_blank" rel="noreferrer">『Link！Like！ラブライブ！』</a>
+        </p>
       </section>
 
       <section className="site-disclaimer" id="site-notice" aria-labelledby="site-notice-title" hidden={activePage !== "guide"}>
