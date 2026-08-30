@@ -209,6 +209,7 @@ export function PilgrimageApp({
     result: RouteResult;
   }>>({});
   const [spotQuery, setSpotQuery] = useState("");
+  const [isSpotFilterExpanded, setIsSpotFilterExpanded] = useState(false);
   const [mapSearchQuery, setMapSearchQuery] = useState("");
   const [selectedCardModelId, setSelectedCardModelId] = useState<string | null>(null);
   const [areaFilter, setAreaFilter] = useState("すべて");
@@ -227,6 +228,7 @@ export function PilgrimageApp({
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
   const [activeGuideImage, setActiveGuideImage] = useState<{ src: string; alt: string } | null>(null);
   const exploreSheetCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const exploreSheetSwipeStartYRef = useRef<number | null>(null);
   const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
@@ -2030,17 +2032,40 @@ export function PilgrimageApp({
             aria-modal="true"
             aria-labelledby="explore-sheet-title"
           >
-            <div className="explore-sheet__handle" aria-hidden="true" />
-            <header className="explore-sheet__header">
-              <strong id="explore-sheet-title">探す</strong>
-              <button
-                type="button"
-                ref={exploreSheetCloseButtonRef}
-                onClick={() => setActiveExplorePanel(null)}
-              >
-                閉じる <span aria-hidden="true">×</span>
-              </button>
-            </header>
+            <div
+              className="explore-sheet__grab-zone"
+              onPointerDown={(event) => {
+                exploreSheetSwipeStartYRef.current = event.clientY;
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerUp={(event) => {
+                const startY = exploreSheetSwipeStartYRef.current;
+                exploreSheetSwipeStartYRef.current = null;
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+                if (startY !== null && event.clientY - startY >= 72) {
+                  setActiveExplorePanel(null);
+                }
+              }}
+              onPointerCancel={() => {
+                exploreSheetSwipeStartYRef.current = null;
+              }}
+            >
+              <div className="explore-sheet__handle" aria-hidden="true" />
+              <header className="explore-sheet__header">
+                <strong id="explore-sheet-title">探す</strong>
+                <button
+                  type="button"
+                  ref={exploreSheetCloseButtonRef}
+                  aria-label="閉じる"
+                  title="閉じる"
+                  onClick={() => setActiveExplorePanel(null)}
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              </header>
+            </div>
             <nav className="explore-sheet__tabs" role="tablist" aria-label="一覧を切り替える">
               <button
                 type="button"
@@ -2072,7 +2097,7 @@ export function PilgrimageApp({
         </div>
 
         <div className="spot-filters" aria-label="スポットの絞り込み">
-          <label>
+          <label className="spot-filters__query">
             <span>キーワード</span>
             <input
               type="search"
@@ -2081,25 +2106,40 @@ export function PilgrimageApp({
               placeholder="施設名・住所・登場回で検索"
             />
           </label>
-          <label>
-            <span>エリア</span>
-            <select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}>
-              <option>すべて</option>
-              {areas.map((area) => <option key={area}>{area}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>コラボ</span>
-            <select
-              value={collaborationFilter}
-              onChange={(event) => setCollaborationFilter(event.target.value as CollaborationId | "すべて")}
-            >
-              <option value="すべて">すべて</option>
-              {collaborations.map((collaboration) => (
-                <option value={collaboration.id} key={collaboration.id}>{collaboration.name}</option>
-              ))}
-            </select>
-          </label>
+          <button
+            type="button"
+            className={`spot-filters__toggle${areaFilter !== "すべて" || collaborationFilter !== "すべて" ? " is-active" : ""}`}
+            aria-expanded={isSpotFilterExpanded}
+            aria-controls="spot-advanced-filters"
+            onClick={() => setIsSpotFilterExpanded((current) => !current)}
+          >
+            <span>{isSpotFilterExpanded ? "閉じる" : "絞り込み"}</span>
+            <small>{filteredSpots.length}件</small>
+          </button>
+          <div
+            className={`spot-filters__advanced${isSpotFilterExpanded ? " is-expanded" : ""}`}
+            id="spot-advanced-filters"
+          >
+            <label>
+              <span>エリア</span>
+              <select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}>
+                <option>すべて</option>
+                {areas.map((area) => <option key={area}>{area}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>コラボ</span>
+              <select
+                value={collaborationFilter}
+                onChange={(event) => setCollaborationFilter(event.target.value as CollaborationId | "すべて")}
+              >
+                <option value="すべて">すべて</option>
+                {collaborations.map((collaboration) => (
+                  <option value={collaboration.id} key={collaboration.id}>{collaboration.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <p><strong>{filteredSpots.length}</strong> / {spots.length} SPOTS</p>
         </div>
 
