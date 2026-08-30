@@ -511,6 +511,9 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.doesNotMatch(app, /LOCAL SAVE/);
   assert.doesNotMatch(app, /旅程をこの端末に保存/);
   assert.match(app, /スマートフォン用メニュー/);
+  assert.match(app, /mobile-nav--explore/);
+  assert.match(app, /aria-pressed=\{activeExplorePanel === "spots"\}/);
+  assert.match(app, /aria-pressed=\{activeExplorePanel === "card-models"\}/);
   assert.match(app, /isEditingItineraryOrder/);
   assert.match(app, /順序を変更/);
   assert.match(app, /className="transit-search-panel"/);
@@ -541,6 +544,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.spot-card__hours/);
   assert.match(css, /Public page: touch-first layout/);
   assert.match(css, /\.mobile-nav/);
+  assert.match(css, /\.mobile-nav--explore\s*\{[^}]*grid-template-columns:\s*repeat\(6,/s);
   assert.match(css, /\.transit-search-panel__confirmed/);
   assert.match(css, /\.transit-search-panel__progress/);
   assert.match(css, /\.map-layout\s*\{[^}]*align-items:\s*stretch/s);

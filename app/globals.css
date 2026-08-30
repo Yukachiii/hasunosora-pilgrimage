@@ -4264,21 +4264,35 @@ footer > span {
     backdrop-filter: blur(16px);
   }
 
-  .mobile-nav a {
+  .mobile-nav--explore {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .mobile-nav :is(a, button) {
     display: grid;
     min-height: 54px;
     place-items: center;
     align-content: center;
     gap: 2px;
+    padding: 0;
+    border: 0;
     border-radius: 9px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
     font-size: 11px;
     font-weight: 800;
+    cursor: pointer;
   }
 
-  .mobile-nav a:active,
-  .mobile-nav a:focus-visible {
+  .mobile-nav :is(a, button):active,
+  .mobile-nav :is(a, button):focus-visible {
     background: rgba(125, 185, 196, 0.28);
     outline: none;
+  }
+
+  .mobile-nav--explore :is(a, button) {
+    font-size: 9px;
   }
 
   .mobile-nav small {
@@ -7259,15 +7273,15 @@ footer > span {
     display: grid;
   }
 
-  .mobile-nav a[aria-current="page"] {
+  .mobile-nav :is(a[aria-current="page"], button[aria-pressed="true"]) {
     background: rgba(125, 185, 196, 0.3);
   }
 
-  .mobile-nav a {
+  .mobile-nav :is(a, button) {
     position: relative;
   }
 
-  .mobile-nav a b {
+  .mobile-nav :is(a, button) b {
     position: absolute;
     top: 4px;
     right: 9px;

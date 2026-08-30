@@ -1017,7 +1017,28 @@ export function PilgrimageApp({
         </a>
       </header>
 
-      <nav className="mobile-nav" aria-label="スマートフォン用メニュー">
+      <nav
+        className={`mobile-nav${activePage === "explore" ? " mobile-nav--explore" : ""}`}
+        aria-label="スマートフォン用メニュー"
+      >
+        {activePage === "explore" ? (
+          <>
+            <button
+              type="button"
+              aria-pressed={activeExplorePanel === "spots"}
+              onClick={() => setActiveExplorePanel("spots")}
+            >
+              <span>スポット</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={activeExplorePanel === "card-models"}
+              onClick={() => setActiveExplorePanel("card-models")}
+            >
+              <span>カード</span>
+            </button>
+          </>
+        ) : null}
         {(Object.keys(appPageLabels) as AppPage[]).map((page) => (
           <a
             href={`#/${page}`}
