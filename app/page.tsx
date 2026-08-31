@@ -41,6 +41,8 @@ export default async function Home() {
     // Local tests and the first deployment can run before D1 is available.
   }
 
+  heroImage ??= "/photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp";
+
   return (
     <PilgrimageApp
       mapboxConfig={mapboxConfig}

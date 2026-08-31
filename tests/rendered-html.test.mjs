@@ -38,7 +38,8 @@ test("server-renders the pilgrimage MVP", async () => {
   const html = await response.text();
   assert.match(html, /蓮ノ旅/);
   assert.doesNotMatch(html, /好きな物語と|同じ景色/);
-  assert.match(html, /hero-title-space/);
+  assert.match(html, /hero--magazine/);
+  assert.match(html, /hero-magazine-number/);
   assert.match(html, /スポットを地図から探す/);
   assert.match(html, /コラボ/);
   assert.match(html, /おいでよ！石川大観光Ⅱ/);
@@ -49,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 1\.0/);
+  assert.match(html, /Ver\. 1\.0\.0/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
@@ -574,7 +575,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /className="today-mode__tools"/);
   assert.doesNotMatch(app, /className="selection-tray"/);
   assert.doesNotMatch(app, /同意画面をもう一度確認する/);
-  assert.match(app, /className="hero-stats"/);
+  assert.match(app, /className="hero-magazine-rule"/);
   assert.match(app, /端末内の保存と外部サービス/);
   assert.match(app, /運営者のサーバーには保存されず/);
   assert.match(app, /非公式ファンサイト/);
@@ -585,6 +586,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /activeExplorePanel/);
   assert.match(app, /className=\{`explore-sheet\$\{isExploreSheetClosing/);
   assert.match(app, /aria-label="一覧を切り替える"/);
+  assert.match(app, /spotSourceFilter/);
+  assert.match(app, /With×MEETS/);
   assert.match(app, /className="explore-sheet__grab-zone"/);
   assert.match(app, /event\.clientY - startY >= 72/);
   assert.match(app, /aria-label="閉じる"/);
@@ -616,6 +619,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /animation:\s*mobile-explore-picker-grow/);
   assert.match(css, /\.explore-sheet\.is-closing \.explore-sheet__panel/);
   assert.match(css, /@keyframes explore-sheet-exit/);
+  assert.match(css, /@keyframes explore-sheet-content-enter/);
   assert.match(css, /button\[aria-current="page"\]/);
   assert.match(css, /\.transit-search-panel__confirmed/);
   assert.match(css, /\.transit-search-panel__progress/);
@@ -656,7 +660,7 @@ test("Mapbox is the main map and the comparison version is removed", async () =>
   assert.doesNotMatch(pagesConfig, /github-pages\/mapbox\/index\.html/);
   assert.match(envExample, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
   assert.match(workflow, /MAPBOX_ACCESS_TOKEN/);
-  assert.match(app, /MAP BY MAPBOX/);
+  assert.match(app, /MapboxPilgrimageMap/);
   assert.match(app, /id="map-freeword-search"/);
   assert.match(app, /この場所に関連するカード/);
   assert.doesNotMatch(app, /Mapbox比較版|href="\.\/mapbox\//);

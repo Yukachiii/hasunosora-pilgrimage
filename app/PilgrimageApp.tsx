@@ -57,6 +57,7 @@ const CARD_MODEL_SPOT_IDS = Array.from(new Set(
 
 type AppPage = "explore" | "planner" | "today" | "guide";
 type ExplorePanel = "spots" | "card-models";
+type SpotSourceFilter = "すべて" | "activity-records" | "sehas" | "with-meets";
 
 const appPageLabels: Record<AppPage, string> = {
   explore: "探す",
@@ -214,6 +215,7 @@ export function PilgrimageApp({
   const [selectedCardModelId, setSelectedCardModelId] = useState<string | null>(null);
   const [areaFilter, setAreaFilter] = useState("すべて");
   const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
+  const [spotSourceFilter, setSpotSourceFilter] = useState<SpotSourceFilter>("すべて");
   const [itineraryCollaborationId, setItineraryCollaborationId] = useState<CollaborationId | "">("");
   const [cardCharacterFilter, setCardCharacterFilter] = useState<CardCharacter | "すべて">("すべて");
   const [hasRestoredPlannerStorage, setHasRestoredPlannerStorage] = useState(false);
@@ -473,6 +475,9 @@ export function PilgrimageApp({
         collaborationFilter !== "すべて" &&
         !spot.collaborationIds?.includes(collaborationFilter)
       ) return false;
+      if (spotSourceFilter === "activity-records" && !spot.activityRecords?.length) return false;
+      if (spotSourceFilter === "sehas" && !spot.sehasEpisodes?.length) return false;
+      if (spotSourceFilter === "with-meets" && !spot.withMeetsEpisodes?.length) return false;
       if (!normalizedQuery) return true;
       return [
         spot.name,
@@ -491,7 +496,7 @@ export function PilgrimageApp({
         ]),
       ].some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
     });
-  }, [areaFilter, collaborationFilter, spotQuery, spots]);
+  }, [areaFilter, collaborationFilter, spotQuery, spotSourceFilter, spots]);
   const filteredCardModels = useMemo(
     () => cardModels.filter((card) =>
       cardCharacterFilter === "すべて" || card.characters.includes(cardCharacterFilter),
@@ -1134,7 +1139,7 @@ export function PilgrimageApp({
       </nav>
 
       <section
-        className={`hero${heroImage ? " has-managed-image" : ""}`}
+        className={`hero hero--magazine${heroImage ? " has-managed-image" : ""}`}
         id="top"
         hidden={activePage !== "explore"}
         style={
@@ -1143,55 +1148,33 @@ export function PilgrimageApp({
             : undefined
         }
       >
-        <div className="hero-orb hero-orb--one" />
-        <div className="hero-orb hero-orb--two" />
-        <div className="hero-copy">
-          <div className="eyebrow">
-            ISHIKAWA · KANAZAWA
+        <div className="hero-magazine-grid" aria-hidden="true" />
+        <div className="hero-magazine-number" aria-hidden="true">01</div>
+        <div className="hero-copy hero-magazine-copy">
+          <div className="eyebrow">ISHIKAWA / KANAZAWA</div>
+          <p className="hero-kicker">蓮ノ空女学院<br />スクールアイドルクラブ</p>
+          <div className="hero-magazine-rule" aria-label={`${spots.length}スポット、${areas.length}エリア`}>
+            <span>{spots.length} SPOTS</span>
+            <span>{areas.length} AREAS</span>
           </div>
-          <p className="hero-kicker">蓮ノ空女学院スクールアイドルクラブ</p>
-          <h1 className="hero-title-space" aria-hidden="true" />
           <p className="hero-lead">
             作品に関連するスポットを検索し、訪問予定を作成できます。
           </p>
-          <div className="hero-actions">
-            <a className="primary-button" href="#/explore/explore-menu" onClick={(event) => { event.preventDefault(); navigateToPage("explore", "explore-menu"); }}>
-              探し方を選ぶ
+          <div className="hero-actions hero-magazine-actions">
+            <a href="#/explore/explore-menu" onClick={(event) => { event.preventDefault(); navigateToPage("explore", "explore-menu"); }}>
+              <small>01</small>
+              <strong>探し方を選ぶ</strong>
               <span aria-hidden="true">↓</span>
             </a>
-            <a className="text-link" href="#/explore/spots" onClick={(event) => { event.preventDefault(); navigateToPage("explore", "spots"); }}>
-              スポット一覧（{spots.length}件）
+            <a href="#/explore/spots" onClick={(event) => { event.preventDefault(); navigateToPage("explore", "spots"); }}>
+              <small>02</small>
+              <strong>スポット一覧</strong>
               <span aria-hidden="true">→</span>
             </a>
           </div>
         </div>
-        <div className="hero-visual" aria-hidden="true">
-          <div className="hero-date">
-            <span>JOURNEY</span>
-            <strong>01</strong>
-          </div>
-          <div className="lotus lotus--one" />
-          <div className="lotus lotus--two" />
-          <div className="hero-place-card">
-            <small>START FROM</small>
-            <strong>KANAZAWA</strong>
-            <span>36.5781° N · 136.6481° E</span>
-          </div>
-          <div className="vertical-copy">{spots.length} REGISTERED SPOTS</div>
-        </div>
-        <div className="hero-stats">
-          <div>
-            <strong>{spots.length}</strong>
-            <span>SPOTS</span>
-          </div>
-          <div>
-            <strong>{areas.length}</strong>
-            <span>AREAS</span>
-          </div>
-          <div>
-            <strong>ROUTE</strong>
-            <span>MAP BY MAPBOX</span>
-          </div>
+        <div className="hero-magazine-side" aria-hidden="true">
+          HASUNOSORA PILGRIMAGE · VER. 1.0.0
         </div>
       </section>
 
@@ -2112,10 +2095,19 @@ export function PilgrimageApp({
             aria-labelledby="explore-sheet-title"
           >
             <div
-              className="explore-sheet__grab-zone"
+              className="explore-sheet__swipe-zone"
               onPointerDown={(event) => {
                 exploreSheetSwipeStartYRef.current = event.clientY;
-                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                const startY = exploreSheetSwipeStartYRef.current;
+                if (
+                  startY !== null &&
+                  Math.abs(event.clientY - startY) >= 8 &&
+                  !event.currentTarget.hasPointerCapture(event.pointerId)
+                ) {
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }
               }}
               onPointerUp={(event) => {
                 const startY = exploreSheetSwipeStartYRef.current;
@@ -2131,38 +2123,40 @@ export function PilgrimageApp({
                 exploreSheetSwipeStartYRef.current = null;
               }}
             >
-              <div className="explore-sheet__handle" aria-hidden="true" />
-              <header className="explore-sheet__header">
-                <strong id="explore-sheet-title">探す</strong>
+              <div className="explore-sheet__grab-zone">
+                <div className="explore-sheet__handle" aria-hidden="true" />
+                <header className="explore-sheet__header">
+                  <strong id="explore-sheet-title">探す</strong>
+                  <button
+                    type="button"
+                    ref={exploreSheetCloseButtonRef}
+                    aria-label="閉じる"
+                    title="閉じる"
+                    onClick={closeExplorePanel}
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </header>
+              </div>
+              <nav className="explore-sheet__tabs" role="tablist" aria-label="一覧を切り替える">
                 <button
                   type="button"
-                  ref={exploreSheetCloseButtonRef}
-                  aria-label="閉じる"
-                  title="閉じる"
-                  onClick={closeExplorePanel}
+                  role="tab"
+                  aria-selected={activeExplorePanel === "spots"}
+                  onClick={() => navigateToPage("explore", "spots")}
                 >
-                  <span aria-hidden="true">×</span>
+                  スポット <small>{spots.length}</small>
                 </button>
-              </header>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeExplorePanel === "card-models"}
+                  onClick={() => navigateToPage("explore", "card-models")}
+                >
+                  カード <small>{cardModels.length}</small>
+                </button>
+              </nav>
             </div>
-            <nav className="explore-sheet__tabs" role="tablist" aria-label="一覧を切り替える">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeExplorePanel === "spots"}
-                onClick={() => setActiveExplorePanel("spots")}
-              >
-                スポット <small>{spots.length}</small>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeExplorePanel === "card-models"}
-                onClick={() => setActiveExplorePanel("card-models")}
-              >
-                カード <small>{cardModels.length}</small>
-              </button>
-            </nav>
             <div className="explore-sheet__body">
       <section className="spots-section" id="spots" hidden={activeExplorePanel !== "spots"}>
         <div className="section-heading">
@@ -2187,7 +2181,7 @@ export function PilgrimageApp({
           </label>
           <button
             type="button"
-            className={`spot-filters__toggle${areaFilter !== "すべて" || collaborationFilter !== "すべて" ? " is-active" : ""}`}
+            className={`spot-filters__toggle${areaFilter !== "すべて" || collaborationFilter !== "すべて" || spotSourceFilter !== "すべて" ? " is-active" : ""}`}
             aria-expanded={isSpotFilterExpanded}
             aria-controls="spot-advanced-filters"
             onClick={() => setIsSpotFilterExpanded((current) => !current)}
@@ -2216,6 +2210,18 @@ export function PilgrimageApp({
                 {collaborations.map((collaboration) => (
                   <option value={collaboration.id} key={collaboration.id}>{collaboration.name}</option>
                 ))}
+              </select>
+            </label>
+            <label>
+              <span>出典</span>
+              <select
+                value={spotSourceFilter}
+                onChange={(event) => setSpotSourceFilter(event.target.value as SpotSourceFilter)}
+              >
+                <option value="すべて">すべて</option>
+                <option value="sehas">せーはす！</option>
+                <option value="activity-records">活動記録</option>
+                <option value="with-meets">With×MEETS</option>
               </select>
             </label>
           </div>
@@ -2609,7 +2615,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 1.0 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 1.0.0 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
