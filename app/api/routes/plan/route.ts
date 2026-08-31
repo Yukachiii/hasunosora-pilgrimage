@@ -339,6 +339,14 @@ async function buildRoutePlan(
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new RoutePlanError("ルート検索がタイムアウトしました。", 504, "TIMEOUT");
     }
+    if (!(error instanceof RoutePlanError)) {
+      console.error("Google Routes request failed", error);
+      throw new RoutePlanError(
+        "Google Mapsとの通信に失敗しました。",
+        502,
+        "ROUTES_UNAVAILABLE",
+      );
+    }
     throw error;
   } finally {
     clearTimeout(timeout);

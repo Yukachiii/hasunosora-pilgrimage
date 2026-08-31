@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 1\.0\.0/);
+  assert.match(html, /Ver\. 1\.0\.1/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
@@ -198,7 +198,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "1.0.0");
+  assert.equal(JSON.parse(packageJson).version, "1.0.1");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -239,6 +239,7 @@ test("Mapbox map and route integration stays guarded", async () => {
   assert.match(map, /optimized-trips\/v1/);
   assert.match(map, /directions\/v5/);
   assert.match(map, /optimizeWaypointOrder/);
+  assert.match(map, /serverResponse\.status === 404 \|\| serverResponse\.status >= 500/);
   assert.match(map, /"planned", GREEN_MARKER_IMAGE_ID/);
   assert.match(map, /"card", BLUE_MARKER_IMAGE_ID/);
   assert.match(map, /"collaboration", YELLOW_MARKER_IMAGE_ID/);
@@ -312,6 +313,7 @@ test("server route planner validates requests before using Google Routes", async
   assert.match(routeApi, /departureTime: cursor\.toISOString\(\)/);
   assert.match(routeApi, /maximumItineraryStops/);
   assert.match(routeApi, /recordRouteApiUsage/);
+  assert.match(routeApi, /Google Mapsとの通信に失敗しました/);
   assert.match(usageStore, /INSERT INTO route_api_usage/);
   assert.doesNotMatch(usageStore, /connecting-ip|x-forwarded-for|spotIds|sourceStationId/);
   assert.match(map, /source: "server"/);

@@ -518,7 +518,10 @@ export function MapboxPilgrimageMap({
             return;
           }
 
-          if (serverResponse && ![404, 503].includes(serverResponse.status)) {
+          const shouldFallbackToMapbox = serverResponse && (
+            serverResponse.status === 404 || serverResponse.status >= 500
+          );
+          if (serverResponse && !shouldFallbackToMapbox) {
             const result = await serverResponse.json().catch(() => ({})) as ServerRoutePlanError;
             throw new Error(result.error || "ルートを計算できませんでした。");
           }
