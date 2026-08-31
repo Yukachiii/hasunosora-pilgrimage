@@ -2517,7 +2517,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: -15px 0 16px;
+  margin: 12px 0 0;
 }
 
 .spot-card__collaborations > span {
@@ -4583,7 +4583,7 @@ footer > span {
 
   .spot-card__collaborations {
     gap: 4px;
-    margin: -3px 0 10px;
+    margin-top: 10px;
   }
 
   .spot-card__collaborations > span {

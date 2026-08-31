@@ -2181,22 +2181,6 @@ export function PilgrimageApp({
                     {spot.area} · {spot.category}
                   </small>
                 </div>
-                {spotCollaborations.length ? (
-                  <div className="spot-card__collaborations">
-                    {spotCollaborations.map(({ collaboration, role, members }) => (
-                      <span key={collaboration.id}>
-                        <b>コラボ</b>
-                        {collaboration.name}
-                        {role ? <small>{role}</small> : null}
-                        {members?.length ? (
-                          <small className="spot-card__panel-members">
-                            等身パネル：{members.join("、")}
-                          </small>
-                        ) : null}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
                 <h3>{spot.name}</h3>
                 <p>{spot.description}</p>
                 <div className={`spot-card__hours${spot.openingTime && spot.closingTime ? " is-known" : ""}`}>
@@ -2221,6 +2205,22 @@ export function PilgrimageApp({
                       </div>
                     ) : null}
                   </dl>
+                ) : null}
+                {spotCollaborations.length ? (
+                  <div className="spot-card__collaborations">
+                    {spotCollaborations.map(({ collaboration, role, members }) => (
+                      <span key={collaboration.id}>
+                        <b>コラボ</b>
+                        {collaboration.name}
+                        {role ? <small>{role}</small> : null}
+                        {members?.length ? (
+                          <small className="spot-card__panel-members">
+                            等身パネル：{members.join("、")}
+                          </small>
+                        ) : null}
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
                 {spot.appearances?.length ? (
                   <div className="spot-card__appearances">
