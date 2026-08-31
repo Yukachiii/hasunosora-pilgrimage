@@ -3674,6 +3674,32 @@ button {
   font-size: 10px;
 }
 
+.site-data-note {
+  margin-top: 28px;
+  padding: 22px 24px;
+  border: 1px solid rgba(31, 43, 59, 0.12);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.site-data-note h3 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.site-data-note p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+.site-data-note p + p {
+  margin-top: 8px;
+}
+
 footer {
   display: grid;
   grid-template-columns: 1fr 1.5fr auto;
@@ -4306,6 +4332,10 @@ footer > span {
     grid-template-columns: 1fr;
     gap: 34px;
     padding: 64px 24px;
+  }
+
+  .site-data-note {
+    padding: 18px;
   }
 
   footer {

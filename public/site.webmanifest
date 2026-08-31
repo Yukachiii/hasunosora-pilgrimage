@@ -1,0 +1,19 @@
+{
+  "name": "蓮ノ旅｜蓮ノ空・金沢 聖地巡礼ガイド",
+  "short_name": "蓮ノ旅",
+  "description": "蓮ノ空・金沢の舞台をめぐる、非公式の聖地巡礼ガイド。",
+  "lang": "ja",
+  "start_url": "/hasunosora-pilgrimage/",
+  "scope": "/hasunosora-pilgrimage/",
+  "display": "standalone",
+  "background_color": "#f7f7f2",
+  "theme_color": "#1f2b3b",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

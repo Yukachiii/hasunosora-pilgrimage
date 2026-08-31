@@ -47,6 +47,22 @@ npm.cmd run build:pages
 
 Mapboxの公開トークンは、GitHub ActionsのSecret `MAPBOX_ACCESS_TOKEN` からビルド時に設定します。トークンは公開ページのURLだけを許可するサイト専用トークンにしてください。
 
+### 公開前の最終確認
+
+```powershell
+npm.cmd run lint
+npm.cmd test
+npm.cmd run build:admin
+npm.cmd run build:pages
+git diff --check
+```
+
+- GitHub ActionsのSecret `MAPBOX_ACCESS_TOKEN` が設定され、公開URLだけを許可している
+- 必要な場合だけ `ROUTE_API_URL` を設定し、許可Originを公開サイトへ限定している
+- `.env.local` と `.env.pages.local` がGitの追跡対象に入っていない
+- 公開サイトで地図、スポット・カード一覧、予定作成、当日表示、ガイドをスマートフォンとPCの両方で確認する
+- SNSへURLを貼り、タイトル・説明・OG画像が表示されることを確認する
+
 ## サーバー側ルート検索
 
 サーバー版では `/api/routes/plan` がルート条件を検証し、専用の

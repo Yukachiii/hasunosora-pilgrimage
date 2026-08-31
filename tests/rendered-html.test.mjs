@@ -201,6 +201,27 @@ test("starter preview is fully replaced", async () => {
   await access(new URL("../public/og.png", import.meta.url));
 });
 
+test("GitHub Pages ships public release metadata", async () => {
+  const [index, robots, sitemap, manifestRaw] = await Promise.all([
+    readFile(new URL("../github-pages/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/robots.txt", import.meta.url), "utf8"),
+    readFile(new URL("../public/sitemap.xml", import.meta.url), "utf8"),
+    readFile(new URL("../public/site.webmanifest", import.meta.url), "utf8"),
+  ]);
+  const manifest = JSON.parse(manifestRaw);
+
+  assert.match(index, /rel="canonical" href="https:\/\/yukachiii\.github\.io\/hasunosora-pilgrimage\/"/);
+  assert.match(index, /property="og:image"/);
+  assert.match(index, /name="twitter:card" content="summary_large_image"/);
+  assert.match(index, /%BASE_URL%favicon\.svg/);
+  assert.match(index, /%BASE_URL%site\.webmanifest/);
+  assert.match(robots, /Sitemap: https:\/\/yukachiii\.github\.io\/hasunosora-pilgrimage\/sitemap\.xml/);
+  assert.match(sitemap, /<loc>https:\/\/yukachiii\.github\.io\/hasunosora-pilgrimage\/<\/loc>/);
+  assert.equal(manifest.start_url, "/hasunosora-pilgrimage/");
+  assert.equal(manifest.short_name, "蓮ノ旅");
+  await access(new URL("../public/favicon.svg", import.meta.url));
+});
+
 test("Mapbox map and route integration stays guarded", async () => {
   const [page, map, css] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -552,6 +573,10 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.doesNotMatch(app, /className="selection-tray"/);
   assert.doesNotMatch(app, /同意画面をもう一度確認する/);
   assert.match(app, /className="hero-stats"/);
+  assert.match(app, /端末内の保存と外部サービス/);
+  assert.match(app, /運営者のサーバーには保存されず/);
+  assert.match(app, /非公式ファンサイト/);
+  assert.doesNotMatch(app, /非公式の試作サイト/);
   assert.match(app, /mapReturnSection/);
   assert.match(app, /スポット一覧へ戻る/);
   assert.match(app, /カードモデル地へ戻る/);

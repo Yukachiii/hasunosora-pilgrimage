@@ -2581,6 +2581,18 @@ export function PilgrimageApp({
               安全確認と最終的な判断は利用者ご自身でお願いいたします。
             </li>
           </ul>
+          <div className="site-data-note" aria-labelledby="site-data-note-title">
+            <h3 id="site-data-note-title">端末内の保存と外部サービス</h3>
+            <p>
+              利用前確認と作成した予定は、この端末のブラウザ（Cookie・localStorage）に保存されます。
+              運営者のサーバーには保存されず、ブラウザのデータを削除すると消去されます。
+            </p>
+            <p>
+              地図の表示・ルート作成では、表示範囲や選択した地点などがMapboxへ送信されます。
+              サーバー経由のルート検索を利用できる環境では、出発地・目的地・移動条件がGoogle Routesへ送信されます。
+            </p>
+            <p>本サイトはアクセス解析および広告トラッキングを導入していません。</p>
+          </div>
         </div>
       </section>
 
@@ -2595,7 +2607,7 @@ export function PilgrimageApp({
           </span>
         </div>
         <p>
-          本サイトはファンによる非公式の試作サイトです。作品・施設・地域の公式運営とは関係ありません。
+          本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
         <span>© 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
