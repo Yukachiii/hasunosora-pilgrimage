@@ -4328,7 +4328,7 @@ footer > span {
     bottom: max(10px, env(safe-area-inset-bottom));
     left: 10px;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
     padding: 6px;
     border: 1px solid rgba(255, 255, 255, 0.46);
@@ -4346,41 +4346,59 @@ footer > span {
   .mobile-explore-picker {
     position: fixed;
     z-index: 2800;
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
-    left: 10px;
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 72px);
+    left: calc(14px + (100% - 50px) / 5);
     display: grid;
-    width: min(210px, calc(100% - 20px));
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: calc((100% - 50px) / 5 + 14px);
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(54px, auto));
     gap: 4px;
-    padding: 4px;
-    border: 1px solid rgba(38, 52, 70, 0.16);
-    border-radius: 12px;
-    background: rgba(247, 247, 242, 0.95);
-    box-shadow: 0 10px 26px rgba(18, 29, 43, 0.2);
+    padding: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.46);
+    border-radius: 14px;
+    background: rgba(31, 43, 59, 0.93);
+    color: white;
+    box-shadow: 0 14px 38px rgba(18, 29, 43, 0.28);
     backdrop-filter: blur(16px);
+    transform-origin: bottom center;
+    animation: mobile-explore-picker-grow 180ms ease-out both;
   }
 
   .mobile-explore-picker button {
-    min-height: 40px;
-    padding: 0 12px;
+    min-height: 54px;
+    padding: 0;
     border: 0;
-    border-radius: 8px;
+    border-radius: 9px;
     background: transparent;
-    color: var(--ink-soft);
+    color: inherit;
     font: inherit;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 800;
     cursor: pointer;
   }
 
   .mobile-explore-picker button[aria-pressed="true"] {
     background: rgba(125, 185, 196, 0.3);
-    color: var(--ink);
   }
 
   .mobile-explore-picker button:is(:active, :focus-visible) {
-    outline: 2px solid rgba(125, 185, 196, 0.72);
-    outline-offset: -2px;
+    background: rgba(125, 185, 196, 0.28);
+    outline: none;
+  }
+
+  @keyframes mobile-explore-picker-grow {
+    from {
+      opacity: 0;
+      clip-path: inset(100% 0 0);
+      transform: translateY(14px);
+    }
+
+    to {
+      opacity: 1;
+      clip-path: inset(0);
+      transform: translateY(0);
+    }
   }
 
   .mobile-nav :is(a, button) {
@@ -6310,6 +6328,7 @@ footer > span {
   align-items: end;
   background: rgba(18, 29, 43, 0.52);
   backdrop-filter: blur(8px);
+  animation: explore-sheet-backdrop-enter 220ms ease-out both;
 }
 
 .explore-sheet__panel {
@@ -6340,6 +6359,37 @@ footer > span {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+.explore-sheet.is-closing {
+  animation: explore-sheet-backdrop-exit 180ms ease-in both;
+}
+
+.explore-sheet.is-closing .explore-sheet__panel {
+  animation: explore-sheet-exit 180ms ease-in both;
+}
+
+@keyframes explore-sheet-backdrop-enter {
+  from { background-color: rgba(18, 29, 43, 0); }
+}
+
+@keyframes explore-sheet-backdrop-exit {
+  to {
+    background-color: rgba(18, 29, 43, 0);
+    backdrop-filter: blur(0);
+  }
+}
+
+@keyframes explore-sheet-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(48px);
   }
 }
 
@@ -7504,7 +7554,7 @@ footer > span {
     display: grid;
   }
 
-  .mobile-nav :is(a[aria-current="page"], button[aria-pressed="true"]) {
+  .mobile-nav :is(a[aria-current="page"], button[aria-current="page"], button[aria-pressed="true"]) {
     background: rgba(125, 185, 196, 0.3);
   }
 

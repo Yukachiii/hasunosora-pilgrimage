@@ -227,6 +227,7 @@ export function PilgrimageApp({
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
   const [isExplorePickerOpen, setIsExplorePickerOpen] = useState(false);
+  const [isExploreSheetClosing, setIsExploreSheetClosing] = useState(false);
   const [activeGuideImage, setActiveGuideImage] = useState<{
     src: string;
     alt: string;
@@ -234,6 +235,7 @@ export function PilgrimageApp({
   } | null>(null);
   const exploreSheetCloseButtonRef = useRef<HTMLButtonElement>(null);
   const exploreSheetSwipeStartYRef = useRef<number | null>(null);
+  const exploreSheetCloseTimerRef = useRef<number | null>(null);
   const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
@@ -264,6 +266,33 @@ export function PilgrimageApp({
   function setStartTime(value: string) {
     updateActivePlannerDay({ startTime: value });
   }
+
+  const cancelExploreSheetClose = useCallback(() => {
+    if (exploreSheetCloseTimerRef.current !== null) {
+      window.clearTimeout(exploreSheetCloseTimerRef.current);
+      exploreSheetCloseTimerRef.current = null;
+    }
+    setIsExploreSheetClosing(false);
+  }, []);
+
+  const closeExplorePanel = useCallback(() => {
+    if (exploreSheetCloseTimerRef.current !== null) return;
+    setIsExploreSheetClosing(true);
+    exploreSheetCloseTimerRef.current = window.setTimeout(() => {
+      exploreSheetCloseTimerRef.current = null;
+      setActiveExplorePanel(null);
+      setIsExploreSheetClosing(false);
+      if (/^#\/explore\/(?:spots|card-models)$/.test(window.location.hash)) {
+        window.history.replaceState(null, "", "#/explore");
+      }
+    }, 180);
+  }, []);
+
+  useEffect(() => () => {
+    if (exploreSheetCloseTimerRef.current !== null) {
+      window.clearTimeout(exploreSheetCloseTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     const syncPage = () => {
@@ -319,7 +348,7 @@ export function PilgrimageApp({
     document.body.style.overflow = "hidden";
     const focusTimer = window.setTimeout(() => exploreSheetCloseButtonRef.current?.focus(), 0);
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActiveExplorePanel(null);
+      if (event.key === "Escape") closeExplorePanel();
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => {
@@ -327,7 +356,7 @@ export function PilgrimageApp({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [activeExplorePanel]);
+  }, [activeExplorePanel, closeExplorePanel]);
 
   useEffect(() => {
     if (!activeGuideImage) return undefined;
@@ -653,10 +682,13 @@ export function PilgrimageApp({
   }
 
   function navigateToPage(page: AppPage, sectionId?: string) {
+    cancelExploreSheetClose();
     setIsExplorePickerOpen(false);
     if (page === "explore" && (sectionId === "spots" || sectionId === "card-models")) {
       setActivePage("explore");
       setActiveExplorePanel(sectionId);
+      const panelHash = `#/explore/${sectionId}`;
+      if (window.location.hash !== panelHash) window.history.pushState(null, "", panelHash);
       return;
     }
     setActiveExplorePanel(null);
@@ -1028,7 +1060,7 @@ export function PilgrimageApp({
         </a>
       </header>
 
-      {activePage === "explore" && isExplorePickerOpen ? (
+      {isExplorePickerOpen ? (
         <nav
           className="mobile-explore-picker"
           id="mobile-explore-picker"
@@ -1038,8 +1070,7 @@ export function PilgrimageApp({
             type="button"
             aria-pressed={activeExplorePanel === "spots"}
             onClick={() => {
-              setActiveExplorePanel("spots");
-              setIsExplorePickerOpen(false);
+              navigateToPage("explore", "spots");
             }}
           >
             スポット
@@ -1048,8 +1079,7 @@ export function PilgrimageApp({
             type="button"
             aria-pressed={activeExplorePanel === "card-models"}
             onClick={() => {
-              setActiveExplorePanel("card-models");
-              setIsExplorePickerOpen(false);
+              navigateToPage("explore", "card-models");
             }}
           >
             カード
@@ -1061,46 +1091,46 @@ export function PilgrimageApp({
         className={`mobile-nav${activeExplorePanel ? " mobile-nav--sheet-open" : ""}`}
         aria-label="スマートフォン用メニュー"
       >
-        {(Object.keys(appPageLabels) as AppPage[]).map((page) => {
-          if (page === "explore" && activePage === "explore") {
-            return (
-              <button
-                type="button"
-                key={page}
-                aria-current="page"
-                aria-expanded={isExplorePickerOpen}
-                aria-controls="mobile-explore-picker"
-                onClick={() => {
-                  if (activeExplorePanel) {
-                    setActiveExplorePanel(null);
-                    setIsExplorePickerOpen(false);
-                    return;
-                  }
-                  setIsExplorePickerOpen((current) => !current);
-                }}
-              >
-                <span>
-                  {activeExplorePanel === "spots"
-                    ? "スポット"
-                    : activeExplorePanel === "card-models"
-                      ? "カード"
-                      : "探す"}
-                </span>
-              </button>
-            );
-          }
-          return (
-            <a
-              href={`#/${page}`}
-              key={page}
-              aria-current={activePage === page ? "page" : undefined}
-              onClick={(event) => { event.preventDefault(); navigateToPage(page); }}
-            >
-              <span>{appPageLabels[page]}</span>
-              {page === "planner" && allPlannedSpotCount ? <b>{allPlannedSpotCount}</b> : null}
-            </a>
-          );
-        })}
+        <a
+          href="#/explore"
+          aria-current={activePage === "explore" && !activeExplorePanel ? "page" : undefined}
+          onClick={(event) => { event.preventDefault(); navigateToPage("explore"); }}
+        >
+          <span>ホーム</span>
+        </a>
+        <button
+          type="button"
+          aria-pressed={isExplorePickerOpen || Boolean(activeExplorePanel)}
+          aria-expanded={isExplorePickerOpen}
+          aria-controls="mobile-explore-picker"
+          onClick={() => {
+            if (activeExplorePanel) {
+              closeExplorePanel();
+              setIsExplorePickerOpen(false);
+              return;
+            }
+            setIsExplorePickerOpen((current) => !current);
+          }}
+        >
+          <span>
+            {activeExplorePanel === "spots"
+              ? "スポット"
+              : activeExplorePanel === "card-models"
+                ? "カード"
+                : "探す"}
+          </span>
+        </button>
+        {(["planner", "today", "guide"] as AppPage[]).map((page) => (
+          <a
+            href={`#/${page}`}
+            key={page}
+            aria-current={activePage === page ? "page" : undefined}
+            onClick={(event) => { event.preventDefault(); navigateToPage(page); }}
+          >
+            <span>{appPageLabels[page]}</span>
+            {page === "planner" && allPlannedSpotCount ? <b>{allPlannedSpotCount}</b> : null}
+          </a>
+        ))}
       </nav>
 
       <section
@@ -2068,11 +2098,11 @@ export function PilgrimageApp({
       </section>
 
         <div
-          className="explore-sheet"
+          className={`explore-sheet${isExploreSheetClosing ? " is-closing" : ""}`}
           hidden={!activeExplorePanel}
           role="presentation"
           onPointerDown={(event) => {
-            if (event.target === event.currentTarget) setActiveExplorePanel(null);
+            if (event.target === event.currentTarget) closeExplorePanel();
           }}
         >
           <div
@@ -2094,7 +2124,7 @@ export function PilgrimageApp({
                   event.currentTarget.releasePointerCapture(event.pointerId);
                 }
                 if (startY !== null && event.clientY - startY >= 72) {
-                  setActiveExplorePanel(null);
+                  closeExplorePanel();
                 }
               }}
               onPointerCancel={() => {
@@ -2109,7 +2139,7 @@ export function PilgrimageApp({
                   ref={exploreSheetCloseButtonRef}
                   aria-label="閉じる"
                   title="閉じる"
-                  onClick={() => setActiveExplorePanel(null)}
+                  onClick={closeExplorePanel}
                 >
                   <span aria-hidden="true">×</span>
                 </button>
