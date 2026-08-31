@@ -532,6 +532,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /aria-label="閉じる"/);
   assert.match(app, /aria-controls="spot-advanced-filters"/);
   assert.match(app, /className=\{`spot-filters__advanced/);
+  assert.match(app, /className="card-model__topline"[\s\S]*?<h3>\{card\.card\}<\/h3>/);
   assert.doesNotMatch(app, /この枠内を上下にスクロール/);
   assert.match(css, /\.map-return-link/);
   assert.match(css, /\.explore-sheet__panel/);
@@ -539,6 +540,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.explore-sheet__body\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(css, /\.explore-sheet \.spot-filters__advanced\s*\{[^}]*display:\s*none/s);
   assert.match(css, /\.explore-sheet \.spot-filters__advanced\.is-expanded\s*\{[^}]*display:\s*grid/s);
+  assert.match(css, /\.card-model__image figcaption\s*\{[^}]*position:\s*absolute[^}]*bottom:\s*6px/s);
+  assert.match(css, /\.explore-sheet \.card-model-filter > p\s*\{[^}]*display:\s*none/s);
   assert.match(app, /href=\{`#\/\$\{page\}`\}/);
   assert.match(routePlanner, /openingHoursStatus/);
   assert.match(routePlanner, /営業時間は公式情報を確認/);

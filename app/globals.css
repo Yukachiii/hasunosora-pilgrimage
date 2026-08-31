@@ -2795,7 +2795,7 @@ button {
 .card-model {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 9px 20px;
+  gap: 7px 20px;
   align-content: start;
   padding: 24px;
   border: 1px solid rgba(38, 52, 70, 0.08);
@@ -2809,10 +2809,11 @@ button {
 }
 
 .card-model__image {
+  position: relative;
   display: grid;
   grid-column: 1 / -1;
   gap: 0;
-  margin: 0 -24px 12px;
+  margin: 0 -24px 8px;
   background: #edf2f4;
 }
 
@@ -2824,10 +2825,16 @@ button {
 }
 
 .card-model__image figcaption {
-  padding: 7px 24px 0;
-  color: var(--ink-soft);
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: rgba(20, 31, 44, 0.72);
+  color: white;
   font-size: 8px;
-  line-height: 1.5;
+  line-height: 1.25;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 .card-model__image a {
@@ -2837,19 +2844,20 @@ button {
 }
 
 .card-model__topline {
-  display: flex;
+  display: grid;
   grid-column: 1 / -1;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
 }
 
 .card-model__topline > span {
+  padding-top: 2px;
   font-family: Georgia, serif;
-  font-size: 18px;
+  font-size: 16px;
+  line-height: 1.35;
 }
 
-.card-model h3,
 .card-model__characters,
 .card-model strong,
 .card-model p,
@@ -2878,7 +2886,7 @@ button {
   font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
   font-size: 17px;
   font-weight: 500;
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .card-model > strong {
@@ -4660,7 +4668,8 @@ footer > span {
   }
 
   .card-model {
-    padding: 12px;
+    gap: 5px 8px;
+    padding: 10px;
   }
 
   .card-model.has-image {
@@ -4668,20 +4677,32 @@ footer > span {
   }
 
   .card-model__image {
-    margin: 0 -12px 12px;
+    margin: 0 -10px 6px;
   }
 
   .card-model__image figcaption {
-    padding-right: 12px;
-    padding-left: 12px;
+    right: 5px;
+    bottom: 5px;
+    padding: 2px 5px;
+    font-size: 7px;
   }
 
   .card-model__topline > span {
-    font-size: 15px;
+    padding-top: 1px;
+    font-size: 13px;
   }
 
   .card-model h3 {
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .card-model__characters {
+    gap: 4px;
+  }
+
+  .card-model__characters span {
+    padding: 3px 6px;
   }
 
   .card-model > strong {
@@ -6413,6 +6434,38 @@ footer > span {
   .explore-sheet :is(.spot-filters, .card-model-filter) {
     padding: 10px;
     border-radius: 0 0 8px 8px;
+  }
+
+  .explore-sheet .card-model-filter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    margin-bottom: 12px;
+    padding: 8px;
+  }
+
+  .explore-sheet .card-model-filter label {
+    width: 100%;
+    min-width: 0;
+    gap: 0;
+  }
+
+  .explore-sheet .card-model-filter label > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .explore-sheet .card-model-filter select {
+    min-height: 42px;
+  }
+
+  .explore-sheet .card-model-filter > p {
+    display: none;
   }
 
   .explore-sheet .spot-filters {

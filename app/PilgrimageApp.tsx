@@ -2314,8 +2314,8 @@ export function PilgrimageApp({
               ) : null}
               <div className="card-model__topline">
                 <span>C{String(index + 1).padStart(2, "0")}</span>
+                <h3>{card.card}</h3>
               </div>
-              <h3>{card.card}</h3>
               <div className="card-model__characters" aria-label="登場キャラクター">
                 {card.characters.map((character) => <span key={character}>{character}</span>)}
               </div>
