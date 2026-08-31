@@ -8,7 +8,7 @@ export default defineConfig({
   publicDir: false,
   resolve: {
     alias: {
-      "@": path.resolve(__dirname),
+      "@": path.resolve(import.meta.dirname),
     },
   },
   plugins: [react()],
