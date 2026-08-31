@@ -2577,8 +2577,11 @@ export function PilgrimageApp({
             activeGuideImage.variant === "card" ? " guide-image-modal--card" : ""
           }`}
           role="presentation"
-          onPointerDown={(event) => {
-            if (event.target === event.currentTarget) setActiveGuideImage(null);
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setActiveGuideImage(null);
           }}
         >
           <section
@@ -2599,8 +2602,22 @@ export function PilgrimageApp({
               </button>
             </header>
             <figure>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={activeGuideImage.src} alt={activeGuideImage.alt} />
+              <div className="guide-image-modal__image-frame">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={activeGuideImage.src} alt={activeGuideImage.alt} />
+                {activeGuideImage.variant === "card" ? (
+                  <span className="guide-image-modal__copyright">
+                    <a
+                      href="https://www.lovelive-anime.jp/hasunosora/"
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="©プロジェクトラブライブ！蓮ノ空女学院スクールアイドルクラブ"
+                    >
+                      ©PL!HS
+                    </a>
+                  </span>
+                ) : null}
+              </div>
             </figure>
           </section>
         </div>

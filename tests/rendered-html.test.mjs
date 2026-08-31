@@ -82,14 +82,20 @@ test("illustrated user guide ships every referenced screenshot", async () => {
     guideImages.map((image) => access(new URL(`../public/guide/${image}`, import.meta.url))),
   );
   assert.match(app, /setActiveGuideImage/);
-  assert.match(app, /event\.target === event\.currentTarget\) setActiveGuideImage\(null\)/);
+  assert.match(app, /event\.target !== event\.currentTarget\) return/);
   assert.match(app, /event\.key === "Escape"\) setActiveGuideImage\(null\)/);
   assert.match(app, /guide-image-modal/);
+  assert.match(app, /className=\{`guide-image-modal\$\{/);
+  assert.match(app, /onClick=\{\(event\) => \{\s*if \(event\.target !== event\.currentTarget\) return;\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*setActiveGuideImage\(null\);/s);
+  assert.doesNotMatch(app, /guide-image-modal[\s\S]{0,300}onPointerDown=/);
   assert.match(app, /variant: "card"/);
   assert.match(app, /card-model__image-button/);
+  assert.match(app, /guide-image-modal__copyright/);
+  assert.match(app, /activeGuideImage\.variant === "card"/);
   assert.doesNotMatch(app, /href="\.\/guide\/[^\"]+" target="_blank"/);
   assert.match(css, /\.guide-image-modal\s*\{/);
   assert.match(css, /\.guide-image-modal--card \.guide-image-modal__dialog\s*\{/);
+  assert.match(css, /\.guide-image-modal__copyright\s*\{/);
 });
 
 test("publishes the complete reviewed location lists", async () => {
