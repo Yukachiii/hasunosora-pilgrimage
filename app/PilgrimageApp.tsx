@@ -226,6 +226,7 @@ export function PilgrimageApp({
   const [isEditingItineraryOrder, setIsEditingItineraryOrder] = useState(false);
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
+  const [isExplorePickerOpen, setIsExplorePickerOpen] = useState(false);
   const [activeGuideImage, setActiveGuideImage] = useState<{
     src: string;
     alt: string;
@@ -268,6 +269,7 @@ export function PilgrimageApp({
     const syncPage = () => {
       const nextPage = pageFromHash(window.location.hash);
       setActivePage(nextPage);
+      setIsExplorePickerOpen(false);
       const sectionId = window.location.hash.replace(/^#\/?[^/]+\/?/, "");
       setActiveExplorePanel(
         nextPage === "explore" && (sectionId === "spots" || sectionId === "card-models")
@@ -651,6 +653,7 @@ export function PilgrimageApp({
   }
 
   function navigateToPage(page: AppPage, sectionId?: string) {
+    setIsExplorePickerOpen(false);
     if (page === "explore" && (sectionId === "spots" || sectionId === "card-models")) {
       setActivePage("explore");
       setActiveExplorePanel(sectionId);
@@ -1025,41 +1028,79 @@ export function PilgrimageApp({
         </a>
       </header>
 
+      {activePage === "explore" && isExplorePickerOpen ? (
+        <nav
+          className="mobile-explore-picker"
+          id="mobile-explore-picker"
+          aria-label="スポット・カード一覧"
+        >
+          <button
+            type="button"
+            aria-pressed={activeExplorePanel === "spots"}
+            onClick={() => {
+              setActiveExplorePanel("spots");
+              setIsExplorePickerOpen(false);
+            }}
+          >
+            スポット
+          </button>
+          <button
+            type="button"
+            aria-pressed={activeExplorePanel === "card-models"}
+            onClick={() => {
+              setActiveExplorePanel("card-models");
+              setIsExplorePickerOpen(false);
+            }}
+          >
+            カード
+          </button>
+        </nav>
+      ) : null}
+
       <nav
-        className={`mobile-nav${activePage === "explore" ? " mobile-nav--explore" : ""}${
-          activeExplorePanel ? " mobile-nav--sheet-open" : ""
-        }`}
+        className={`mobile-nav${activeExplorePanel ? " mobile-nav--sheet-open" : ""}`}
         aria-label="スマートフォン用メニュー"
       >
-        {activePage === "explore" ? (
-          <>
-            <button
-              type="button"
-              aria-pressed={activeExplorePanel === "spots"}
-              onClick={() => setActiveExplorePanel("spots")}
+        {(Object.keys(appPageLabels) as AppPage[]).map((page) => {
+          if (page === "explore" && activePage === "explore") {
+            return (
+              <button
+                type="button"
+                key={page}
+                aria-current="page"
+                aria-expanded={isExplorePickerOpen}
+                aria-controls="mobile-explore-picker"
+                onClick={() => {
+                  if (activeExplorePanel) {
+                    setActiveExplorePanel(null);
+                    setIsExplorePickerOpen(false);
+                    return;
+                  }
+                  setIsExplorePickerOpen((current) => !current);
+                }}
+              >
+                <span>
+                  {activeExplorePanel === "spots"
+                    ? "スポット"
+                    : activeExplorePanel === "card-models"
+                      ? "カード"
+                      : "探す"}
+                </span>
+              </button>
+            );
+          }
+          return (
+            <a
+              href={`#/${page}`}
+              key={page}
+              aria-current={activePage === page ? "page" : undefined}
+              onClick={(event) => { event.preventDefault(); navigateToPage(page); }}
             >
-              <span>スポット</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={activeExplorePanel === "card-models"}
-              onClick={() => setActiveExplorePanel("card-models")}
-            >
-              <span>カード</span>
-            </button>
-          </>
-        ) : null}
-        {(Object.keys(appPageLabels) as AppPage[]).map((page) => (
-          <a
-            href={`#/${page}`}
-            key={page}
-            aria-current={activePage === page ? "page" : undefined}
-            onClick={(event) => { event.preventDefault(); navigateToPage(page); }}
-          >
-            <span>{appPageLabels[page]}</span>
-            {page === "planner" && allPlannedSpotCount ? <b>{allPlannedSpotCount}</b> : null}
-          </a>
-        ))}
+              <span>{appPageLabels[page]}</span>
+              {page === "planner" && allPlannedSpotCount ? <b>{allPlannedSpotCount}</b> : null}
+            </a>
+          );
+        })}
       </nav>
 
       <section
