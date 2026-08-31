@@ -2609,7 +2609,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>© 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 1.0 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
