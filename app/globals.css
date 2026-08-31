@@ -2824,6 +2824,21 @@ button {
   object-fit: cover;
 }
 
+.card-model__image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.card-model__image-button:focus-visible {
+  outline: 3px solid var(--ice-deep);
+  outline-offset: -3px;
+}
+
 .card-model__image figcaption {
   position: absolute;
   right: 6px;
@@ -3484,13 +3499,22 @@ button {
 
 .guide-image-modal {
   position: fixed;
-  z-index: 1200;
+  z-index: 3000;
   inset: 0;
   display: grid;
   padding: 18px;
   place-items: center;
   background: rgba(10, 19, 31, 0.82);
   backdrop-filter: blur(8px);
+}
+
+.guide-image-modal--card {
+  background: rgba(10, 19, 31, 0.68);
+}
+
+.guide-image-modal--card .guide-image-modal__dialog {
+  width: min(720px, calc(100% - 16px));
+  max-height: min(76dvh, 680px);
 }
 
 .guide-image-modal__dialog {
@@ -3529,6 +3553,7 @@ button {
 
 .guide-image-modal__dialog > header button {
   display: inline-flex;
+  flex: none;
   min-height: 38px;
   padding: 0 14px;
   align-items: center;
@@ -3540,6 +3565,7 @@ button {
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .guide-image-modal__dialog > header button span {
@@ -4282,6 +4308,10 @@ footer > span {
 
   .mobile-nav--explore {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .mobile-nav--sheet-open {
+    z-index: 2700;
   }
 
   .mobile-nav :is(a, button) {
@@ -6376,14 +6406,14 @@ footer > span {
 
 @media (max-width: 760px) {
   .explore-sheet {
-    padding: 0;
+    padding: 0 0 calc(76px + env(safe-area-inset-bottom));
     background: rgba(18, 29, 43, 0.42);
     backdrop-filter: blur(5px);
   }
 
   .explore-sheet__panel {
     width: 100%;
-    height: min(94dvh, 960px);
+    height: min(calc(94dvh - 76px - env(safe-area-inset-bottom)), 884px);
     border-right: 0;
     border-bottom: 0;
     border-left: 0;

@@ -84,9 +84,12 @@ test("illustrated user guide ships every referenced screenshot", async () => {
   assert.match(app, /setActiveGuideImage/);
   assert.match(app, /event\.target === event\.currentTarget\) setActiveGuideImage\(null\)/);
   assert.match(app, /event\.key === "Escape"\) setActiveGuideImage\(null\)/);
-  assert.match(app, /className="guide-image-modal"/);
+  assert.match(app, /guide-image-modal/);
+  assert.match(app, /variant: "card"/);
+  assert.match(app, /card-model__image-button/);
   assert.doesNotMatch(app, /href="\.\/guide\/[^\"]+" target="_blank"/);
   assert.match(css, /\.guide-image-modal\s*\{/);
+  assert.match(css, /\.guide-image-modal--card \.guide-image-modal__dialog\s*\{/);
 });
 
 test("publishes the complete reviewed location lists", async () => {
@@ -514,6 +517,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /mobile-nav--explore/);
   assert.match(app, /aria-pressed=\{activeExplorePanel === "spots"\}/);
   assert.match(app, /aria-pressed=\{activeExplorePanel === "card-models"\}/);
+  assert.match(app, /mobile-nav--sheet-open/);
   assert.match(app, /isEditingItineraryOrder/);
   assert.match(app, /順序を変更/);
   assert.match(app, /className="transit-search-panel"/);

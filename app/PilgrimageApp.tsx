@@ -226,7 +226,11 @@ export function PilgrimageApp({
   const [isEditingItineraryOrder, setIsEditingItineraryOrder] = useState(false);
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
-  const [activeGuideImage, setActiveGuideImage] = useState<{ src: string; alt: string } | null>(null);
+  const [activeGuideImage, setActiveGuideImage] = useState<{
+    src: string;
+    alt: string;
+    variant?: "guide" | "card";
+  } | null>(null);
   const exploreSheetCloseButtonRef = useRef<HTMLButtonElement>(null);
   const exploreSheetSwipeStartYRef = useRef<number | null>(null);
   const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
@@ -1020,7 +1024,9 @@ export function PilgrimageApp({
       </header>
 
       <nav
-        className={`mobile-nav${activePage === "explore" ? " mobile-nav--explore" : ""}`}
+        className={`mobile-nav${activePage === "explore" ? " mobile-nav--explore" : ""}${
+          activeExplorePanel ? " mobile-nav--sheet-open" : ""
+        }`}
         aria-label="スマートフォン用メニュー"
       >
         {activePage === "explore" ? (
@@ -2291,14 +2297,25 @@ export function PilgrimageApp({
             <article className={`card-model${card.imageUrl ? " has-image" : ""}`} key={card.id}>
               {card.imageUrl ? (
                 <figure className="card-model__image">
-                  {/* Static GitHub Pages assets avoid an external image-optimization request. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={card.imageUrl}
-                    alt={`${card.card}のカードイラスト`}
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  <button
+                    type="button"
+                    className="card-model__image-button"
+                    aria-label={`${card.card}のカードイラストを拡大表示`}
+                    onClick={() => setActiveGuideImage({
+                      src: card.imageUrl!,
+                      alt: `${card.card}のカードイラスト`,
+                      variant: "card",
+                    })}
+                  >
+                    {/* Static GitHub Pages assets avoid an external image-optimization request. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={card.imageUrl}
+                      alt={`${card.card}のカードイラスト`}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </button>
                   <figcaption>
                     画像：<a
                       href="https://www.lovelive-anime.jp/hasunosora/"
@@ -2507,7 +2524,9 @@ export function PilgrimageApp({
 
       {activeGuideImage ? (
         <div
-          className="guide-image-modal"
+          className={`guide-image-modal${
+            activeGuideImage.variant === "card" ? " guide-image-modal--card" : ""
+          }`}
           role="presentation"
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) setActiveGuideImage(null);
