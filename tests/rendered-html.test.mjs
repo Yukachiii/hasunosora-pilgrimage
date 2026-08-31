@@ -103,8 +103,10 @@ test("publishes the complete reviewed location lists", async () => {
   assert.equal(new Set(spots.map((spot) => spot.id)).size, 97);
   assert.ok(spots.every((spot) => Number.isFinite(spot.lat) && Number.isFinite(spot.lng)));
   assert.equal(
-    spots.filter((spot) => spot.activityRecords?.length || spot.sehasEpisodes?.length).length,
-    53,
+    spots.filter((spot) => (
+      spot.activityRecords?.length || spot.sehasEpisodes?.length || spot.withMeetsEpisodes?.length
+    )).length,
+    54,
   );
   assert.deepEqual(
     spots.find((spot) => spot.id === "kanazawa-station").activityRecords,
@@ -116,6 +118,14 @@ test("publishes the complete reviewed location lists", async () => {
   );
   assert.ok(spots.every((spot) => !spot.description.startsWith("登場情報：")));
   assert.equal(spots.find((spot) => spot.id === "higashide-coffee").activityRecords, undefined);
+  assert.deepEqual(
+    spots.find((spot) => spot.id === "higashide-coffee").withMeetsEpisodes,
+    ["103期 2023/7/24『蓮ノ空1年生の会！』（村野さやか紹介・16:01頃）"],
+  );
+  assert.equal(
+    spots.find((spot) => spot.id === "higashide-coffee").sourceUrl,
+    "https://www.youtube.com/watch?v=T2mjEvzjnMQ&t=961s",
+  );
   assert.equal(cardModels.length, 53);
   const cardCharacterNames = [
     "日野下花帆", "村野さやか", "乙宗梢", "夕霧綴理", "大沢瑠璃乃", "藤島慈",

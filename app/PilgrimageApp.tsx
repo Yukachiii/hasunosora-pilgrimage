@@ -450,6 +450,7 @@ export function PilgrimageApp({
         spot.category,
         ...(spot.activityRecords ?? []),
         ...(spot.sehasEpisodes ?? []),
+        ...(spot.withMeetsEpisodes ?? []),
         ...(spot.appearances ?? []),
         ...collaborationsForSpot(spot).flatMap(({ collaboration, role, members }) => [
           collaboration.name,
@@ -491,6 +492,7 @@ export function PilgrimageApp({
         spot.description,
         ...(spot.activityRecords ?? []),
         ...(spot.sehasEpisodes ?? []),
+        ...(spot.withMeetsEpisodes ?? []),
         ...(spot.appearances ?? []),
       ];
       return values.some((value) => value.toLocaleLowerCase("ja").includes(query))
@@ -2196,7 +2198,7 @@ export function PilgrimageApp({
                     <small>{spot.openingHoursCheckedAt.replaceAll("-", ".")} 確認</small>
                   ) : null}
                 </div>
-                {spot.activityRecords?.length || spot.sehasEpisodes?.length ? (
+                {spot.activityRecords?.length || spot.sehasEpisodes?.length || spot.withMeetsEpisodes?.length ? (
                   <dl className="spot-card__episodes">
                     {spot.activityRecords?.length ? (
                       <div>
@@ -2208,6 +2210,12 @@ export function PilgrimageApp({
                       <div>
                         <dt>せーはす！</dt>
                         <dd>{spot.sehasEpisodes.join("・")}</dd>
+                      </div>
+                    ) : null}
+                    {spot.withMeetsEpisodes?.length ? (
+                      <div>
+                        <dt>With×MEETS</dt>
+                        <dd>{spot.withMeetsEpisodes.join("・")}</dd>
                       </div>
                     ) : null}
                   </dl>

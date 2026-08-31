@@ -32,6 +32,7 @@ export type PilgrimageSpot = {
   description: string;
   activityRecords?: string[];
   sehasEpisodes?: string[];
+  withMeetsEpisodes?: string[];
   accessNote: string;
   sourceUrl: string;
   transitSearchName: string;

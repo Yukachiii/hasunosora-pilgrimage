@@ -241,6 +241,11 @@ function validateSpot(value, spotId, current) {
     current.sehasEpisodes,
     "せーはす！放送回",
   );
+  const withMeetsEpisodes = optionalTextList(
+    value.withMeetsEpisodes,
+    current.withMeetsEpisodes,
+    "With×MEETS配信回",
+  );
   const normalizedAppearances = optionalTextList(
     value.appearances,
     current.appearances,
@@ -276,6 +281,7 @@ function validateSpot(value, spotId, current) {
     openingHoursCheckedAt: optionalDate(value.openingHoursCheckedAt, "営業時間の確認日"),
     activityRecords,
     sehasEpisodes,
+    withMeetsEpisodes,
     accessNote: requiredText(value.accessNote, "アクセス案内", 160),
     sourceUrl: officialUrl(value.sourceUrl),
     appearances: normalizedAppearances,
