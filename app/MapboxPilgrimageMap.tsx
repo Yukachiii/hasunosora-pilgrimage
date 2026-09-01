@@ -39,6 +39,7 @@ type Props = {
   onRouteResult: (result: RouteResult) => void;
   accessToken: string;
   routeServiceUrl: string;
+  isVisible?: boolean;
 };
 
 type MapboxRoute = {
@@ -210,9 +211,11 @@ export function MapboxPilgrimageMap({
   onRouteResult,
   accessToken,
   routeServiceUrl,
+  isVisible = true,
 }: Props) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const routeLinesRef = useRef<Array<Array<[number, number]>>>([]);
   const onSelectRef = useRef(onSelect);
   const plannedSpotIdSet = useMemo(() => new Set(plannedSpotIds), [plannedSpotIds]);
   const cardModelSpotIdSet = useMemo(() => new Set(cardModelSpotIds), [cardModelSpotIds]);
@@ -246,6 +249,7 @@ export function MapboxPilgrimageMap({
 
   const clearRoute = useCallback(() => {
     const map = mapRef.current;
+    routeLinesRef.current = [];
     if (!map?.isStyleLoaded()) return;
     if (map.getLayer(ROUTE_LAYER_ID)) map.removeLayer(ROUTE_LAYER_ID);
     if (map.getLayer(ROUTE_SHADOW_LAYER_ID)) map.removeLayer(ROUTE_SHADOW_LAYER_ID);
@@ -257,6 +261,7 @@ export function MapboxPilgrimageMap({
     const usableLines = lines.filter((line) => line.length > 1);
     if (!map?.isStyleLoaded() || !usableLines.length) return;
     clearRoute();
+    routeLinesRef.current = usableLines;
     const feature: GeoJSON.Feature<GeoJSON.MultiLineString> = {
       type: "Feature",
       properties: {},
@@ -281,6 +286,21 @@ export function MapboxPilgrimageMap({
     usableLines.flat().forEach(([lng, lat]) => bounds.extend([lng, lat]));
     map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 650 });
   }, [clearRoute]);
+
+  useEffect(() => {
+    if (!isVisible || mapState !== "ready") return;
+    const frame = window.requestAnimationFrame(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      map.resize();
+      const lines = routeLinesRef.current;
+      if (!lines.length) return;
+      const bounds = new mapboxgl.LngLatBounds();
+      lines.flat().forEach(([lng, lat]) => bounds.extend([lng, lat]));
+      map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 0 });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isVisible, mapState]);
 
   useEffect(() => {
     if (!token || !mapElementRef.current) return;

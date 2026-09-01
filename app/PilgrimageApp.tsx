@@ -1287,7 +1287,11 @@ export function PilgrimageApp({
         ) : null}
 
         <div className="map-layout">
-          <div className="map-column" hidden={activePage !== "explore"}>
+          <div
+            className={`map-column${activePage === "planner" ? " map-column--route" : ""}`}
+            hidden={activePage !== "explore" && !(activePage === "planner" && plannerStep === 3)}
+          >
+            {activePage === "explore" ? (
             <div className="map-search">
               <label htmlFor="map-freeword-search">地図から検索</label>
               <div className="map-search__field">
@@ -1328,8 +1332,17 @@ export function PilgrimageApp({
                 </div>
               ) : null}
             </div>
+            ) : (
+              <div className="planner-route-map__heading">
+                <div>
+                  <small>ROUTE MAP</small>
+                  <strong>予定の経路</strong>
+                </div>
+                <span>{itinerarySpots.length}か所</span>
+              </div>
+            )}
             <MapboxPilgrimageMap
-              spots={spots}
+              spots={activePage === "planner" ? itinerarySpots : spots}
               selectedId={selectedId}
               plannedSpotIds={itineraryIds}
               cardModelSpotIds={CARD_MODEL_SPOT_IDS}
@@ -1341,6 +1354,7 @@ export function PilgrimageApp({
               onRouteResult={handleRouteResult}
               accessToken={mapboxConfig.accessToken}
               routeServiceUrl={routeServiceUrl}
+              isVisible={activePage === "explore" || (activePage === "planner" && plannerStep === 3)}
             />
           </div>
           <div className="selected-map-detail" hidden={activePage !== "explore"}>

@@ -637,6 +637,10 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(rightColumn, /訪問するスポット/);
   assert.doesNotMatch(rightColumn, /journey-start|travel-modes|collaboration-route-fill/);
   assert.match(app, /className="route-workspace" id="planner"/);
+  assert.match(app, /予定の経路/);
+  assert.match(app, /activePage === "planner" \? itinerarySpots : spots/);
+  assert.match(app, /activePage === "planner" && plannerStep === 3/);
+  assert.match(css, /\.app-page--planner \.map-column--route \.map-shell\s*\{[^}]*height:\s*480px/s);
 });
 
 test("Mapbox is the main map and the comparison version is removed", async () => {
@@ -654,6 +658,8 @@ test("Mapbox is the main map and the comparison version is removed", async () =>
   assert.match(map, /directions\/v5/);
   assert.match(map, /showTransitLabels: true/);
   assert.match(map, /showCompass:\s*true/);
+  assert.match(map, /map\.resize\(\)/);
+  assert.match(map, /routeLinesRef/);
   assert.doesNotMatch(map, /cluster:\s*true/);
   assert.doesNotMatch(map, /SPOT_CLUSTER/);
   assert.doesNotMatch(map, /getClusterExpansionZoom/);

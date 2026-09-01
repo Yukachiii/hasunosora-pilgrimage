@@ -6906,6 +6906,54 @@ footer > span {
   display: block;
 }
 
+.app-page--planner .map-column--route {
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.app-page--planner .map-column--route .map-shell {
+  height: 480px;
+  border-radius: 8px;
+}
+
+.planner-route-map__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 2px 12px;
+}
+
+.planner-route-map__heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.planner-route-map__heading small {
+  color: var(--ice-deep);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.17em;
+}
+
+.planner-route-map__heading strong {
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: 21px;
+  font-weight: 500;
+}
+
+.planner-route-map__heading span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 680px) {
+  .app-page--planner .map-column--route .map-shell {
+    height: 360px;
+  }
+}
+
 .app-page--planner .route-planner {
   width: min(820px, 100%);
   margin: 0 auto;
