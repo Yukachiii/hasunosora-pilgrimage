@@ -58,7 +58,6 @@ git diff --check
 ```
 
 - GitHub ActionsのSecret `MAPBOX_ACCESS_TOKEN` が設定され、公開URLだけを許可している
-- 必要な場合だけ `ROUTE_API_URL` を設定し、許可Originを公開サイトへ限定している
 - `.env.local` と `.env.pages.local` がGitの追跡対象に入っていない
 - 公開サイトで地図、スポット・カード一覧、予定作成、当日表示、ガイドをスマートフォンとPCの両方で確認する
 - SNSへURLを貼り、タイトル・説明・OG画像が表示されることを確認する
@@ -75,15 +74,10 @@ APIキーはブラウザへ配信されません。短時間の重複検索を�
 - 主要駅: 公共交通検索の再設計まで一時停止
 - 手動調整: 画面で並べ替えた順序をサーバーがそのまま使用
 
-GitHub Pagesだけではサーバー処理を実行できません。サーバー版を別途公開した後、
-GitHub ActionsのSecret `ROUTE_API_URL` に
-`https://サーバーのドメイン/api/routes/plan` を設定すると、Pages版もそのAPIを利用します。
-未設定時はMapbox Directions APIを使うブラウザ内ルート検索へ自動的に戻ります。
-
-公開ページは選択したスポットのIDと座標をルートAPIへ送ります。API側は件数、
-IDとの対応、国内座標範囲を検証するため、スポット追加のたびにルートAPI内の
-スポット一覧を更新する必要はありません。旧公開ページからIDだけが送られた場合は、
-互換性のためサーバー内の登録スポットを参照します。
+GitHub Pagesの公開画面は、予定に入っているスポットの現在の座標をMapbox
+Directions APIへ直接渡します。別のルートAPIやスポット一覧の二重登録は不要です。
+サーバー版のルート検索はローカル開発用として残していますが、GitHub Pagesからは
+接続しません。
 
 サーバー用キーはブラウザ用と分け、Google Cloud側でRoutes APIのみに制限してください。
 
@@ -108,8 +102,7 @@ ROUTE_USAGE_API_URL=https://サーバーのドメイン/api/admin/route-usage
 ROUTE_USAGE_ADMIN_TOKEN=十分に長いランダムな共有トークン
 ```
 
-`VITE_ROUTE_API_URL`が設定済みなら、`ROUTE_USAGE_API_URL`は同じサーバーから
-自動推測できます。`ROUTE_USAGE_ADMIN_TOKEN`はルートAPIサーバー側にも同じ値を
+`ROUTE_USAGE_ADMIN_TOKEN`はルートAPIサーバー側にも同じ値を
 秘密の環境変数として設定してください。トークンはGitへ追加せず、GitHub Pagesや
 ブラウザ用環境変数にも設定しません。
 

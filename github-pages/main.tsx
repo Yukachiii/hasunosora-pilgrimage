@@ -27,7 +27,6 @@ createRoot(document.getElementById("root")!).render(
       mapboxConfig={{
         accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "",
       }}
-      routeServiceUrl={import.meta.env.VITE_ROUTE_API_URL?.trim() ?? ""}
       spots={publicSpots}
       spotImages={{}}
       heroImage={resolvePhotoUrl(siteSettings.heroImage) ?? null}

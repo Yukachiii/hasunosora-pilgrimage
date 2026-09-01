@@ -33,7 +33,6 @@ jobs:
       - name: Build public site
         env:
           VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
-          VITE_ROUTE_API_URL: ${{ secrets.ROUTE_API_URL }}
         run: npm run build:pages
 
       - name: Configure GitHub Pages
