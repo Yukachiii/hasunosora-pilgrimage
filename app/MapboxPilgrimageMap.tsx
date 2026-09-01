@@ -342,22 +342,7 @@ export function MapboxPilgrimageMap({
     mapboxgl.accessToken = token;
     const map = new mapboxgl.Map({
       container: mapElementRef.current,
-      style: "mapbox://styles/mapbox/standard",
-      config: {
-        basemap: {
-          theme: "faded",
-          lightPreset: "day",
-          showPlaceLabels: true,
-          showRoadLabels: true,
-          showPointOfInterestLabels: true,
-          densityPointOfInterestLabels: 4,
-          showTransitLabels: true,
-          showLandmarkIcons: true,
-          showLandmarkIconLabels: true,
-          showPedestrianRoads: true,
-          show3dObjects: false,
-        },
-      },
+      style: "mapbox://styles/mapbox/streets-v12",
       center: [136.6562, 36.5708],
       zoom: 12.4,
       attributionControl: true,
@@ -365,8 +350,8 @@ export function MapboxPilgrimageMap({
     });
     map.on("style.load", () => {
       if (cancelled) return;
-      // Standard style imports its label layers asynchronously. Applying the
-      // language after the style is ready also covers zoom-dependent layers.
+      // Apply localization after every style load so all zoom-dependent label
+      // layers use Japanese where the Streets source provides it.
       map.setLanguage("ja");
     });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), "top-right");
