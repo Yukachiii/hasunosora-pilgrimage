@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 1\.0\.3/);
+  assert.match(html, /Ver\. 1\.0\.4/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
@@ -198,7 +198,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "1.0.3");
+  assert.equal(JSON.parse(packageJson).version, "1.0.4");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -239,7 +239,8 @@ test("Mapbox map and route integration stays guarded", async () => {
   assert.match(map, /optimized-trips\/v1/);
   assert.match(map, /directions\/v5/);
   assert.match(map, /optimizeWaypointOrder/);
-  assert.match(map, /serverResponse\.status === 404 \|\| serverResponse\.status >= 500/);
+  assert.match(map, /serverError\?\.code === "SPOT_DATA_OUT_OF_DATE"/);
+  assert.match(map, /serverError\?\.error === "登録されていないスポットが含まれています。"/);
   assert.match(map, /"planned", GREEN_MARKER_IMAGE_ID/);
   assert.match(map, /"card", BLUE_MARKER_IMAGE_ID/);
   assert.match(map, /"collaboration", YELLOW_MARKER_IMAGE_ID/);
@@ -298,6 +299,20 @@ test("server route planner validates requests before using Google Routes", async
   }));
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /2～27か所/);
+
+  const staleDataResponse = await requestApp(new Request("http://localhost/api/routes/plan", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      stopIds: ["kanazawa-station", "newer-public-spot"],
+      travelMode: "WALKING",
+      optimizeWaypointOrder: false,
+      stayMinutes: { "kanazawa-station": 15, "newer-public-spot": 15 },
+      departureTime: new Date().toISOString(),
+    }),
+  }));
+  assert.equal(staleDataResponse.status, 409);
+  assert.equal((await staleDataResponse.json()).code, "SPOT_DATA_OUT_OF_DATE");
 
   const [routeApi, map, page, pagesMain, workflow, usageStore] = await Promise.all([
     readFile(new URL("../app/api/routes/plan/route.ts", import.meta.url), "utf8"),

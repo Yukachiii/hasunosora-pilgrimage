@@ -140,7 +140,11 @@ function normalizeRequest(value: unknown): NormalizedPlan {
   }
   const resolvedStops = stopIds.map((id) => spots.find((spot) => spot.id === id));
   if (resolvedStops.some((spot) => !spot)) {
-    throw new RoutePlanError("登録されていないスポットが含まれています。");
+    throw new RoutePlanError(
+      "公開ページとルートAPIのスポットデータに更新差があります。",
+      409,
+      "SPOT_DATA_OUT_OF_DATE",
+    );
   }
   if (!allowedModes.has(body.travelMode as TravelMode)) {
     throw new RoutePlanError("移動手段が正しくありません。");

@@ -538,12 +538,17 @@ export function MapboxPilgrimageMap({
             return;
           }
 
+          const serverError = serverResponse
+            ? await serverResponse.json().catch(() => ({})) as ServerRoutePlanError
+            : null;
           const shouldFallbackToMapbox = serverResponse && (
-            serverResponse.status === 404 || serverResponse.status >= 500
+            serverResponse.status === 404 ||
+            serverResponse.status >= 500 ||
+            serverError?.code === "SPOT_DATA_OUT_OF_DATE" ||
+            serverError?.error === "登録されていないスポットが含まれています。"
           );
           if (serverResponse && !shouldFallbackToMapbox) {
-            const result = await serverResponse.json().catch(() => ({})) as ServerRoutePlanError;
-            throw new Error(result.error || "ルートを計算できませんでした。");
+            throw new Error(serverError?.error || "ルートを計算できませんでした。");
           }
         }
 
