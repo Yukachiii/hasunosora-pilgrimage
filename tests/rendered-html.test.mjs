@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 1\.1\.6/);
+  assert.match(html, /Ver\. 1\.1\.7/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -200,7 +200,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "1.1.6");
+  assert.equal(JSON.parse(packageJson).version, "1.1.7");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -634,7 +634,11 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /spotSourceFilter/);
   assert.match(app, /With×MEETS/);
   assert.match(app, /className="explore-sheet__grab-zone"/);
-  assert.match(app, /event\.clientY - startY >= 72/);
+  assert.match(app, /isExploreSheetExpanded/);
+  assert.match(app, /moveExploreSheetDrag/);
+  assert.match(app, /panel\.style\.height = `\$\{nextHeight\}px`/);
+  assert.match(app, /settleExploreSheet\(deltaY <= -36\)/);
+  assert.match(app, /deltaY >= collapsedDistance \+ 96/);
   assert.match(app, /aria-label="閉じる"/);
   assert.match(app, /aria-controls="spot-advanced-filters"/);
   assert.match(app, /className=\{`spot-filters__advanced/);
@@ -663,6 +667,9 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.mobile-explore-picker\s*\{[^}]*grid-template-columns:\s*1fr[^}]*grid-template-rows:\s*repeat\(2,/s);
   assert.match(css, /animation:\s*mobile-explore-picker-grow/);
   assert.match(css, /\.explore-sheet\.is-closing \.explore-sheet__panel/);
+  assert.match(css, /\.explore-sheet__panel\.is-expanded/);
+  assert.match(css, /\.explore-sheet__panel\.is-dragging/);
+  assert.match(css, /height:\s*calc\(100dvh - 76px - env\(safe-area-inset-bottom\)\)/);
   assert.match(css, /@keyframes explore-sheet-exit/);
   assert.match(css, /@keyframes explore-sheet-content-enter/);
   assert.match(css, /button\[aria-current="page"\]/);

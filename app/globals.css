@@ -6373,6 +6373,21 @@ footer > span {
   background: #f7f7f2;
   box-shadow: 0 -24px 70px rgba(9, 18, 30, 0.28);
   animation: explore-sheet-enter 220ms ease-out both;
+  transition:
+    height 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 220ms ease;
+  will-change: height, transform;
+}
+
+.explore-sheet__panel.is-expanded {
+  height: calc(100dvh - 48px);
+  border-radius: 12px 12px 10px 10px;
+}
+
+.explore-sheet__panel.is-dragging {
+  animation: none;
+  transition: none;
 }
 
 .explore-sheet__swipe-zone {
@@ -6414,12 +6429,12 @@ footer > span {
 @keyframes explore-sheet-exit {
   from {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(var(--explore-sheet-close-offset, 0));
   }
 
   to {
     opacity: 0;
-    transform: translateY(48px);
+    transform: translateY(calc(100% + 24px));
   }
 }
 
@@ -6577,6 +6592,11 @@ footer > span {
     border-bottom: 0;
     border-left: 0;
     border-radius: 18px 18px 0 0;
+  }
+
+  .explore-sheet__panel.is-expanded {
+    height: calc(100dvh - 76px - env(safe-area-inset-bottom));
+    border-radius: 0;
   }
 
   .explore-sheet__handle {

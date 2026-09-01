@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from "react";
 import {
@@ -230,6 +231,7 @@ export function PilgrimageApp({
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
   const [isExplorePickerOpen, setIsExplorePickerOpen] = useState(false);
   const [isExploreSheetClosing, setIsExploreSheetClosing] = useState(false);
+  const [isExploreSheetExpanded, setIsExploreSheetExpanded] = useState(false);
   const [activeGuideImage, setActiveGuideImage] = useState<{
     src: string;
     alt: string;
@@ -237,7 +239,19 @@ export function PilgrimageApp({
   } | null>(null);
   const exploreSheetCloseButtonRef = useRef<HTMLButtonElement>(null);
   const exploreSheetSwipeStartYRef = useRef<number | null>(null);
+  const exploreSheetPanelRef = useRef<HTMLDivElement>(null);
+  const exploreSheetCollapsedHeightRef = useRef(0);
+  const exploreSheetDragRef = useRef<{
+    pointerId: number;
+    startY: number;
+    startHeight: number;
+    collapsedHeight: number;
+    maxHeight: number;
+    startedExpanded: boolean;
+    dragged: boolean;
+  } | null>(null);
   const exploreSheetCloseTimerRef = useRef<number | null>(null);
+  const exploreSheetSettleTimerRef = useRef<number | null>(null);
   const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
@@ -274,16 +288,35 @@ export function PilgrimageApp({
       window.clearTimeout(exploreSheetCloseTimerRef.current);
       exploreSheetCloseTimerRef.current = null;
     }
+    const panel = exploreSheetPanelRef.current;
+    panel?.classList.remove("is-dragging");
+    panel?.style.removeProperty("height");
+    panel?.style.removeProperty("transform");
+    panel?.style.removeProperty("--explore-sheet-close-offset");
     setIsExploreSheetClosing(false);
   }, []);
 
   const closeExplorePanel = useCallback(() => {
     if (exploreSheetCloseTimerRef.current !== null) return;
+    const panel = exploreSheetPanelRef.current;
+    if (panel) {
+      const dragOffset = panel.style.transform.match(/translateY\(([-\d.]+)px\)/)?.[1] ?? "0";
+      panel.style.setProperty("--explore-sheet-close-offset", `${Math.max(0, Number(dragOffset))}px`);
+      panel.classList.remove("is-dragging");
+    }
     setIsExploreSheetClosing(true);
     exploreSheetCloseTimerRef.current = window.setTimeout(() => {
       exploreSheetCloseTimerRef.current = null;
       setActiveExplorePanel(null);
       setIsExploreSheetClosing(false);
+      setIsExploreSheetExpanded(false);
+      exploreSheetCollapsedHeightRef.current = 0;
+      exploreSheetDragRef.current = null;
+      if (panel) {
+        panel.style.removeProperty("height");
+        panel.style.removeProperty("transform");
+        panel.style.removeProperty("--explore-sheet-close-offset");
+      }
       if (/^#\/explore\/(?:spots|card-models)$/.test(window.location.hash)) {
         window.history.replaceState(null, "", "#/explore");
       }
@@ -294,7 +327,126 @@ export function PilgrimageApp({
     if (exploreSheetCloseTimerRef.current !== null) {
       window.clearTimeout(exploreSheetCloseTimerRef.current);
     }
+    if (exploreSheetSettleTimerRef.current !== null) {
+      window.clearTimeout(exploreSheetSettleTimerRef.current);
+    }
   }, []);
+
+  const settleExploreSheet = useCallback((expanded: boolean) => {
+    const panel = exploreSheetPanelRef.current;
+    const drag = exploreSheetDragRef.current;
+    if (!panel || !drag) return;
+
+    if (exploreSheetSettleTimerRef.current !== null) {
+      window.clearTimeout(exploreSheetSettleTimerRef.current);
+    }
+    setIsExploreSheetExpanded(expanded);
+    panel.classList.remove("is-dragging");
+    panel.style.height = `${expanded ? drag.maxHeight : drag.collapsedHeight}px`;
+    panel.style.transform = "translateY(0px)";
+    exploreSheetDragRef.current = null;
+    exploreSheetSwipeStartYRef.current = null;
+    exploreSheetSettleTimerRef.current = window.setTimeout(() => {
+      exploreSheetSettleTimerRef.current = null;
+      panel.style.removeProperty("height");
+      panel.style.removeProperty("transform");
+    }, 220);
+  }, []);
+
+  function startExploreSheetDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.button !== 0 || isExploreSheetClosing) return;
+    const panel = exploreSheetPanelRef.current;
+    const overlay = panel?.parentElement;
+    if (!panel || !overlay) return;
+
+    if (exploreSheetSettleTimerRef.current !== null) {
+      window.clearTimeout(exploreSheetSettleTimerRef.current);
+      exploreSheetSettleTimerRef.current = null;
+    }
+    panel.style.removeProperty("height");
+    panel.style.removeProperty("transform");
+
+    const panelRect = panel.getBoundingClientRect();
+    const overlayRect = overlay.getBoundingClientRect();
+    const overlayStyle = window.getComputedStyle(overlay);
+    const maximumHeight = panelRect.bottom - overlayRect.top - Number.parseFloat(overlayStyle.paddingTop || "0");
+    if (!isExploreSheetExpanded || exploreSheetCollapsedHeightRef.current === 0) {
+      exploreSheetCollapsedHeightRef.current = panelRect.height;
+    }
+    const collapsedHeight = Math.min(exploreSheetCollapsedHeightRef.current, maximumHeight);
+    exploreSheetSwipeStartYRef.current = event.clientY;
+    exploreSheetDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startHeight: panelRect.height,
+      collapsedHeight,
+      maxHeight: maximumHeight,
+      startedExpanded: isExploreSheetExpanded,
+      dragged: false,
+    };
+  }
+
+  function moveExploreSheetDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const panel = exploreSheetPanelRef.current;
+    const drag = exploreSheetDragRef.current;
+    if (!panel || !drag || drag.pointerId !== event.pointerId) return;
+
+    const deltaY = event.clientY - drag.startY;
+    if (Math.abs(deltaY) < 4) return;
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    drag.dragged = true;
+    panel.classList.add("is-dragging");
+
+    let nextHeight = drag.startHeight;
+    let translateY = 0;
+    if (drag.startedExpanded) {
+      if (deltaY > 0) {
+        const collapsibleDistance = Math.max(0, drag.startHeight - drag.collapsedHeight);
+        nextHeight = drag.startHeight - Math.min(deltaY, collapsibleDistance);
+        translateY = Math.max(0, deltaY - collapsibleDistance);
+      }
+    } else if (deltaY < 0) {
+      nextHeight = Math.min(drag.maxHeight, drag.startHeight - deltaY);
+    } else {
+      translateY = deltaY;
+    }
+
+    panel.style.height = `${nextHeight}px`;
+    panel.style.transform = `translateY(${translateY}px)`;
+  }
+
+  function finishExploreSheetDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = exploreSheetDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.dragged) {
+      exploreSheetDragRef.current = null;
+      exploreSheetSwipeStartYRef.current = null;
+      return;
+    }
+
+    const collapsedDistance = Math.max(0, drag.startHeight - drag.collapsedHeight);
+    if (deltaY >= collapsedDistance + 96) {
+      closeExplorePanel();
+      return;
+    }
+    if (drag.startedExpanded) {
+      settleExploreSheet(deltaY < 40);
+      return;
+    }
+    settleExploreSheet(deltaY <= -36);
+  }
+
+  function cancelExploreSheetDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = exploreSheetDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    settleExploreSheet(drag.startedExpanded);
+  }
 
   useEffect(() => {
     const syncPage = () => {
@@ -302,11 +454,17 @@ export function PilgrimageApp({
       setActivePage(nextPage);
       setIsExplorePickerOpen(false);
       const sectionId = window.location.hash.replace(/^#\/?[^/]+\/?/, "");
-      setActiveExplorePanel(
+      const nextExplorePanel =
         nextPage === "explore" && (sectionId === "spots" || sectionId === "card-models")
           ? sectionId
-          : null,
-      );
+          : null;
+      setActiveExplorePanel(nextExplorePanel);
+      if (!nextExplorePanel) {
+        setIsExploreSheetExpanded(false);
+        exploreSheetCollapsedHeightRef.current = 0;
+        exploreSheetDragRef.current = null;
+        exploreSheetSwipeStartYRef.current = null;
+      }
       window.setTimeout(() => {
         if (sectionId && sectionId !== "spots" && sectionId !== "card-models") {
           document.getElementById(sectionId)?.scrollIntoView({ block: "start" });
@@ -697,6 +855,10 @@ export function PilgrimageApp({
       return;
     }
     setActiveExplorePanel(null);
+    setIsExploreSheetExpanded(false);
+    exploreSheetCollapsedHeightRef.current = 0;
+    exploreSheetDragRef.current = null;
+    exploreSheetSwipeStartYRef.current = null;
     const hash = `#/${page}${sectionId ? `/${sectionId}` : ""}`;
     setActivePage(page);
     if (window.location.hash === hash) {
@@ -1174,7 +1336,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 1.1.6
+          HASUNOSORA PILGRIMAGE · VER. 1.1.7
         </div>
       </section>
 
@@ -2103,39 +2265,18 @@ export function PilgrimageApp({
           }}
         >
           <div
-            className="explore-sheet__panel"
+            ref={exploreSheetPanelRef}
+            className={`explore-sheet__panel${isExploreSheetExpanded ? " is-expanded" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="explore-sheet-title"
           >
             <div
               className="explore-sheet__swipe-zone"
-              onPointerDown={(event) => {
-                exploreSheetSwipeStartYRef.current = event.clientY;
-              }}
-              onPointerMove={(event) => {
-                const startY = exploreSheetSwipeStartYRef.current;
-                if (
-                  startY !== null &&
-                  Math.abs(event.clientY - startY) >= 8 &&
-                  !event.currentTarget.hasPointerCapture(event.pointerId)
-                ) {
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                }
-              }}
-              onPointerUp={(event) => {
-                const startY = exploreSheetSwipeStartYRef.current;
-                exploreSheetSwipeStartYRef.current = null;
-                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  event.currentTarget.releasePointerCapture(event.pointerId);
-                }
-                if (startY !== null && event.clientY - startY >= 72) {
-                  closeExplorePanel();
-                }
-              }}
-              onPointerCancel={() => {
-                exploreSheetSwipeStartYRef.current = null;
-              }}
+              onPointerDown={startExploreSheetDrag}
+              onPointerMove={moveExploreSheetDrag}
+              onPointerUp={finishExploreSheetDrag}
+              onPointerCancel={cancelExploreSheetDrag}
             >
               <div className="explore-sheet__grab-zone">
                 <div className="explore-sheet__handle" aria-hidden="true" />
@@ -2629,7 +2770,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 1.1.6 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 1.1.7 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
