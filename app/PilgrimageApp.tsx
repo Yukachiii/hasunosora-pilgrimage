@@ -1174,7 +1174,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 1.1.4
+          HASUNOSORA PILGRIMAGE · VER. 1.1.5
         </div>
       </section>
 
@@ -2026,7 +2026,7 @@ export function PilgrimageApp({
             <h2>コラボ</h2>
           </div>
           <p>
-            公式発表済みの企画から、加賀温泉郷コラボと石川県コラボ第5弾だけを掲載しています。
+            コラボ企画の開催情報と対象スポットを掲載しています。
             開催期間や各施設の休業日は、出発前に公式案内も確認してください。
           </p>
         </div>
@@ -2629,7 +2629,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 1.1.4 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 1.1.5 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
