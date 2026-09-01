@@ -343,7 +343,6 @@ export function MapboxPilgrimageMap({
     const map = new mapboxgl.Map({
       container: mapElementRef.current,
       style: "mapbox://styles/mapbox/standard",
-      language: "ja",
       config: {
         basemap: {
           theme: "faded",
@@ -363,6 +362,12 @@ export function MapboxPilgrimageMap({
       zoom: 12.4,
       attributionControl: true,
       cooperativeGestures: true,
+    });
+    map.on("style.load", () => {
+      if (cancelled) return;
+      // Standard style imports its label layers asynchronously. Applying the
+      // language after the style is ready also covers zoom-dependent layers.
+      map.setLanguage("ja");
     });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), "top-right");
     map.on("load", () => {

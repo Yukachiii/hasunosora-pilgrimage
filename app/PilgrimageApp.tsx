@@ -1174,7 +1174,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 1.1.2
+          HASUNOSORA PILGRIMAGE · VER. 1.1.3
         </div>
       </section>
 
@@ -2629,7 +2629,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 1.1.2 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 1.1.3 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
