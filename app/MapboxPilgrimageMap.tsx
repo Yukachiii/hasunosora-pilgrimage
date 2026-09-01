@@ -476,7 +476,7 @@ export function MapboxPilgrimageMap({
     if (!map || mapState !== "ready") return;
     const selected = spots.find((spot) => spot.id === selectedId);
     if (!selected) return;
-    map.easeTo({ center: [selected.lng, selected.lat], zoom: 16.2, duration: 450 });
+    map.easeTo({ center: [selected.lng, selected.lat], duration: 450 });
   }, [mapState, selectedId, spots]);
 
   useEffect(() => {
