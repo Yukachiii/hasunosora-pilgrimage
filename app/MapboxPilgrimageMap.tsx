@@ -56,59 +56,20 @@ const ROUTE_LAYER_ID = "pilgrimage-route-line";
 const SPOT_SOURCE_ID = "pilgrimage-spots";
 const SPOT_LAYER_ID = "pilgrimage-spot-points";
 const SELECTED_SPOT_LAYER_ID = "pilgrimage-selected-spot";
-const RED_MARKER_IMAGE_ID = "pilgrimage-red-marker";
-const YELLOW_MARKER_IMAGE_ID = "pilgrimage-yellow-marker";
-const BLUE_MARKER_IMAGE_ID = "pilgrimage-blue-marker";
-const GREEN_MARKER_IMAGE_ID = "pilgrimage-green-marker";
+const NUMBERED_MARKER_IMAGE_PREFIX = "pilgrimage-numbered-marker";
+const MARKER_IMAGE_WIDTH = 64;
+const MARKER_IMAGE_HEIGHT = 102;
+const MARKER_IMAGE_PIXEL_RATIO = 3;
 
 function markerIconSize() {
   return [
     "interpolate",
     ["linear"],
     ["zoom"],
-    6, 0.045,
-    10, 0.07,
-    14, 0.1,
+    6, 0.45,
+    10, 0.7,
+    14, 1,
   ] as mapboxgl.Expression;
-}
-
-function markerTextSize() {
-  const sizes = { compact: [5, 7, 8], standard: [6, 8, 10] };
-  const threeDigits = [">=", ["length", ["get", "indexLabel"]], 3];
-  return [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    6, ["case", threeDigits, sizes.compact[0], sizes.standard[0]],
-    10, ["case", threeDigits, sizes.compact[1], sizes.standard[1]],
-    14, ["case", threeDigits, sizes.compact[2], sizes.standard[2]],
-  ] as mapboxgl.Expression;
-}
-
-function selectedMarkerTextSize() {
-  return [
-    "case",
-    [">=", ["length", ["get", "indexLabel"]], 3],
-    9,
-    11,
-  ] as mapboxgl.Expression;
-}
-
-function ensureMapImage(map: mapboxgl.Map, id: string, url: string) {
-  return new Promise<void>((resolve, reject) => {
-    if (map.hasImage(id)) {
-      resolve();
-      return;
-    }
-    map.loadImage(url, (error, image) => {
-      if (error || !image) {
-        reject(error ?? new Error(`地図ピン画像を読み込めませんでした: ${url}`));
-        return;
-      }
-      if (!map.hasImage(id)) map.addImage(id, image);
-      resolve();
-    });
-  });
 }
 
 function buildGoogleMapsUrl(request: RouteRequest) {
@@ -171,6 +132,75 @@ function mapboxProfile(mode: TravelMode) {
 
 type MarkerKind = "standard" | "collaboration" | "card" | "planned";
 
+const markerAssetByKind: Record<MarkerKind, string> = {
+  standard: "./map-markers/red.png",
+  collaboration: "./map-markers/yellow.png",
+  card: "./map-markers/blue.png",
+  planned: "./map-markers/green.png",
+};
+
+const markerAssetCache = new Map<MarkerKind, Promise<HTMLImageElement>>();
+
+function numberedMarkerImageId(kind: MarkerKind, label: string) {
+  return `${NUMBERED_MARKER_IMAGE_PREFIX}-${kind}-${label}`;
+}
+
+function loadMarkerAsset(kind: MarkerKind) {
+  const cached = markerAssetCache.get(kind);
+  if (cached) return cached;
+  const request = new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`地図ピン画像を読み込めませんでした: ${markerAssetByKind[kind]}`));
+    image.src = markerAssetByKind[kind];
+  });
+  markerAssetCache.set(kind, request);
+  return request;
+}
+
+function createNumberedMarkerImage(image: HTMLImageElement, label: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = MARKER_IMAGE_WIDTH;
+  canvas.height = MARKER_IMAGE_HEIGHT;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("地図ピンを描画できませんでした。");
+
+  context.drawImage(image, 0, 0, MARKER_IMAGE_WIDTH, MARKER_IMAGE_HEIGHT);
+  context.beginPath();
+  context.ellipse(32, 33, 24, 15, 0, 0, Math.PI * 2);
+  context.fillStyle = "#fffdf7";
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = "#6a370f";
+  context.stroke();
+
+  context.fillStyle = "#4b270e";
+  context.font = `800 ${label.length >= 3 ? 21 : 26}px Arial, sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, 32, 34, 43);
+  return context.getImageData(0, 0, MARKER_IMAGE_WIDTH, MARKER_IMAGE_HEIGHT);
+}
+
+async function ensureNumberedMarkerImages(
+  map: mapboxgl.Map,
+  features: GeoJSON.Feature<GeoJSON.Point>[],
+) {
+  const kinds = [...new Set(features.map((feature) => feature.properties?.markerKind as MarkerKind))];
+  const assets = new Map(await Promise.all(kinds.map(async (kind) => [kind, await loadMarkerAsset(kind)] as const)));
+  for (const feature of features) {
+    const kind = feature.properties?.markerKind as MarkerKind;
+    const label = String(feature.properties?.indexLabel ?? "");
+    const imageId = numberedMarkerImageId(kind, label);
+    if (!map.hasImage(imageId)) {
+      map.addImage(imageId, createNumberedMarkerImage(assets.get(kind)!, label), {
+        pixelRatio: MARKER_IMAGE_PIXEL_RATIO,
+      });
+    }
+  }
+}
+
 function markerKindForSpot(
   spot: PilgrimageSpot,
   plannedSpotIds: ReadonlySet<string>,
@@ -196,6 +226,10 @@ function spotFeatureCollection(
         spotId: spot.id,
         indexLabel: String(index + 1).padStart(2, "0"),
         markerKind: markerKindForSpot(spot, plannedSpotIds, cardModelSpotIds),
+        markerImageId: numberedMarkerImageId(
+          markerKindForSpot(spot, plannedSpotIds, cardModelSpotIds),
+          String(index + 1).padStart(2, "0"),
+        ),
       },
     })),
   };
@@ -361,12 +395,7 @@ export function MapboxPilgrimageMap({
     const showPointer = () => { map.getCanvas().style.cursor = "pointer"; };
     const clearPointer = () => { map.getCanvas().style.cursor = ""; };
 
-    void Promise.all([
-      ensureMapImage(map, RED_MARKER_IMAGE_ID, "./map-markers/red.png"),
-      ensureMapImage(map, YELLOW_MARKER_IMAGE_ID, "./map-markers/yellow.png"),
-      ensureMapImage(map, BLUE_MARKER_IMAGE_ID, "./map-markers/blue.png"),
-      ensureMapImage(map, GREEN_MARKER_IMAGE_ID, "./map-markers/green.png"),
-    ]).then(() => {
+    void ensureNumberedMarkerImages(map, data.features).then(() => {
       if (cancelled) return;
       const existingSource = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
       if (existingSource) {
@@ -374,18 +403,8 @@ export function MapboxPilgrimageMap({
       } else {
         map.addSource(SPOT_SOURCE_ID, { type: "geojson", data });
       }
-      const markerImage = [
-        "match",
-        ["get", "markerKind"],
-        "planned", GREEN_MARKER_IMAGE_ID,
-        "card", BLUE_MARKER_IMAGE_ID,
-        "collaboration", YELLOW_MARKER_IMAGE_ID,
-        RED_MARKER_IMAGE_ID,
-      ] as mapboxgl.Expression;
-
       if (map.getLayer(SPOT_LAYER_ID)) {
         map.setLayoutProperty(SPOT_LAYER_ID, "icon-size", markerIconSize());
-        map.setLayoutProperty(SPOT_LAYER_ID, "text-size", markerTextSize());
       } else {
         map.addLayer({
           id: SPOT_LAYER_ID,
@@ -393,33 +412,17 @@ export function MapboxPilgrimageMap({
           source: SPOT_SOURCE_ID,
           filter: ["!=", ["get", "spotId"], selectedId],
           layout: {
-            "icon-image": markerImage,
+            "icon-image": ["get", "markerImageId"],
             "icon-size": markerIconSize(),
             "icon-anchor": "bottom",
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
-            "text-field": ["get", "indexLabel"],
-            "text-size": markerTextSize(),
-            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-offset": [0, -2.1],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: {
-            "text-color": "#4b270e",
-            "text-halo-color": "#fffdf7",
-            "text-halo-width": 2,
           },
         });
       }
 
       if (map.getLayer(SELECTED_SPOT_LAYER_ID)) {
-        map.setLayoutProperty(SELECTED_SPOT_LAYER_ID, "icon-size", 0.13);
-        map.setLayoutProperty(
-          SELECTED_SPOT_LAYER_ID,
-          "text-size",
-          selectedMarkerTextSize(),
-        );
+        map.setLayoutProperty(SELECTED_SPOT_LAYER_ID, "icon-size", 1.3);
       } else {
         map.addLayer({
           id: SELECTED_SPOT_LAYER_ID,
@@ -427,22 +430,11 @@ export function MapboxPilgrimageMap({
           source: SPOT_SOURCE_ID,
           filter: ["==", ["get", "spotId"], selectedId],
           layout: {
-            "icon-image": markerImage,
-            "icon-size": 0.13,
+            "icon-image": ["get", "markerImageId"],
+            "icon-size": 1.3,
             "icon-anchor": "bottom",
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
-            "text-field": ["get", "indexLabel"],
-            "text-size": selectedMarkerTextSize(),
-            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-            "text-offset": [0, -2.55],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: {
-            "text-color": "#4b270e",
-            "text-halo-color": "#fffdf7",
-            "text-halo-width": 2.2,
           },
         });
       }
