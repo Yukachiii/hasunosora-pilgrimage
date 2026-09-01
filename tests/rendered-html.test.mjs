@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 1\.0\.1/);
+  assert.match(html, /Ver\. 1\.0\.2/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
@@ -198,7 +198,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "1.0.1");
+  assert.equal(JSON.parse(packageJson).version, "1.0.2");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -264,6 +264,7 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(app, /itinerary-editor__empty/);
   assert.match(css, /\.itinerary-editor li\.itinerary-editor__empty\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);
   assert.match(app, /訪問順を自動で最適化/);
+  assert.match(app, /const \[optimizeOrder, setOptimizeOrder\] = useState\(false\)/);
   assert.match(app, /移動時間と訪問順を計算し、一日の予定として表示します/);
   assert.match(app, /cardCharacterFilter/);
   assert.match(planner, /東京駅/);
@@ -541,6 +542,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(storage, /PlannerDaySnapshot/);
   assert.match(storage, /activeDayIndex/);
   assert.match(storage, /v:\s*3/);
+  assert.match(storage, /optimizeOrder: candidate\.optimizeOrder === true/);
   assert.match(app, /sanitizePlannerSnapshot/);
   assert.match(app, /この内容は計算済みです/);
   assert.match(app, /当日の予定/);
