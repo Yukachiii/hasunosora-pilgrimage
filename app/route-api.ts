@@ -1,7 +1,14 @@
 import type { TravelMode } from "./route-planner";
 
+export type ServerRouteStopLocation = {
+  id: string;
+  lat: number;
+  lng: number;
+};
+
 export type ServerRoutePlanRequest = {
   stopIds: string[];
+  stopLocations?: ServerRouteStopLocation[];
   travelMode: TravelMode;
   optimizeWaypointOrder: boolean;
   stayMinutes: Record<string, number>;

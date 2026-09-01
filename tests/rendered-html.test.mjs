@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 1\.0\.4/);
+  assert.match(html, /Ver\. 1\.1\.0/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
   assert.match(html, /金沢駅/);
   assert.match(html, /近江町市場/);
@@ -198,7 +198,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "1.0.4");
+  assert.equal(JSON.parse(packageJson).version, "1.1.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -314,6 +314,24 @@ test("server route planner validates requests before using Google Routes", async
   assert.equal(staleDataResponse.status, 409);
   assert.equal((await staleDataResponse.json()).code, "SPOT_DATA_OUT_OF_DATE");
 
+  const currentClientResponse = await requestApp(new Request("http://localhost/api/routes/plan", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      stopIds: ["kanazawa-station", "newer-public-spot"],
+      stopLocations: [
+        { id: "kanazawa-station", lat: 36.5778025, lng: 136.647986 },
+        { id: "newer-public-spot", lat: 36.563916, lng: 136.65395 },
+      ],
+      travelMode: "WALKING",
+      optimizeWaypointOrder: false,
+      stayMinutes: { "kanazawa-station": 15, "newer-public-spot": 15 },
+      departureTime: "invalid-for-validation",
+    }),
+  }));
+  assert.equal(currentClientResponse.status, 400);
+  assert.match((await currentClientResponse.json()).error, /出発日時/);
+
   const [routeApi, map, page, pagesMain, workflow, usageStore] = await Promise.all([
     readFile(new URL("../app/api/routes/plan/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
@@ -328,11 +346,15 @@ test("server route planner validates requests before using Google Routes", async
   assert.match(routeApi, /inFlightPlans/);
   assert.match(routeApi, /departureTime: cursor\.toISOString\(\)/);
   assert.match(routeApi, /maximumItineraryStops/);
+  assert.match(routeApi, /submittedRouteStops/);
+  assert.match(routeApi, /lat < 20 \|\| lat > 46/);
+  assert.match(routeApi, /stops: plan\.stops\.map\(\(stop\) => \[stop\.id, stop\.lat, stop\.lng\]\)/);
   assert.match(routeApi, /recordRouteApiUsage/);
   assert.match(routeApi, /Google Mapsとの通信に失敗しました/);
   assert.match(usageStore, /INSERT INTO route_api_usage/);
   assert.doesNotMatch(usageStore, /connecting-ip|x-forwarded-for|spotIds|sourceStationId/);
   assert.match(map, /source: "server"/);
+  assert.match(map, /stopLocations: requestedRoute\.stops\.map/);
   assert.match(page, /routeServiceUrl="\/api\/routes\/plan"/);
   assert.match(pagesMain, /VITE_ROUTE_API_URL/);
   assert.match(workflow, /ROUTE_API_URL/);

@@ -504,6 +504,11 @@ export function MapboxPilgrimageMap({
               headers: { "content-type": "application/json" },
               body: JSON.stringify({
                 stopIds: requestedRoute.stops.map((spot) => spot.id),
+                stopLocations: requestedRoute.stops.map((spot) => ({
+                  id: spot.id,
+                  lat: spot.lat,
+                  lng: spot.lng,
+                })),
                 travelMode: requestedRoute.travelMode,
                 optimizeWaypointOrder: requestedRoute.optimizeWaypointOrder,
                 stayMinutes: Object.fromEntries(

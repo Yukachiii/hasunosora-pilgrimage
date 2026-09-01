@@ -80,6 +80,11 @@ GitHub ActionsのSecret `ROUTE_API_URL` に
 `https://サーバーのドメイン/api/routes/plan` を設定すると、Pages版もそのAPIを利用します。
 未設定時はMapbox Directions APIを使うブラウザ内ルート検索へ自動的に戻ります。
 
+公開ページは選択したスポットのIDと座標をルートAPIへ送ります。API側は件数、
+IDとの対応、国内座標範囲を検証するため、スポット追加のたびにルートAPI内の
+スポット一覧を更新する必要はありません。旧公開ページからIDだけが送られた場合は、
+互換性のためサーバー内の登録スポットを参照します。
+
 サーバー用キーはブラウザ用と分け、Google Cloud側でRoutes APIのみに制限してください。
 
 ## API使用状況

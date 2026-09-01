@@ -119,6 +119,37 @@ function requiredString(value: unknown, label: string) {
   return value.trim();
 }
 
+function submittedRouteStops(
+  value: unknown,
+  stopIds: string[],
+): RouteLocation[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value) || value.length !== stopIds.length) {
+    throw new RoutePlanError("スポットの位置情報が正しくありません。");
+  }
+  return value.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new RoutePlanError("スポットの位置情報が正しくありません。");
+    }
+    const candidate = entry as { id?: unknown; lat?: unknown; lng?: unknown };
+    const id = requiredString(candidate.id, "スポット");
+    const lat = Number(candidate.lat);
+    const lng = Number(candidate.lng);
+    if (id !== stopIds[index]) {
+      throw new RoutePlanError("スポットと位置情報の順序が一致しません。");
+    }
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng) ||
+      lat < 20 || lat > 46 ||
+      lng < 122 || lng > 154
+    ) {
+      throw new RoutePlanError("スポットの位置情報が国内の範囲外です。");
+    }
+    return { id, name: id, address: "", lat, lng };
+  });
+}
+
 function normalizeRequest(value: unknown): NormalizedPlan {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new RoutePlanError("ルート条件が正しくありません。");
@@ -138,14 +169,18 @@ function normalizeRequest(value: unknown): NormalizedPlan {
   if (new Set(stopIds).size !== stopIds.length) {
     throw new RoutePlanError("同じスポットを重複して指定できません。");
   }
-  const resolvedStops = stopIds.map((id) => spots.find((spot) => spot.id === id));
-  if (resolvedStops.some((spot) => !spot)) {
+  const providedStops = submittedRouteStops(body.stopLocations, stopIds);
+  const registeredStops = providedStops
+    ? null
+    : stopIds.map((id) => spots.find((spot) => spot.id === id));
+  if (registeredStops?.some((spot) => !spot)) {
     throw new RoutePlanError(
       "公開ページとルートAPIのスポットデータに更新差があります。",
       409,
       "SPOT_DATA_OUT_OF_DATE",
     );
   }
+  const resolvedStops = providedStops ?? registeredStops as RouteLocation[];
   if (!allowedModes.has(body.travelMode as TravelMode)) {
     throw new RoutePlanError("移動手段が正しくありません。");
   }
@@ -181,7 +216,7 @@ function normalizeRequest(value: unknown): NormalizedPlan {
   }
   return {
     stopIds,
-    stops: resolvedStops as RouteLocation[],
+    stops: resolvedStops,
     travelMode,
     optimizeWaypointOrder: travelMode !== "TRANSIT" && body.optimizeWaypointOrder === true,
     stayMinutes,
@@ -403,7 +438,7 @@ export async function POST(request: Request) {
       );
     }
     const cacheKey = JSON.stringify({
-      stopIds: plan.stopIds,
+      stops: plan.stops.map((stop) => [stop.id, stop.lat, stop.lng]),
       travelMode: plan.travelMode,
       optimizeWaypointOrder: plan.optimizeWaypointOrder,
       stayMinutes: plan.stayMinutes,
