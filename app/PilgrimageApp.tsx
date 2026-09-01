@@ -1174,7 +1174,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 1.1.5
+          HASUNOSORA PILGRIMAGE · VER. 1.1.6
         </div>
       </section>
 
@@ -2482,7 +2482,7 @@ export function PilgrimageApp({
             <div className="guide-step__copy">
               <span className="guide-step__number">01</span>
               <h3>探し方を選ぶ</h3>
-              <p>「探す」では、定番スポット、開催中のコラボ、地図、カードの4種類から選べます。</p>
+              <p>「探す」では、目的に合う方法でスポットやカードを探せます。</p>
             </div>
             <div className="guide-step__screens">
               <button
@@ -2629,7 +2629,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 1.1.5 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 1.1.6 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
