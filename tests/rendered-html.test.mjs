@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 2\.0\.1/);
+  assert.match(html, /Ver\. 2\.0\.2/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -200,7 +200,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "2.0.1");
+  assert.equal(JSON.parse(packageJson).version, "2.0.2");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -281,8 +281,9 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(app, /Yahoo!の検索結果を確認する/);
   assert.match(app, /confirmedTransitLegCount/);
   assert.match(app, /全国の主要駅から最初のスポット/);
-  assert.match(app, /className="journey-start__today"/);
-  assert.match(app, /setVisitDate\(japanDate\(\)\)/);
+  assert.match(app, /aria-label="訪問日"/);
+  assert.match(app, /aria-label="出発時刻"/);
+  assert.match(app, /aria-label="移動手段"/);
   assert.doesNotMatch(app, /公共交通（準備中）/);
   assert.match(yahooTransit, /transit\.yahoo\.co\.jp\/search\/result/);
   assert.match(yahooTransit, /m1: paddedMinute\[0\]/);
@@ -680,7 +681,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.map-layout\s*\{[^}]*align-items:\s*stretch/s);
   assert.match(css, /\.route-planner\s*\{[^}]*align-self:\s*stretch[^}]*height:\s*auto[^}]*max-height:\s*none/s);
   assert.match(css, /\.route-workspace__controls/);
-  assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.journey-start__datetime\s*\{[^}]*grid-template-columns:\s*1fr/s);
+  assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.planner-overview\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
   assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.selected-spot-bar strong\s*\{[^}]*white-space:\s*normal/s);
   assert.doesNotMatch(css, /scroll-snap-(?:type|align)/);
   assert.match(css, /\.route-planner \.itinerary-editor > ol\s*\{[^}]*max-height:\s*none/s);
@@ -693,6 +694,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /activePage === "planner" \? itinerarySpots : spots/);
   assert.match(app, /className="planner-overview"/);
   assert.match(app, /className="planner-conditions"/);
+  assert.doesNotMatch(app, />予定条件</);
   assert.match(app, /planner-create-bar/);
   assert.match(app, /automaticRouteAttemptRef/);
   assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]*?searchRoute\(\);[\s\S]*?\}, 650\)/);

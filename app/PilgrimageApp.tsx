@@ -1374,7 +1374,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 2.0.1
+          HASUNOSORA PILGRIMAGE · VER. 2.0.2
         </div>
       </section>
 
@@ -1427,7 +1427,7 @@ export function PilgrimageApp({
           </div>
           <p>
             {activePage === "planner"
-              ? "選択したスポットを確認し、訪問日とルート条件を設定してください。"
+              ? "訪問日・出発時刻・移動手段は、下の項目を押して変更できます。"
               : "ピンを選択すると、スポット情報の確認と予定への追加ができます。"}
           </p>
         </div>
@@ -1470,18 +1470,51 @@ export function PilgrimageApp({
 
         {activePage === "planner" ? (
           <div className="planner-overview" aria-label="現在の予定概要">
-            <span>
+            <span className="planner-overview__static">
               <small>訪問先</small>
               <strong>{itineraryIds.length}か所</strong>
             </span>
-            <span>
+            <label className="planner-overview__control">
               <small>訪問日</small>
-              <strong>{visitDate.replaceAll("-", "/")}</strong>
-            </span>
-            <span>
+              <input
+                type="date"
+                min={japanDate()}
+                max={japanDate(99)}
+                value={visitDate}
+                aria-label="訪問日"
+                onChange={(event) => {
+                  setVisitDate(event.target.value);
+                  if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
+                }}
+              />
+            </label>
+            <label className="planner-overview__control">
+              <small>出発時刻</small>
+              <input
+                type="time"
+                value={startTime}
+                aria-label="出発時刻"
+                onChange={(event) => {
+                  setStartTime(event.target.value);
+                  if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
+                }}
+              />
+            </label>
+            <label className="planner-overview__control">
               <small>移動手段</small>
-              <strong>{travelModes.find((mode) => mode.value === travelMode)?.label ?? "未設定"}</strong>
-            </span>
+              <select
+                value={travelMode}
+                aria-label="移動手段"
+                onChange={(event) => {
+                  setTravelMode(event.target.value as TravelMode);
+                  invalidateRoute();
+                }}
+              >
+                {travelModes.filter((mode) => !mode.disabled).map((mode) => (
+                  <option key={mode.value} value={mode.value}>{mode.label}</option>
+                ))}
+              </select>
+            </label>
           </div>
         ) : null}
 
@@ -1631,7 +1664,7 @@ export function PilgrimageApp({
               </div>
               <ol>
                 {!itinerarySpots.length ? (
-                  <li className="itinerary-editor__empty">探すページからスポットを追加してください。</li>
+                  <li className="itinerary-editor__empty">下の「探す」からスポットを追加してください。</li>
                 ) : null}
                 {itinerarySpots.map((spot, index) => (
                   <li key={spot.id}>
@@ -1675,40 +1708,17 @@ export function PilgrimageApp({
           </aside>
         </div>
 
-        <section className="route-workspace" id="planner" aria-label="ルート条件と一日の予定" hidden={activePage !== "planner"}>
+        <section className="route-workspace" id="planner" aria-label="予定の詳細と一日の予定" hidden={activePage !== "planner"}>
           <div className="route-workspace__controls">
             <details className="planner-conditions">
               <summary>
                 <span>
-                  <small>DATE &amp; ROUTE</small>
-                  <strong>予定条件</strong>
+                  <small>OPTIONAL</small>
+                  <strong>詳細設定</strong>
                 </span>
-                <em>{visitDate.replaceAll("-", "/")} · {startTime}出発</em>
+                <em>出発駅・宿泊・予約・訪問順</em>
               </summary>
               <div className="journey-start">
-              <fieldset className="travel-modes travel-modes--compact">
-                <legend>移動手段</legend>
-                <div>
-                  {travelModes.map((mode) => (
-                    <label key={mode.value} className={mode.disabled ? "is-disabled" : undefined}>
-                      <input
-                        type="radio"
-                        name="travel-mode"
-                        value={mode.value}
-                        checked={travelMode === mode.value}
-                        disabled={mode.disabled}
-                        onChange={() => {
-                          if (mode.disabled) return;
-                          setTravelMode(mode.value);
-                          invalidateRoute();
-                        }}
-                      />
-                      <span className="mode-icon">{mode.icon}</span>
-                      <span>{mode.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
               {travelMode === "TRANSIT" ? (
                 <div className="transit-origin">
                   <label>
@@ -1738,44 +1748,6 @@ export function PilgrimageApp({
                   </p>
                 </div>
               ) : null}
-              <div className="journey-start__datetime">
-                <div className="journey-start__date">
-                  <label htmlFor="visit-date">訪問日</label>
-                  <button
-                    className="journey-start__today"
-                    type="button"
-                    disabled={visitDate === japanDate()}
-                    onClick={() => {
-                      setVisitDate(japanDate());
-                      if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
-                    }}
-                  >
-                    今日
-                  </button>
-                  <input
-                    id="visit-date"
-                    type="date"
-                    min={japanDate()}
-                    max={japanDate(99)}
-                    value={visitDate}
-                    onChange={(event) => {
-                      setVisitDate(event.target.value);
-                      if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
-                    }}
-                  />
-                </div>
-                <label>
-                  <span>出発時刻</span>
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(event) => {
-                      setStartTime(event.target.value);
-                      if (travelMode === "TRANSIT" || sourceStationId) invalidateRoute();
-                    }}
-                  />
-                </label>
-              </div>
               {plannerDays.length === 1 ? (
                 <div className="multi-day-prompt">
                   <span>宿泊を伴う旅行ですか？</span>
@@ -1878,18 +1850,26 @@ export function PilgrimageApp({
                   </section>
                 </div>
               </details>
+
+              <label className={`route-optimize ${travelMode === "TRANSIT" ? "is-disabled" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={travelMode !== "TRANSIT" && optimizeOrder}
+                  disabled={travelMode === "TRANSIT"}
+                  onChange={(event) => {
+                    setOptimizeOrder(event.target.checked);
+                    invalidateRoute();
+                  }}
+                />
+                <span>
+                  <strong>訪問順を自動で最適化</strong>
+                  <small>{travelMode === "TRANSIT" ? "公共交通は指定順で、各スポットの滞在終了時刻に合わせて区間検索します。" : "最初と最後を固定して、中間地点を並べ替えます。"}</small>
+                </span>
+              </label>
               </div>
             </details>
 
             <div className="route-workspace__options">
-
-            <div className="planner-review">
-              <span>
-                {plannerDays.length > 1 ? `${activeDayIndex + 1}日目 · ` : ""}
-                {visitDate.replaceAll("-", "/")}
-              </span>
-              <span>{itineraryIds.length}か所 · {startTime}–{activePlannerDay.endTime}</span>
-            </div>
             {previousHotelName || activePlannerDay.hotelName ? (
               <p className="planner-review__note">
                 {previousHotelName ? `前泊：${previousHotelName}` : ""}
@@ -1919,27 +1899,6 @@ export function PilgrimageApp({
                 終了目安は出発時刻より後に設定してください。
               </p>
             ) : null}
-
-            <details className="planner-advanced">
-              <summary>詳細設定</summary>
-
-            <label className={`route-optimize ${travelMode === "TRANSIT" ? "is-disabled" : ""}`}>
-              <input
-                type="checkbox"
-                checked={travelMode !== "TRANSIT" && optimizeOrder}
-                disabled={travelMode === "TRANSIT"}
-                onChange={(event) => {
-                  setOptimizeOrder(event.target.checked);
-                  invalidateRoute();
-                }}
-              />
-              <span>
-                <strong>訪問順を自動で最適化</strong>
-                <small>{travelMode === "TRANSIT" ? "公共交通は指定順で、各スポットの滞在終了時刻に合わせて区間検索します。" : "最初と最後を固定して、中間地点を並べ替えます。"}</small>
-              </span>
-            </label>
-
-            </details>
 
             <div className={`planner-create-bar${routeIsCurrent ? " is-complete" : ""}`}>
               <button
@@ -2797,7 +2756,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 2.0.1 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 2.0.2 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
