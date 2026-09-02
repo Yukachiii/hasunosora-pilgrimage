@@ -32,6 +32,7 @@ export type RouteResult = {
 type Props = {
   spots: PilgrimageSpot[];
   selectedId: string;
+  focusSpotRequest?: { spotId: string; requestId: number } | null;
   plannedSpotIds: string[];
   cardModelSpotIds: string[];
   onSelect: (id: string) => void;
@@ -40,6 +41,7 @@ type Props = {
   accessToken: string;
   routeServiceUrl: string;
   isVisible?: boolean;
+  viewMode?: "explore" | "planner";
 };
 
 type MapboxRoute = {
@@ -238,6 +240,7 @@ function spotFeatureCollection(
 export function MapboxPilgrimageMap({
   spots,
   selectedId,
+  focusSpotRequest = null,
   plannedSpotIds,
   cardModelSpotIds,
   onSelect,
@@ -246,6 +249,7 @@ export function MapboxPilgrimageMap({
   accessToken,
   routeServiceUrl,
   isVisible = true,
+  viewMode = "explore",
 }: Props) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -321,20 +325,39 @@ export function MapboxPilgrimageMap({
     map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 650 });
   }, [clearRoute]);
 
+  const fitPlannerView = useCallback((duration: number) => {
+    const map = mapRef.current;
+    if (!map || mapState !== "ready") return;
+    const bounds = new mapboxgl.LngLatBounds();
+    const lines = routeLinesRef.current;
+    if (lines.length) {
+      lines.flat().forEach(([lng, lat]) => bounds.extend([lng, lat]));
+    } else {
+      spots.forEach((spot) => bounds.extend([spot.lng, spot.lat]));
+    }
+    if (bounds.isEmpty()) return;
+    map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration });
+  }, [mapState, spots]);
+
   useEffect(() => {
     if (!isVisible || mapState !== "ready") return;
     const frame = window.requestAnimationFrame(() => {
       const map = mapRef.current;
       if (!map) return;
       map.resize();
-      const lines = routeLinesRef.current;
-      if (!lines.length) return;
-      const bounds = new mapboxgl.LngLatBounds();
-      lines.flat().forEach(([lng, lat]) => bounds.extend([lng, lat]));
-      map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 0 });
+      if (viewMode === "planner") fitPlannerView(0);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [isVisible, mapState]);
+  }, [fitPlannerView, isVisible, mapState, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "planner" || mapState !== "ready") return;
+    const frame = window.requestAnimationFrame(() => {
+      mapRef.current?.resize();
+      fitPlannerView(500);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [fitPlannerView, mapState, viewMode]);
 
   useEffect(() => {
     if (!token || !mapElementRef.current) return;
@@ -460,6 +483,18 @@ export function MapboxPilgrimageMap({
     if (!selected) return;
     map.easeTo({ center: [selected.lng, selected.lat], duration: 450 });
   }, [mapState, selectedId, spots]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapState !== "ready" || !focusSpotRequest) return;
+    const focused = spots.find((spot) => spot.id === focusSpotRequest.spotId);
+    if (!focused) return;
+    map.easeTo({
+      center: [focused.lng, focused.lat],
+      zoom: Math.max(map.getZoom(), 15.5),
+      duration: 550,
+    });
+  }, [focusSpotRequest, mapState, spots]);
 
   useEffect(() => {
     if (!routeRequest) {

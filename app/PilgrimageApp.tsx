@@ -197,7 +197,6 @@ export function PilgrimageApp({
     createPlannerDay(0, japanDate()),
   ]);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
-  const [addSpotId, setAddSpotId] = useState(spots[0].id);
   const [stayMinutes, setStayMinutes] = useState<Record<string, number>>(() =>
     Object.fromEntries(spots.map((spot) => [spot.id, recommendedStayMinutes(spot)])),
   );
@@ -236,6 +235,10 @@ export function PilgrimageApp({
     alt: string;
     variant?: "guide" | "card";
   } | null>(null);
+  const [mapFocusRequest, setMapFocusRequest] = useState<{
+    spotId: string;
+    requestId: number;
+  } | null>(null);
   const exploreSheetCloseButtonRef = useRef<HTMLButtonElement>(null);
   const exploreSheetSwipeStartYRef = useRef<number | null>(null);
   const exploreSheetPanelRef = useRef<HTMLDivElement>(null);
@@ -252,6 +255,7 @@ export function PilgrimageApp({
   const exploreSheetCloseTimerRef = useRef<number | null>(null);
   const exploreSheetSettleTimerRef = useRef<number | null>(null);
   const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const automaticRouteAttemptRef = useRef("");
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
   const visitDate = activePlannerDay.visitDate;
@@ -545,15 +549,23 @@ export function PilgrimageApp({
           ? sanitizePlannerSnapshot(JSON.parse(legacyDraftRaw) as unknown, validSpotIds)
           : null);
         if (draft) {
-          setPlannerDays(draft.plannerDays);
+          const firstDraftDate = draft.plannerDays[0]?.visitDate ?? japanDate();
+          const restoredPastPlan = firstDraftDate < japanDate();
+          const restoredPlannerDays = restoredPastPlan
+            ? draft.plannerDays.map((day, index) => ({
+                ...day,
+                visitDate: dateAfter(japanDate(), index),
+              }))
+            : draft.plannerDays;
+          setPlannerDays(restoredPlannerDays);
           setActiveDayIndex(draft.activeDayIndex);
           setStayMinutes((current) => ({ ...current, ...draft.stayMinutes }));
           setTravelMode(draft.travelMode);
           setOptimizeOrder(draft.optimizeOrder);
           setSourceStationId(draft.sourceStationId);
           setItineraryCollaborationId(draft.itineraryCollaborationId as CollaborationId | "");
-          setCompletedSpotIds(draft.completedSpotIds);
-          setTodayOffsetMinutes(draft.todayOffsetMinutes);
+          setCompletedSpotIds(restoredPastPlan ? [] : draft.completedSpotIds);
+          setTodayOffsetMinutes(restoredPastPlan ? 0 : draft.todayOffsetMinutes);
           setTransitLegProgress(draft.transitLegProgress);
           if (draft.itineraryIds[0]) setSelectedId(draft.itineraryIds[0]);
         }
@@ -711,8 +723,6 @@ export function PilgrimageApp({
     () => plannerDays.reduce((total, day) => total + day.itineraryIds.length, 0),
     [plannerDays],
   );
-  const availableSpots = spots.filter((spot) => !itineraryIds.includes(spot.id));
-
   const plannedSpots = useMemo(() => {
     if (routeResult.state !== "success" || !routeResult.orderedStopIds?.length || !routeRequest) {
       return routeRequest?.stops ?? itinerarySpots;
@@ -847,10 +857,7 @@ export function PilgrimageApp({
     cancelExploreSheetClose();
     setIsExplorePickerOpen(false);
     if (page === "explore" && (sectionId === "spots" || sectionId === "card-models")) {
-      setActivePage("explore");
       setActiveExplorePanel(sectionId);
-      const panelHash = `#/explore/${sectionId}`;
-      if (window.location.hash !== panelHash) window.history.pushState(null, "", panelHash);
       return;
     }
     setActiveExplorePanel(null);
@@ -908,7 +915,7 @@ export function PilgrimageApp({
     }
   }, [activeDayId, routeRequest]);
 
-  function searchRoute() {
+  const searchRoute = useCallback(() => {
     if (itinerarySpots.length < 2) {
       setRouteResult({
         state: "error",
@@ -955,18 +962,54 @@ export function PilgrimageApp({
       }));
     }
     setSelectedId(itinerarySpots.at(-1)!.id);
+  }, [activeDayId, itinerarySpots, optimizeOrder, routeIsCurrent, sourceStationId, startTime, stayMinutes, travelMode, visitDate]);
+
+  useEffect(() => {
+    if (activePage !== "planner") {
+      automaticRouteAttemptRef.current = "";
+      return undefined;
+    }
+    if (
+      !hasRestoredPlannerStorage ||
+      activeExplorePanel !== null ||
+      itinerarySpots.length < 2 ||
+      dayTimeWindowInvalid ||
+      routeIsCurrent ||
+      routeResult.state === "loading"
+    ) return undefined;
+
+    const attemptKey = `${activeDayId}:${currentRouteSignature}`;
+    if (automaticRouteAttemptRef.current === attemptKey) return undefined;
+    const timer = window.setTimeout(() => {
+      automaticRouteAttemptRef.current = attemptKey;
+      searchRoute();
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [activeDayId, activeExplorePanel, activePage, currentRouteSignature, dayTimeWindowInvalid, hasRestoredPlannerStorage, itinerarySpots.length, routeIsCurrent, routeResult.state, searchRoute]);
+
+  function focusItinerarySpot(spotId: string) {
+    setSelectedId(spotId);
+    setMapFocusRequest({ spotId, requestId: Date.now() });
   }
 
-  function addSpot(requestedId?: string) {
-    const id = requestedId ?? (
-      itineraryIds.includes(addSpotId)
-        ? spots.find((spot) => !itineraryIds.includes(spot.id))?.id
-        : addSpotId
-    );
+  function handlePlannerPrimaryAction() {
+    if (routeIsCurrent && routeResult.state === "success") {
+      navigateToPage("today");
+      return;
+    }
+    if (routeIsCurrent && routeResult.state === "external") {
+      const panel = document.getElementById("transit-search-panel") as HTMLDetailsElement | null;
+      if (panel) panel.open = true;
+      panel?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    automaticRouteAttemptRef.current = "";
+    searchRoute();
+  }
+
+  function addSpot(id: string) {
     if (!id || itineraryIds.includes(id) || itineraryIds.length >= maximumItineraryStops) return;
     setItineraryIds((current) => [...current, id]);
-    const next = spots.find((spot) => !itineraryIds.includes(spot.id) && spot.id !== id);
-    if (next) setAddSpotId(next.id);
     invalidateRoute();
   }
 
@@ -1006,8 +1049,6 @@ export function PilgrimageApp({
     setCollaborationFilter(id);
     setAreaFilter("すべて");
     setSpotQuery("");
-    const nextAvailable = spots.find((spot) => !collaborationSpotIds.includes(spot.id));
-    if (nextAvailable) setAddSpotId(nextAvailable.id);
     invalidateRoute();
   }
 
@@ -1333,7 +1374,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 2.0.0
+          HASUNOSORA PILGRIMAGE · VER. 2.0.1
         </div>
       </section>
 
@@ -1502,6 +1543,7 @@ export function PilgrimageApp({
             <MapboxPilgrimageMap
               spots={activePage === "planner" ? itinerarySpots : spots}
               selectedId={selectedId}
+              focusSpotRequest={mapFocusRequest}
               plannedSpotIds={itineraryIds}
               cardModelSpotIds={CARD_MODEL_SPOT_IDS}
               onSelect={(id) => {
@@ -1513,6 +1555,7 @@ export function PilgrimageApp({
               accessToken={mapboxConfig.accessToken}
               routeServiceUrl={routeServiceUrl}
               isVisible={activePage === "explore" || activePage === "planner"}
+              viewMode={activePage === "planner" ? "planner" : "explore"}
             />
           </div>
           <div className="selected-map-detail" hidden={activePage !== "explore"}>
@@ -1592,24 +1635,32 @@ export function PilgrimageApp({
                 ) : null}
                 {itinerarySpots.map((spot, index) => (
                   <li key={spot.id}>
-                    <span className={`route-point ${index === 0 ? "route-point--start" : index === itinerarySpots.length - 1 ? "route-point--goal" : ""}`}>
-                      {index === 0 ? "S" : index === itinerarySpots.length - 1 ? "G" : index + 1}
-                    </span>
-                    <div>
-                      <strong>{spot.shortName}</strong>
-                      <label>
-                        滞在
-                        <input
-                          type="number"
-                          min="0"
-                          max="480"
-                          step="5"
-                          value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}
-                          onChange={(event) => changeStayMinutes(spot.id, Number(event.target.value))}
-                        />
-                        分
-                      </label>
-                    </div>
+                    <button
+                      type="button"
+                      className="itinerary-spot-focus"
+                      onClick={() => focusItinerarySpot(spot.id)}
+                      aria-label={`${spot.name}を地図で拡大表示`}
+                    >
+                      <span className={`route-point ${index === 0 ? "route-point--start" : index === itinerarySpots.length - 1 ? "route-point--goal" : ""}`}>
+                        {index === 0 ? "S" : index === itinerarySpots.length - 1 ? "G" : index + 1}
+                      </span>
+                      <span>
+                        <strong>{spot.shortName}</strong>
+                        <small>地図で見る</small>
+                      </span>
+                    </button>
+                    <label>
+                      滞在
+                      <input
+                        type="number"
+                        min="0"
+                        max="480"
+                        step="5"
+                        value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}
+                        onChange={(event) => changeStayMinutes(spot.id, Number(event.target.value))}
+                      />
+                      分
+                    </label>
                     {isEditingItineraryOrder ? (
                       <div className="itinerary-actions">
                         <button type="button" disabled={index === 0} onClick={() => moveSpot(index, -1)} aria-label={`${spot.name}を一つ前へ`}>↑</button>
@@ -1620,25 +1671,6 @@ export function PilgrimageApp({
                   </li>
                 ))}
               </ol>
-              <div className="itinerary-add">
-                <select
-                  value={availableSpots.some((spot) => spot.id === addSpotId) ? addSpotId : availableSpots[0]?.id ?? ""}
-                  onChange={(event) => setAddSpotId(event.target.value)}
-                  disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}
-                  aria-label="追加するスポット"
-                >
-                  {areas.map((area) => {
-                    const areaSpots = availableSpots.filter((spot) => spot.area === area);
-                    return areaSpots.length ? (
-                      <optgroup label={area} key={area}>
-                        {areaSpots.map((spot) => <option key={spot.id} value={spot.id}>{spot.shortName}</option>)}
-                      </optgroup>
-                    ) : null;
-                  })}
-                </select>
-                <button type="button" onClick={() => addSpot()} disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}>追加</button>
-              </div>
-              <button type="button" className="planner-find-spots" onClick={() => navigateToPage("explore")}>スポットを追加・変更する</button>
             </div>
           </aside>
         </div>
@@ -1909,12 +1941,12 @@ export function PilgrimageApp({
 
             </details>
 
-            <div className="planner-create-bar">
+            <div className={`planner-create-bar${routeIsCurrent ? " is-complete" : ""}`}>
               <button
                 className="route-search-button"
                 type="button"
-                onClick={searchRoute}
-                disabled={itineraryIds.length < 2 || dayTimeWindowInvalid || routeResult.state === "loading" || routeIsCurrent}
+                onClick={handlePlannerPrimaryAction}
+                disabled={itineraryIds.length < 2 || dayTimeWindowInvalid || routeResult.state === "loading" || (!routeIsCurrent && routeResult.state === "idle")}
               >
                 {itineraryIds.length < 2
                   ? "訪問先を2か所以上選んでください"
@@ -1923,14 +1955,20 @@ export function PilgrimageApp({
                     : routeResult.state === "loading"
                       ? "作成しています…"
                       : routeIsCurrent
-                        ? travelMode === "TRANSIT" ? "検索リンクを作成済みです" : "この予定は作成済みです"
-                        : travelMode === "TRANSIT" ? "乗換検索を含む予定を作る" : "この内容で予定を作る"}
+                        ? travelMode === "TRANSIT" ? "乗換検索を確認する" : "当日の予定を見る"
+                        : routeResult.state === "error" || routeResult.state === "fallback"
+                          ? "もう一度計算する"
+                          : "自動で予定を作成します"}
                 <span aria-hidden="true">→</span>
               </button>
               <p className="route-api-note">
-                {travelMode === "TRANSIT"
-                  ? "指定順に区間検索を作ります。検索結果はYahoo!乗換案内で確認してください。"
-                  : "移動時間と訪問順を計算し、一日の予定として表示します。"}
+                {routeIsCurrent
+                  ? travelMode === "TRANSIT"
+                    ? "区間検索を作成しました。内容を確認してください。"
+                    : "予定を作成しました。当日タブからいつでも確認できます。"
+                  : travelMode === "TRANSIT"
+                    ? "予定タブを開くと、指定順の区間検索を自動で作ります。"
+                    : "予定タブを開くと、移動時間と訪問順を自動で計算します。"}
               </p>
             </div>
             </div>
@@ -1946,7 +1984,7 @@ export function PilgrimageApp({
                   <p>
                     {itineraryIds.length < 2
                       ? "訪問先を2か所以上選び、滞在時間と訪問順を決めてください。"
-                      : "内容を確認し、「この内容で予定を作る」を押してください。"}
+                      : "選んだ訪問先から予定を自動で作成します。"}
                   </p>
                 </>
               )}
@@ -1989,7 +2027,7 @@ export function PilgrimageApp({
             </div>
 
             {transitLegs.length ? (
-              <details className="transit-search-panel">
+              <details className="transit-search-panel" id="transit-search-panel">
                 <summary className="transit-search-panel__heading">
                   <div>
                     <small>PUBLIC TRANSIT</small>
@@ -2088,7 +2126,7 @@ export function PilgrimageApp({
             ) : null}
 
             {schedule && routeResult.state === "success" && (
-              <section className="day-schedule" aria-label="作成した一日予定">
+              <section className="day-schedule" id="created-plan" aria-label="作成した一日予定">
                 <div className="day-schedule__heading">
                   <div>
                     <small>YOUR DAY</small>
@@ -2759,7 +2797,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 2.0.0 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 2.0.1 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 

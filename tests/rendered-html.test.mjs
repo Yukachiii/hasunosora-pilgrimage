@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 2\.0\.0/);
+  assert.match(html, /Ver\. 2\.0\.1/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -200,7 +200,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "2.0.0");
+  assert.equal(JSON.parse(packageJson).version, "2.0.1");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -270,7 +270,7 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(css, /\.itinerary-editor li\.itinerary-editor__empty\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);
   assert.match(app, /訪問順を自動で最適化/);
   assert.match(app, /const \[optimizeOrder, setOptimizeOrder\] = useState\(false\)/);
-  assert.match(app, /移動時間と訪問順を計算し、一日の予定として表示します/);
+  assert.match(app, /移動時間と訪問順を自動で計算します/);
   assert.match(app, /cardCharacterFilter/);
   assert.match(planner, /東京駅/);
   assert.match(planner, /大阪駅/);
@@ -585,7 +585,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(storage, /v:\s*3/);
   assert.match(storage, /optimizeOrder: candidate\.optimizeOrder === true/);
   assert.match(app, /sanitizePlannerSnapshot/);
-  assert.match(app, /この予定は作成済みです/);
+  assert.match(app, /当日の予定を見る/);
   assert.match(app, /当日の予定/);
   assert.match(app, /日程を追加/);
   assert.match(app, /plannerDays\.length > 1/);
@@ -616,7 +616,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /mobile-nav--sheet-open/);
   assert.match(app, /isEditingItineraryOrder/);
   assert.match(app, /順序を変更/);
-  assert.match(app, /className="transit-search-panel"/);
+  assert.match(app, /className="transit-search-panel" id="transit-search-panel"/);
   assert.match(app, /className="today-mode__tools"/);
   assert.doesNotMatch(app, /className="selection-tray"/);
   assert.doesNotMatch(app, /同意画面をもう一度確認する/);
@@ -629,6 +629,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /スポット一覧へ戻る/);
   assert.match(app, /カードモデル地へ戻る/);
   assert.match(app, /activeExplorePanel/);
+  const exploreOverlayNavigation = app.match(/if \(page === "explore" && \(sectionId === "spots" \|\| sectionId === "card-models"\)\) \{[\s\S]*?return;[\s\S]*?\}/)?.[0] ?? "";
+  assert.doesNotMatch(exploreOverlayNavigation, /setActivePage|pushState|location\.hash/);
   assert.match(app, /className=\{`explore-sheet\$\{isExploreSheetClosing/);
   assert.match(app, /aria-label="一覧を切り替える"/);
   assert.match(app, /spotSourceFilter/);
@@ -691,8 +693,13 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /activePage === "planner" \? itinerarySpots : spots/);
   assert.match(app, /className="planner-overview"/);
   assert.match(app, /className="planner-conditions"/);
-  assert.match(app, /className="planner-create-bar"/);
-  assert.match(app, /この内容で予定を作る/);
+  assert.match(app, /planner-create-bar/);
+  assert.match(app, /automaticRouteAttemptRef/);
+  assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]*?searchRoute\(\);[\s\S]*?\}, 650\)/);
+  assert.match(app, /自動で予定を作成します/);
+  assert.match(app, /className="itinerary-spot-focus"/);
+  assert.match(app, /focusSpotRequest=\{mapFocusRequest\}/);
+  assert.doesNotMatch(app, /className="itinerary-add"|className="planner-find-spots"/);
   assert.doesNotMatch(app, /plannerStep|planner-steps/);
   assert.match(css, /\.app-page--planner \.map-column--route \.map-shell\s*\{[^}]*height:\s*340px/s);
   assert.match(css, /\.planner-create-bar\s*\{[^}]*position:\s*sticky/s);
@@ -716,7 +723,10 @@ test("Mapbox is the main map and the comparison version is removed", async () =>
   assert.match(map, /map\.setLanguage\("ja"\)/);
   assert.match(map, /showCompass:\s*true/);
   assert.match(map, /map\.easeTo\(\{ center: \[selected\.lng, selected\.lat\], duration: 450 \}\)/);
-  assert.doesNotMatch(map, /map\.easeTo\(\{[^}]*zoom:/);
+  assert.match(map, /focusSpotRequest/);
+  assert.match(map, /zoom: Math\.max\(map\.getZoom\(\), 15\.5\)/);
+  assert.match(map, /viewMode !== "planner"/);
+  assert.match(map, /fitPlannerView\(500\)/);
   assert.match(map, /map\.resize\(\)/);
   assert.match(map, /routeLinesRef/);
   assert.doesNotMatch(map, /cluster:\s*true/);

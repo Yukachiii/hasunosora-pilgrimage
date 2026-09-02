@@ -1279,8 +1279,7 @@ button {
 }
 
 .journey-start select,
-.journey-start input,
-.itinerary-add select {
+.journey-start input {
   width: 100%;
   min-width: 0;
   height: 38px;
@@ -1376,7 +1375,7 @@ button {
 
 .itinerary-editor li {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 10px;
@@ -1398,17 +1397,43 @@ button {
   writing-mode: horizontal-tb;
 }
 
-.itinerary-editor li > div:nth-child(2) {
+.itinerary-spot-focus {
   display: grid;
   min-width: 0;
-  gap: 5px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
 }
 
-.itinerary-editor li > div > strong {
+.itinerary-spot-focus > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.itinerary-spot-focus strong {
   overflow: hidden;
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.itinerary-spot-focus small {
+  color: var(--ice-deep);
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.itinerary-spot-focus:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--ice-deep);
+  outline-offset: 3px;
 }
 
 .itinerary-editor li label {
@@ -1431,6 +1456,8 @@ button {
 
 .itinerary-actions {
   display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
   gap: 3px;
 }
 
@@ -1452,27 +1479,6 @@ button {
   opacity: 0.3;
 }
 
-.itinerary-add {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px;
-}
-
-.itinerary-add button {
-  padding: 0 13px;
-  border: 0;
-  border-radius: 4px;
-  background: var(--ice-deep);
-  color: white;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.itinerary-add button:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
 
 .route-fields {
   position: relative;
@@ -3832,8 +3838,7 @@ footer > span {
   }
 
   .journey-start select,
-  .journey-start input,
-  .itinerary-add select {
+  .journey-start input {
     height: 34px;
   }
 
@@ -3848,10 +3853,6 @@ footer > span {
   .itinerary-editor li {
     gap: 7px;
     padding: 7px;
-  }
-
-  .itinerary-editor li > div:nth-child(2) {
-    gap: 3px;
   }
 
   .itinerary-editor li input {
@@ -4111,10 +4112,6 @@ footer > span {
     padding: 22px 18px;
   }
 
-  .itinerary-editor li {
-    grid-template-columns: 28px minmax(0, 1fr);
-  }
-
   .itinerary-editor li.itinerary-editor__empty {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -4124,7 +4121,7 @@ footer > span {
   }
 
   .itinerary-actions {
-    grid-column: 2;
+    grid-column: 1 / -1;
   }
 
   .travel-modes > div {
@@ -4592,7 +4589,6 @@ footer > span {
 
   .journey-start select,
   .journey-start input,
-  .itinerary-add select,
   .spot-filters input,
   .spot-filters select,
   .card-model-filter select {
@@ -4605,7 +4601,7 @@ footer > span {
     padding: 11px 9px;
   }
 
-  .itinerary-editor li > div > strong {
+  .itinerary-spot-focus strong {
     font-size: 12px;
   }
 
@@ -4623,11 +4619,6 @@ footer > span {
     width: 38px;
     height: 38px;
     font-size: 13px;
-  }
-
-  .itinerary-add button {
-    min-width: 58px;
-    min-height: 48px;
   }
 
   .travel-modes label {
@@ -7024,17 +7015,6 @@ footer > span {
   scrollbar-gutter: auto;
 }
 
-.planner-find-spots {
-  min-height: 42px;
-  border: 1px solid var(--ice-deep);
-  border-radius: 4px;
-  background: rgba(217, 239, 242, 0.18);
-  color: var(--ink);
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 800;
-}
-
 .app-page--planner .route-workspace {
   width: min(980px, 100%);
   margin-right: auto;
@@ -7125,6 +7105,16 @@ footer > span {
 
 .planner-create-bar .route-search-button {
   margin-top: 0;
+}
+
+.planner-create-bar.is-complete {
+  border-color: rgba(125, 185, 196, 0.72);
+  background: rgba(239, 249, 248, 0.96);
+}
+
+#created-plan,
+#transit-search-panel {
+  scroll-margin-top: 24px;
 }
 
 .planner-step-actions {
