@@ -1010,6 +1010,56 @@ button {
   line-height: 1.75;
 }
 
+.selected-map-detail__photos {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.selected-map-detail__photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.selected-map-detail__photo-grid button {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #e5e9e6;
+  cursor: zoom-in;
+}
+
+.selected-map-detail__photo-grid img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.selected-map-detail__photo-grid button:hover img,
+.selected-map-detail__photo-grid button:focus-visible img {
+  opacity: 0.92;
+  transform: scale(1.025);
+}
+
+.selected-map-detail__photo-grid button > span {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 3px 5px;
+  border-radius: 2px;
+  background: rgba(25, 39, 55, 0.82);
+  color: white;
+  font: 700 7px Georgia, serif;
+}
+
 .selected-map-detail__cards {
   display: grid;
   gap: 10px;
@@ -3799,6 +3849,10 @@ footer > span {
     border-radius: 0 0 8px 8px;
   }
 
+  .selected-map-detail__photos {
+    display: none;
+  }
+
   .route-planner {
     display: block;
     height: auto;
@@ -5014,6 +5068,84 @@ footer > span {
   color: var(--ice-deep);
 }
 
+.admin-version-control {
+  display: grid;
+  max-width: 760px;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.admin-version-control > div {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-version-control small {
+  color: var(--ice-deep);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.admin-version-control strong {
+  font-size: 11px;
+}
+
+.admin-version-control > div > span,
+.admin-version-control label > span {
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.admin-version-control label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-version-control input {
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: white;
+  color: var(--ink);
+  font: 700 11px Consolas, monospace;
+}
+
+.admin-version-control button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--ink);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.admin-version-control button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.admin-version-control > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ice-deep);
+  font-size: 8px;
+}
+
 .admin-tabs {
   position: sticky;
   z-index: 30;
@@ -5291,6 +5423,12 @@ footer > span {
   background: #f0f8f7;
 }
 
+.upload-dropzone.is-dragging {
+  border-color: var(--ice-deep);
+  background: var(--ice-pale);
+  box-shadow: inset 0 0 0 3px rgba(125, 185, 196, 0.18);
+}
+
 .upload-dropzone input {
   position: absolute;
   width: 1px;
@@ -5353,6 +5491,154 @@ footer > span {
   font-size: 9px;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.photo-assignment-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+
+.photo-assignment-list__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.photo-assignment-list__heading strong {
+  font-size: 10px;
+}
+
+.photo-assignment-list__heading span {
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.photo-assignment-list > div:last-child {
+  display: grid;
+  max-height: 430px;
+  gap: 7px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.photo-assignment-list article {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fbfcfa;
+}
+
+.photo-assignment-list article.is-current {
+  border-color: var(--ice-deep);
+  box-shadow: 0 0 0 2px rgba(125, 185, 196, 0.12);
+}
+
+.photo-assignment-list__preview {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 52px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: #dfe5e4;
+  cursor: pointer;
+}
+
+.photo-assignment-list__preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-assignment-list__preview span {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  background: rgba(25, 39, 55, 0.82);
+  color: white;
+  font: 700 7px Georgia, serif;
+}
+
+.photo-assignment-list__copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.photo-assignment-list__copy > button {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-assignment-list__copy select {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 9px;
+}
+
+.photo-assignment-list__copy > strong {
+  color: var(--ice-deep);
+  font-size: 9px;
+}
+
+.photo-assignment-list__copy small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-assignment-list__copy small.is-found {
+  color: var(--ice-deep);
+  font-weight: 800;
+}
+
+.photo-assignment-list__copy small.is-far {
+  color: #8a6524;
+  font-weight: 800;
+}
+
+.photo-assignment-list__remove {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: white;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
 }
 
 .placement-switch {
@@ -5439,6 +5725,11 @@ footer > span {
 .gps-note--found {
   background: var(--ice);
   color: var(--ink);
+}
+
+.gps-note--far {
+  background: #fff7df;
+  color: #6f501d;
 }
 
 .hero-placement-note {
@@ -5553,6 +5844,23 @@ footer > span {
 .admin-publish:disabled {
   cursor: wait;
   opacity: 0.58;
+}
+
+.photo-publish-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 20px;
+}
+
+.photo-publish-actions .admin-publish {
+  margin-top: 0;
+}
+
+.admin-publish.admin-publish--secondary {
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
 }
 
 .privacy-note {
@@ -5723,6 +6031,31 @@ footer > span {
 .spot-selector {
   position: sticky;
   top: 18px;
+}
+
+.spot-selector__filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.spot-selector__filters .admin-field--wide {
+  grid-column: 1 / -1;
+}
+
+.spot-selector__filters .admin-field input,
+.spot-selector__filters .admin-field select {
+  padding: 9px;
+  font-size: 9px;
+}
+
+.spot-selector__list {
+  max-height: 620px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .spot-selector > div:last-child {
@@ -6259,6 +6592,15 @@ footer > span {
     grid-column: auto;
   }
 
+  .admin-version-control {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .admin-version-control > p {
+    grid-column: auto;
+  }
+
   .admin-tabs {
     position: fixed;
     top: auto;
@@ -6328,6 +6670,19 @@ footer > span {
   .crop-controls,
   .spot-form__grid {
     grid-template-columns: 1fr;
+  }
+
+  .photo-publish-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .photo-assignment-list article {
+    grid-template-columns: 54px minmax(0, 1fr) 28px;
+  }
+
+  .photo-assignment-list__preview {
+    width: 54px;
+    height: 48px;
   }
 
   .admin-coordinate-picker__heading {

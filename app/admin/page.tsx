@@ -8,6 +8,7 @@ import {
 } from "@/db/content";
 import { requireAdminPage } from "@/lib/admin-auth";
 import { AdminApp } from "./AdminApp";
+import siteSettings from "@/content/site.json";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,7 @@ async function AdminGate() {
         imageUrl: `/api/media/${asset.id}`,
         heroCandidate: asset.placement === "hero",
       }))}
+      initialSiteVersion={siteSettings.version}
     />
   );
 }

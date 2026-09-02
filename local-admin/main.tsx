@@ -8,6 +8,7 @@ import "../app/globals.css";
 type AdminState = {
   spots: PilgrimageSpot[];
   assets: AdminAsset[];
+  siteVersion: string;
   writeToken: string;
   lanUrl: string;
 };
@@ -66,6 +67,7 @@ function LocalAdminRoot() {
       localMode
       localToken={state.writeToken}
       localNetworkUrl={state.lanUrl}
+      initialSiteVersion={state.siteVersion}
     />
   );
 }

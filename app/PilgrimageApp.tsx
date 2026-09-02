@@ -179,18 +179,20 @@ type Props = {
   };
   routeServiceUrl?: string;
   spots: PilgrimageSpot[];
-  spotImages: Record<string, string>;
+  spotPhotoGroups: Record<string, string[]>;
   heroImages: string[];
   initialHeroIndex?: number;
+  siteVersion: string;
 };
 
 export function PilgrimageApp({
   mapboxConfig,
   routeServiceUrl = "",
   spots,
-  spotImages,
+  spotPhotoGroups,
   heroImages,
   initialHeroIndex = 0,
+  siteVersion,
 }: Props) {
   const heroImage = heroImages[initialHeroIndex] ?? heroImages[0] ?? null;
   const [hasAcceptedVisitorNotice, setHasAcceptedVisitorNotice] = useState(false);
@@ -236,7 +238,7 @@ export function PilgrimageApp({
   const [activeGuideImage, setActiveGuideImage] = useState<{
     src: string;
     alt: string;
-    variant?: "guide" | "card";
+    variant?: "guide" | "card" | "spot";
   } | null>(null);
   const [mapFocusRequest, setMapFocusRequest] = useState<{
     spotId: string;
@@ -686,6 +688,13 @@ export function PilgrimageApp({
     if (!selectedCardModel || selectedCardModel.spotId !== selectedSpot.id) return relatedCards;
     return [selectedCardModel, ...relatedCards.filter((card) => card.id !== selectedCardModel.id)];
   }, [selectedCardModel, selectedSpot.id]);
+  const selectedSpotPhotos = useMemo(
+    () => Array.from(new Set([
+      ...(spotPhotoGroups[selectedSpot.id] ?? []),
+      ...(selectedSpot.imageUrl ? [selectedSpot.imageUrl] : []),
+    ])),
+    [selectedSpot.id, selectedSpot.imageUrl, spotPhotoGroups],
+  );
   const mapSearchResults = useMemo(() => {
     const query = mapSearchQuery.trim().toLocaleLowerCase("ja");
     if (!query) return [];
@@ -1377,7 +1386,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 3.0.0
+          HASUNOSORA PILGRIMAGE · VER. {siteVersion}
         </div>
       </section>
 
@@ -1618,6 +1627,32 @@ export function PilgrimageApp({
               </div>
               {selectedSpot.description ? (
                 <p className="selected-map-detail__description">{selectedSpot.description}</p>
+              ) : null}
+              {selectedSpotPhotos.length ? (
+                <div className="selected-map-detail__photos">
+                  <div className="selected-map-detail__cards-heading">
+                    <strong>この場所の写真</strong>
+                    <span>{selectedSpotPhotos.length}枚</span>
+                  </div>
+                  <div className="selected-map-detail__photo-grid">
+                    {selectedSpotPhotos.map((imageUrl, index) => (
+                      <button
+                        type="button"
+                        key={imageUrl}
+                        aria-label={`${selectedSpot.name}の写真${index + 1}を拡大表示`}
+                        onClick={() => setActiveGuideImage({
+                          src: imageUrl,
+                          alt: `${selectedSpot.name}の写真 ${index + 1}`,
+                          variant: "spot",
+                        })}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imageUrl} alt="" loading="lazy" decoding="async" />
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : null}
               {selectedSpotCards.length ? (
                 <div className="selected-map-detail__cards">
@@ -2379,7 +2414,7 @@ export function PilgrimageApp({
         >
           {filteredSpots.map((spot) => {
             const index = spots.findIndex((item) => item.id === spot.id);
-            const imageUrl = spotImages[spot.id] ?? spot.imageUrl;
+            const imageUrl = spotPhotoGroups[spot.id]?.[0] ?? spot.imageUrl;
             const spotCollaborations = collaborationsForSpot(spot);
             return (
             <article
@@ -2392,7 +2427,7 @@ export function PilgrimageApp({
                   ? ({
                       "--spot-image": `url("${imageUrl}")`,
                       "--spot-image-position":
-                        spotImages[spot.id]
+                        spotPhotoGroups[spot.id]?.[0]
                           ? "center center"
                           : spot.imagePosition ?? "center center",
                     } as CSSProperties)
@@ -2759,7 +2794,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 3.0.0 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. {siteVersion} · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 

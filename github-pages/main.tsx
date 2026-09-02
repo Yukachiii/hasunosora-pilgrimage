@@ -3,13 +3,14 @@ import { createRoot } from "react-dom/client";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { PilgrimageApp } from "../app/PilgrimageApp";
 import { spots } from "../app/spots";
+import mediaAssets from "../content/media.json";
 import siteSettings from "../content/site.json";
 import "../app/globals.css";
 
-const photoModules = import.meta.glob<string>(
+const photoModules = import.meta.glob(
   "../public/photos/**/*.{jpg,jpeg,png,webp}",
   { eager: true, query: "?url", import: "default" },
-);
+) as Record<string, string>;
 
 function resolvePhotoUrl(source?: string | null) {
   if (!source?.startsWith("/photos/")) return undefined;
@@ -49,6 +50,15 @@ const publicSpots = spots.map((spot) => ({
   imageUrl: resolvePhotoUrl(spot.imageUrl),
 }));
 
+const spotPhotoGroups = mediaAssets.reduce<Record<string, string[]>>((groups, asset) => {
+  if (asset.placement !== "spot" || !asset.spotId) return groups;
+  const imageUrl = resolvePhotoUrl(asset.imageUrl);
+  if (!imageUrl) return groups;
+  groups[asset.spotId] ??= [];
+  if (!groups[asset.spotId].includes(imageUrl)) groups[asset.spotId].push(imageUrl);
+  return groups;
+}, {});
+
 const heroImages = uniquePhotoUrls([
   resolvePhotoUrl(siteSettings.heroImage),
   ...siteSettings.heroImages.map(resolvePhotoUrl),
@@ -62,9 +72,10 @@ createRoot(document.getElementById("root")!).render(
         accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "",
       }}
       spots={publicSpots}
-      spotImages={{}}
+      spotPhotoGroups={spotPhotoGroups}
       heroImages={heroImages}
       initialHeroIndex={initialHeroIndex}
+      siteVersion={siteSettings.version}
     />
   </StrictMode>,
 );

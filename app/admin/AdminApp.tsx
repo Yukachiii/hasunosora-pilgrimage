@@ -8,10 +8,13 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type DragEvent,
   type FormEvent,
 } from "react";
 import {
   cardModels,
+  collaborations,
+  type CollaborationId,
   type CardModelLocation,
   type PilgrimageSpot,
 } from "@/app/spots";
@@ -38,6 +41,7 @@ type Props = {
   localMode?: boolean;
   localToken?: string;
   localNetworkUrl?: string;
+  initialSiteVersion?: string;
 };
 
 type PublishStatus = {
@@ -77,20 +81,42 @@ async function loadPublishStatus(): Promise<PublishStatus> {
 }
 
 type Placement = "spot" | "hero";
-type QueuedPhoto = { file: File; url: string };
 type GpsState =
   | { state: "loading" }
   | { state: "none" }
   | {
-      state: "found";
+      state: "found" | "far";
       lat: number;
       lng: number;
       nearestSpotId: string;
       distanceM: number;
     };
+type QueuedPhoto = {
+  id: string;
+  file: File;
+  url: string;
+  placement: Placement;
+  spotId: string;
+  cropX: number;
+  cropY: number;
+  zoom: number;
+  gpsState: GpsState;
+  spotManuallySelected: boolean;
+};
+type AdminSpotSourceFilter = "すべて" | "activity-records" | "sehas" | "with-meets";
 
 const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const imageFileExtensionPattern = /\.(?:jpe?g|png|webp)$/i;
+const automaticSpotDistanceLimitM = 500;
 const watermarkText = "© Yukachiii";
+
+function isSupportedImageFile(file: File) {
+  return imageTypes.has(file.type) || (!file.type && imageFileExtensionPattern.test(file.name));
+}
+
+function fileIdentity(file: File) {
+  return `${file.name}\u0000${file.size}\u0000${file.lastModified}`;
+}
 
 function distanceInMeters(
   a: { lat: number; lng: number },
@@ -253,6 +279,7 @@ export function AdminApp({
   localMode = false,
   localToken = "",
   localNetworkUrl = "",
+  initialSiteVersion = "3.1.0",
 }: Props) {
   const [tab, setTab] = useState<"photos" | "spots" | "cards" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
@@ -264,6 +291,10 @@ export function AdminApp({
   const [shuttingDown, setShuttingDown] = useState(false);
   const [serverStopped, setServerStopped] = useState(false);
   const [networkCopyMessage, setNetworkCopyMessage] = useState("");
+  const [siteVersion, setSiteVersion] = useState(initialSiteVersion);
+  const [versionDraft, setVersionDraft] = useState(initialSiteVersion);
+  const [versionSaving, setVersionSaving] = useState(false);
+  const [versionMessage, setVersionMessage] = useState("");
 
   useEffect(() => {
     if (!localMode) return;
@@ -335,6 +366,43 @@ export function AdminApp({
       setNetworkCopyMessage("コピーしました");
     } catch {
       setNetworkCopyMessage("URLを長押ししてコピーしてください");
+    }
+  }
+
+  async function saveSiteVersion(event: FormEvent) {
+    event.preventDefault();
+    if (!localMode || !localToken || versionSaving) return;
+    const normalized = versionDraft.trim().replace(/^ver\.\s*/i, "");
+    if (!/^\d+\.\d+\.\d+$/.test(normalized)) {
+      setVersionMessage("3桁の形式（例：3.1.0）で入力してください。");
+      return;
+    }
+    setVersionSaving(true);
+    setVersionMessage("");
+    try {
+      const response = await fetch("/api/admin/site-version", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          "x-local-admin-token": localToken,
+        },
+        body: JSON.stringify({ version: normalized }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        version?: string;
+        error?: string;
+      };
+      if (!response.ok || !result.version) {
+        throw new Error(result.error ?? "バージョン表記を保存できませんでした。");
+      }
+      setSiteVersion(result.version);
+      setVersionDraft(result.version);
+      setVersionMessage(`Ver. ${result.version} を保存しました。公開すると反映されます。`);
+      setPublishStatus(await loadPublishStatus());
+    } catch (error) {
+      setVersionMessage(error instanceof Error ? error.message : "バージョン表記を保存できませんでした。");
+    } finally {
+      setVersionSaving(false);
     }
   }
 
@@ -430,6 +498,29 @@ export function AdminApp({
               {networkCopyMessage ? <b>{networkCopyMessage}</b> : null}
             </p>
           </div>
+        ) : null}
+        {localMode ? (
+          <form className="admin-version-control" onSubmit={saveSiteVersion}>
+            <div>
+              <small>PUBLIC VERSION</small>
+              <strong>公開ページのバージョン表記</strong>
+              <span>現在 Ver. {siteVersion}</span>
+            </div>
+            <label>
+              <span>Ver.</span>
+              <input
+                value={versionDraft}
+                inputMode="decimal"
+                pattern="\d+\.\d+\.\d+"
+                aria-label="公開ページのバージョン"
+                onChange={(event) => setVersionDraft(event.target.value)}
+              />
+            </label>
+            <button type="submit" disabled={versionSaving || versionDraft.trim() === siteVersion}>
+              {versionSaving ? "保存中…" : "表記を保存"}
+            </button>
+            {versionMessage ? <p role="status">{versionMessage}</p> : null}
+          </form>
         ) : null}
         {localMode && publishMessage && <p className="admin-message" role="status">{publishMessage}</p>}
         {localMode && publishStatus?.error && <p className="admin-message" role="status">{publishStatus.error}</p>}
@@ -781,20 +872,24 @@ function PhotoManager({
   localToken: string;
 }) {
   const [queue, setQueue] = useState<QueuedPhoto[]>([]);
-  const [placement, setPlacement] = useState<Placement>("spot");
-  const [spotId, setSpotId] = useState(spots[0]?.id ?? "");
-  const [cropX, setCropX] = useState(50);
-  const [cropY, setCropY] = useState(50);
-  const [zoom, setZoom] = useState(1);
-  const [gpsState, setGpsState] = useState<GpsState>({ state: "none" });
+  const [selectedPhotoId, setSelectedPhotoId] = useState("");
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const [changingHeroCandidateId, setChangingHeroCandidateId] = useState("");
   const [message, setMessage] = useState("");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const queuedUrlsRef = useRef(new Set<string>());
-  const currentPhoto = queue[0] ?? null;
+  const dragDepthRef = useRef(0);
+  const currentPhoto = queue.find((photo) => photo.id === selectedPhotoId) ?? queue[0] ?? null;
   const currentFile = currentPhoto?.file ?? null;
   const previewUrl = currentPhoto?.url ?? "";
+  const placement = currentPhoto?.placement ?? "spot";
+  const spotId = currentPhoto?.spotId ?? spots[0]?.id ?? "";
+  const cropX = currentPhoto?.cropX ?? 50;
+  const cropY = currentPhoto?.cropY ?? 50;
+  const zoom = currentPhoto?.zoom ?? 1;
+  const gpsState = currentPhoto?.gpsState ?? { state: "none" as const };
 
   useEffect(() => {
     const urls = queuedUrlsRef.current;
@@ -803,39 +898,6 @@ function PhotoManager({
       urls.clear();
     };
   }, []);
-
-  useEffect(() => {
-    if (!currentFile) return;
-
-    let cancelled = false;
-    readGps(currentFile)
-      .then((gps) => {
-        if (cancelled || !gps || !Number.isFinite(gps.latitude) || !Number.isFinite(gps.longitude)) {
-          if (!cancelled) setGpsState({ state: "none" });
-          return;
-        }
-        const nearest = nearestSpot(gps.latitude, gps.longitude, spots);
-        if (!nearest) {
-          setGpsState({ state: "none" });
-          return;
-        }
-        setSpotId(nearest.spot.id);
-        setGpsState({
-          state: "found",
-          lat: gps.latitude,
-          lng: gps.longitude,
-          nearestSpotId: nearest.spot.id,
-          distanceM: nearest.distanceM,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setGpsState({ state: "none" });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentFile, spots]);
 
   useEffect(() => {
     if (!previewUrl || !canvasRef.current) return;
@@ -852,65 +914,133 @@ function PhotoManager({
     };
   }, [previewUrl, placement, cropX, cropY, zoom]);
 
-  function addFiles(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFiles = Array.from(event.target.files ?? []).filter((file) => imageTypes.has(file.type));
-    const selected = selectedFiles.map((file) => {
+  function updateQueuedPhoto(id: string, update: Partial<QueuedPhoto>) {
+    setQueue((current) => current.map((photo) =>
+      photo.id === id ? { ...photo, ...update } : photo,
+    ));
+  }
+
+  async function detectPhotoLocation(photoId: string, file: File) {
+    try {
+      const gps = await readGps(file);
+      if (!gps || !Number.isFinite(gps.latitude) || !Number.isFinite(gps.longitude)) {
+        updateQueuedPhoto(photoId, { gpsState: { state: "none" } });
+        return;
+      }
+      const nearest = nearestSpot(gps.latitude, gps.longitude, spots);
+      if (!nearest) {
+        updateQueuedPhoto(photoId, { gpsState: { state: "none" } });
+        return;
+      }
+      const gpsState: GpsState = {
+        state: nearest.distanceM <= automaticSpotDistanceLimitM ? "found" : "far",
+        lat: gps.latitude,
+        lng: gps.longitude,
+        nearestSpotId: nearest.spot.id,
+        distanceM: nearest.distanceM,
+      };
+      setQueue((current) => current.map((photo) =>
+        photo.id === photoId
+          ? {
+              ...photo,
+              spotId:
+                gpsState.state === "found" && !photo.spotManuallySelected
+                  ? nearest.spot.id
+                  : photo.spotId,
+              gpsState,
+            }
+          : photo,
+      ));
+    } catch {
+      updateQueuedPhoto(photoId, { gpsState: { state: "none" } });
+    }
+  }
+
+  function queueFiles(files: File[]) {
+    const validFiles = files.filter((file) => isSupportedImageFile(file) && file.size <= 25 * 1024 * 1024);
+    const existingFiles = new Set(queue.map((photo) => fileIdentity(photo.file)));
+    const acceptedFiles = validFiles.filter((file) => {
+      const identity = fileIdentity(file);
+      if (existingFiles.has(identity)) return false;
+      existingFiles.add(identity);
+      return true;
+    });
+    const selected = acceptedFiles.map((file, index) => {
       const url = URL.createObjectURL(file);
       queuedUrlsRef.current.add(url);
-      return { file, url };
+      return {
+        id: `queued-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+        file,
+        url,
+        placement: "spot" as const,
+        spotId: spots[0]?.id ?? "",
+        cropX: 50,
+        cropY: 50,
+        zoom: 1,
+        gpsState: { state: "loading" as const },
+        spotManuallySelected: false,
+      };
     });
     if (selected.length) {
-      if (!queue.length) resetPhotoEditor();
+      if (!queue.length) setSelectedPhotoId(selected[0].id);
       setQueue((current) => [...current, ...selected]);
+      for (const photo of selected) void detectPhotoLocation(photo.id, photo.file);
+      setMessage("");
     }
-    if ((event.target.files?.length ?? 0) !== selectedFiles.length) {
-      setMessage("JPEG、PNG、WebP以外のファイルは除外しました。");
+    const invalidCount = files.length - validFiles.length;
+    const duplicateCount = validFiles.length - acceptedFiles.length;
+    if (invalidCount || duplicateCount) {
+      const notices = [
+        invalidCount ? `${invalidCount}枚は形式または容量が対象外` : "",
+        duplicateCount ? `${duplicateCount}枚は選択済み` : "",
+      ].filter(Boolean);
+      setMessage(`${notices.join("、")}のため除外しました。`);
     }
+  }
+
+  function addFiles(event: ChangeEvent<HTMLInputElement>) {
+    queueFiles(Array.from(event.target.files ?? []));
     event.target.value = "";
   }
 
-  function resetPhotoEditor(resetPlacement = true) {
-    setCropX(50);
-    setCropY(50);
-    setZoom(1);
-    if (resetPlacement) setPlacement("spot");
-    setGpsState({ state: "loading" });
-    setMessage("");
+  function handleFileDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDraggingFiles(false);
+    queueFiles(Array.from(event.dataTransfer.files));
   }
 
-  function advanceQueue() {
-    if (currentPhoto) {
-      URL.revokeObjectURL(currentPhoto.url);
-      queuedUrlsRef.current.delete(currentPhoto.url);
+  function removeQueuedPhoto(photoId: string) {
+    const index = queue.findIndex((photo) => photo.id === photoId);
+    const target = queue[index];
+    if (!target) return;
+    URL.revokeObjectURL(target.url);
+    queuedUrlsRef.current.delete(target.url);
+    const next = queue.filter((photo) => photo.id !== photoId);
+    setQueue(next);
+    if (selectedPhotoId === photoId) {
+      setSelectedPhotoId(next[Math.min(index, next.length - 1)]?.id ?? "");
     }
-    setQueue((current) => current.slice(1));
-    if (queue.length > 1) resetPhotoEditor(false);
-    else setGpsState({ state: "none" });
   }
 
-  async function publishCurrent() {
-    if (!currentFile || !previewUrl || saving) return;
-    setSaving(true);
-    setMessage("");
-
-    try {
+  async function uploadPhoto(photo: QueuedPhoto) {
       const derivative = await makePublicDerivative(
-        previewUrl,
-        placement,
-        cropX,
-        cropY,
-        zoom,
+        photo.url,
+        photo.placement,
+        photo.cropX,
+        photo.cropY,
+        photo.zoom,
       );
       const metadata = {
-        placement,
-        spotId: placement === "spot" ? spotId : null,
-        cropX,
-        cropY,
-        zoom,
-        gpsLat: gpsState.state === "found" ? gpsState.lat : null,
-        gpsLng: gpsState.state === "found" ? gpsState.lng : null,
+        placement: photo.placement,
+        spotId: photo.placement === "spot" ? photo.spotId : null,
+        cropX: photo.cropX,
+        cropY: photo.cropY,
+        zoom: photo.zoom,
+        gpsLat: photo.gpsState.state === "found" || photo.gpsState.state === "far" ? photo.gpsState.lat : null,
+        gpsLng: photo.gpsState.state === "found" || photo.gpsState.state === "far" ? photo.gpsState.lng : null,
         nearestSpotId:
-          gpsState.state === "found" ? gpsState.nearestSpotId : null,
+          photo.gpsState.state === "found" || photo.gpsState.state === "far" ? photo.gpsState.nearestSpotId : null,
       };
 
       let response: Response;
@@ -929,7 +1059,7 @@ function PhotoManager({
         });
       } else {
         const formData = new FormData();
-        formData.append("original", currentFile);
+        formData.append("original", photo.file);
         formData.append(
           "derivative",
           new File(
@@ -948,9 +1078,18 @@ function PhotoManager({
       if (!response.ok || !result.asset) {
         throw new Error(result.error ?? "画像を公開できませんでした。");
       }
+      return result.asset;
+  }
 
-      setAssets((current) => [result.asset!, ...current]);
-      advanceQueue();
+  async function publishCurrent() {
+    if (!currentPhoto || saving) return;
+    setSaving(true);
+    setMessage("");
+
+    try {
+      const asset = await uploadPhoto(currentPhoto);
+      setAssets((current) => [asset, ...current]);
+      removeQueuedPhoto(currentPhoto.id);
       setMessage(
         localMode
           ? "透かし済み画像をローカルファイルへ保存しました。GitHub Pagesへはまだ公開されていません。"
@@ -961,6 +1100,52 @@ function PhotoManager({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function publishAll() {
+    if (!queue.length || saving) return;
+    setSaving(true);
+    setMessage("");
+    const pending = [...queue];
+    const uploaded: AdminAsset[] = [];
+    const successfulIds = new Set<string>();
+    const failures: string[] = [];
+
+    for (let index = 0; index < pending.length; index += 1) {
+      const photo = pending[index];
+      setBatchProgress({ current: index + 1, total: pending.length });
+      try {
+        const asset = await uploadPhoto(photo);
+        uploaded.push(asset);
+        successfulIds.add(photo.id);
+      } catch (error) {
+        failures.push(`${photo.file.name}：${error instanceof Error ? error.message : "保存できませんでした。"}`);
+      }
+    }
+
+    if (uploaded.length) {
+      setAssets((current) => [...[...uploaded].reverse(), ...current]);
+      for (const photo of pending) {
+        if (!successfulIds.has(photo.id)) continue;
+        URL.revokeObjectURL(photo.url);
+        queuedUrlsRef.current.delete(photo.url);
+      }
+      const remaining = queue.filter((photo) => !successfulIds.has(photo.id));
+      setQueue(remaining);
+      setSelectedPhotoId(remaining[0]?.id ?? "");
+    }
+
+    if (failures.length) {
+      setMessage(`${uploaded.length}枚を保存、${failures.length}枚を未処理のまま残しました。${failures.join(" / ")}`);
+    } else {
+      setMessage(
+        localMode
+          ? `${uploaded.length}枚をローカルファイルへ一括保存しました。GitHub Pagesへはまだ公開されていません。`
+          : `${uploaded.length}枚を一括公開しました。`,
+      );
+    }
+    setBatchProgress(null);
+    setSaving(false);
   }
 
   async function deleteAsset(asset: AdminAsset) {
@@ -1018,7 +1203,7 @@ function PhotoManager({
 
   const currentSpot = spots.find((spot) => spot.id === spotId);
   const nearest =
-    gpsState.state === "found"
+    gpsState.state === "found" || gpsState.state === "far"
       ? spots.find((spot) => spot.id === gpsState.nearestSpotId)
       : null;
   const heroAssets = assets.filter((asset) => asset.heroCandidate ?? asset.placement === "hero");
@@ -1031,19 +1216,90 @@ function PhotoManager({
             <div><span>STEP 1</span><h2>写真を選ぶ</h2></div>
             {queue.length > 0 && <small>残り {queue.length}枚</small>}
           </div>
-          <label className="upload-dropzone">
+          <label
+            className={`upload-dropzone${isDraggingFiles ? " is-dragging" : ""}`}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              dragDepthRef.current += 1;
+              setIsDraggingFiles(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+              if (!dragDepthRef.current) setIsDraggingFiles(false);
+            }}
+            onDrop={handleFileDrop}
+          >
             <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={addFiles} />
-            <strong>写真を選択</strong>
-            <span>複数枚まとめて選べます（1枚25MBまで）</span>
+            <strong>{isDraggingFiles ? "ここへドロップ" : "写真を選択"}</strong>
+            <span>クリックまたはD&amp;D・複数枚対応（1枚25MBまで）</span>
           </label>
           {currentFile ? (
             <div className="file-summary">
               <div><small>編集中</small><strong>{currentFile.name}</strong></div>
-              <button type="button" onClick={advanceQueue}>この写真を飛ばす</button>
+              <button type="button" onClick={() => removeQueuedPhoto(currentPhoto.id)}>この写真を外す</button>
             </div>
           ) : (
             <p className="empty-note">写真を選ぶと、ここから配置と切り抜きを調整できます。</p>
           )}
+          {queue.length > 0 ? (
+            <section className="photo-assignment-list" aria-label="画像ごとの配置先">
+              <div className="photo-assignment-list__heading">
+                <strong>画像ごとの配置先</strong>
+                <span>{queue.length}枚</span>
+              </div>
+              <div>
+                {queue.map((photo, index) => {
+                  const assignedSpot = spots.find((spot) => spot.id === photo.spotId);
+                  return (
+                    <article className={photo.id === currentPhoto?.id ? "is-current" : undefined} key={photo.id}>
+                      <button
+                        type="button"
+                        className="photo-assignment-list__preview"
+                        aria-label={`${photo.file.name}を編集`}
+                        onClick={() => setSelectedPhotoId(photo.id)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photo.url} alt="" />
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                      </button>
+                      <div className="photo-assignment-list__copy">
+                        <button type="button" onClick={() => setSelectedPhotoId(photo.id)}>{photo.file.name}</button>
+                        {photo.placement === "spot" ? (
+                          <select
+                            value={photo.spotId}
+                            aria-label={`${photo.file.name}の配置先スポット`}
+                            onChange={(event) => updateQueuedPhoto(photo.id, {
+                              spotId: event.target.value,
+                              spotManuallySelected: true,
+                            })}
+                          >
+                            {spots.map((spot) => <option value={spot.id} key={spot.id}>{spot.name}</option>)}
+                          </select>
+                        ) : (
+                          <strong>トップ画像候補</strong>
+                        )}
+                        <small className={`is-${photo.gpsState.state}`}>
+                          {photo.gpsState.state === "loading"
+                            ? "位置情報を確認中…"
+                            : photo.gpsState.state === "found"
+                              ? `GPSから自動選択：${assignedSpot?.name ?? "候補なし"}（${formatDistance(photo.gpsState.distanceM)}）`
+                              : photo.gpsState.state === "far"
+                                ? `GPS候補が遠いため手動選択：${spots.find((spot) => spot.id === photo.gpsState.nearestSpotId)?.name ?? "候補なし"}（${formatDistance(photo.gpsState.distanceM)}）`
+                                : "GPSなし・手動選択"}
+                        </small>
+                      </div>
+                      <button type="button" className="photo-assignment-list__remove" onClick={() => removeQueuedPhoto(photo.id)} aria-label={`${photo.file.name}を外す`}>×</button>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
         </div>
 
         {currentFile && (
@@ -1053,13 +1309,16 @@ function PhotoManager({
                 <div><span>STEP 2</span><h2>配置先を決める</h2></div>
               </div>
               <div className="placement-switch">
-                <label><input type="radio" checked={placement === "spot"} onChange={() => setPlacement("spot")} />スポットカード</label>
-                <label><input type="radio" checked={placement === "hero"} onChange={() => setPlacement("hero")} />トップ画像候補</label>
+                <label><input type="radio" checked={placement === "spot"} onChange={() => updateQueuedPhoto(currentPhoto.id, { placement: "spot" })} />スポットカード</label>
+                <label><input type="radio" checked={placement === "hero"} onChange={() => updateQueuedPhoto(currentPhoto.id, { placement: "hero" })} />トップ画像候補</label>
               </div>
               {placement === "spot" && (
                 <label className="admin-field">
                   <span>配置するスポット</span>
-                  <select value={spotId} onChange={(event) => setSpotId(event.target.value)}>
+                  <select value={spotId} onChange={(event) => updateQueuedPhoto(currentPhoto.id, {
+                    spotId: event.target.value,
+                    spotManuallySelected: true,
+                  })}>
                     {spots.map((spot) => <option value={spot.id} key={spot.id}>{spot.name}</option>)}
                   </select>
                 </label>
@@ -1070,6 +1329,9 @@ function PhotoManager({
                   {gpsState.state === "none" && "GPS情報は見つかりませんでした。配置先を手動で選んでください。"}
                   {gpsState.state === "found" && nearest && (
                     <>最寄り候補は <strong>{nearest.name}</strong>（{formatDistance(gpsState.distanceM)}）です。必要なら変更してください。</>
+                  )}
+                  {gpsState.state === "far" && nearest && (
+                    <>最寄りの <strong>{nearest.name}</strong> まで{formatDistance(gpsState.distanceM)}あるため、自動選択せず手動指定にしています。</>
                   )}
                 </div>
               ) : (
@@ -1094,17 +1356,28 @@ function PhotoManager({
                 </div>
               </div>
               <div className="crop-controls">
-                <label><span>左右位置</span><input type="range" min="0" max="100" value={cropX} onChange={(event) => setCropX(Number(event.target.value))} /></label>
-                <label><span>上下位置</span><input type="range" min="0" max="100" value={cropY} onChange={(event) => setCropY(Number(event.target.value))} /></label>
-                <label><span>拡大</span><input type="range" min="1" max="2.5" step="0.05" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>
+                <label><span>左右位置</span><input type="range" min="0" max="100" value={cropX} onChange={(event) => updateQueuedPhoto(currentPhoto.id, { cropX: Number(event.target.value) })} /></label>
+                <label><span>上下位置</span><input type="range" min="0" max="100" value={cropY} onChange={(event) => updateQueuedPhoto(currentPhoto.id, { cropY: Number(event.target.value) })} /></label>
+                <label><span>拡大</span><input type="range" min="1" max="2.5" step="0.05" value={zoom} onChange={(event) => updateQueuedPhoto(currentPhoto.id, { zoom: Number(event.target.value) })} /></label>
               </div>
-              <button className="admin-publish" type="button" disabled={saving} onClick={publishCurrent}>
-                {saving
-                  ? "公開用画像を作成中…"
-                  : placement === "hero"
-                    ? "トップ画像候補に追加する"
-                    : "この内容で公開する"}<span>→</span>
-              </button>
+              <div className="photo-publish-actions">
+                {queue.length > 1 ? (
+                  <button className="admin-publish admin-publish--secondary" type="button" disabled={saving} onClick={publishCurrent}>
+                    この1枚だけ追加する<span>→</span>
+                  </button>
+                ) : null}
+                <button className="admin-publish" type="button" disabled={saving} onClick={queue.length > 1 ? publishAll : publishCurrent}>
+                  {batchProgress
+                    ? `${batchProgress.current} / ${batchProgress.total}枚を保存中…`
+                    : saving
+                      ? "公開用画像を作成中…"
+                      : queue.length > 1
+                        ? `${queue.length}枚をまとめて追加する`
+                        : placement === "hero"
+                          ? "トップ画像候補に追加する"
+                          : "この内容で公開する"}<span>→</span>
+                </button>
+              </div>
               <p className="privacy-note">
                 公開用画像はWebP/JPEGへ再生成され、{watermarkText}の透かしを焼き込みます。
                 GPS・端末名・ISO・撮影日時などのEXIFは含まれず、
@@ -1201,10 +1474,45 @@ function SpotManager({
   const [draft, setDraft] = useState<PilgrimageSpot>(selected);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [query, setQuery] = useState("");
+  const [areaFilter, setAreaFilter] = useState("すべて");
+  const [collaborationFilter, setCollaborationFilter] = useState<CollaborationId | "すべて">("すべて");
+  const [sourceFilter, setSourceFilter] = useState<AdminSpotSourceFilter>("すべて");
   const categories = useMemo(
     () => Array.from(new Set(baseSpots.map((spot) => spot.category))),
     [baseSpots],
   );
+  const areas = useMemo(
+    () => Array.from(new Set(spots.map((spot) => spot.area))),
+    [spots],
+  );
+  const filteredSpots = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("ja");
+    return spots.filter((spot) => {
+      if (areaFilter !== "すべて" && spot.area !== areaFilter) return false;
+      if (collaborationFilter !== "すべて" && !spot.collaborationIds?.includes(collaborationFilter)) return false;
+      if (sourceFilter === "activity-records" && !spot.activityRecords?.length) return false;
+      if (sourceFilter === "sehas" && !spot.sehasEpisodes?.length) return false;
+      if (sourceFilter === "with-meets" && !spot.withMeetsEpisodes?.length) return false;
+      if (!normalizedQuery) return true;
+      const collaborationLabels = (spot.collaborationIds ?? []).flatMap((id) => {
+        const collaboration = collaborations.find((item) => item.id === id);
+        return collaboration ? [collaboration.name, collaboration.subtitle] : [];
+      });
+      return [
+        spot.name,
+        spot.shortName,
+        spot.address,
+        spot.area,
+        spot.category,
+        ...(spot.activityRecords ?? []),
+        ...(spot.sehasEpisodes ?? []),
+        ...(spot.withMeetsEpisodes ?? []),
+        ...(spot.appearances ?? []),
+        ...collaborationLabels,
+      ].some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
+    });
+  }, [areaFilter, collaborationFilter, query, sourceFilter, spots]);
 
   if (!draft) return null;
 
@@ -1272,15 +1580,48 @@ function SpotManager({
   return (
     <section className="spot-editor-layout">
       <aside className="admin-panel spot-selector">
-        <div className="admin-panel__heading"><div><span>SPOTS</span><h2>編集する場所</h2></div></div>
-        <div>
-          {spots.map((spot, index) => (
+        <div className="admin-panel__heading"><div><span>SPOTS</span><h2>編集する場所</h2></div><small>{filteredSpots.length} / {spots.length}</small></div>
+        <div className="spot-selector__filters" aria-label="スポットの絞り込み">
+          <label className="admin-field admin-field--wide">
+            <span>キーワード</span>
+            <input type="search" value={query} placeholder="施設名・住所・登場回で検索" onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <label className="admin-field">
+            <span>エリア</span>
+            <select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}>
+              <option>すべて</option>
+              {areas.map((area) => <option key={area}>{area}</option>)}
+            </select>
+          </label>
+          <label className="admin-field">
+            <span>コラボ</span>
+            <select value={collaborationFilter} onChange={(event) => setCollaborationFilter(event.target.value as CollaborationId | "すべて")}>
+              <option value="すべて">すべて</option>
+              {collaborations.map((collaboration) => <option value={collaboration.id} key={collaboration.id}>{collaboration.name}</option>)}
+            </select>
+          </label>
+          <label className="admin-field admin-field--wide">
+            <span>出典</span>
+            <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as AdminSpotSourceFilter)}>
+              <option value="すべて">すべて</option>
+              <option value="sehas">せーはす！</option>
+              <option value="activity-records">活動記録</option>
+              <option value="with-meets">With×MEETS</option>
+            </select>
+          </label>
+        </div>
+        <div className="spot-selector__list">
+          {filteredSpots.map((spot) => {
+            const index = spots.findIndex((item) => item.id === spot.id);
+            return (
             <button type="button" className={spot.id === selectedId ? "is-active" : ""} key={spot.id} onClick={() => { setSelectedId(spot.id); setDraft(spot); setMessage(""); }}>
               <span>{String(index + 1).padStart(2, "0")}</span>
               <strong>{spot.name}</strong>
               {overrideIds.has(spot.id) && <small>修正済み</small>}
             </button>
-          ))}
+            );
+          })}
+          {!filteredSpots.length ? <p className="empty-note">条件に合うスポットがありません。</p> : null}
         </div>
       </aside>
 

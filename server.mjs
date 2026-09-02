@@ -302,6 +302,25 @@ function updateSiteHeroImages(site, imageUrls) {
   return site;
 }
 
+function normalizedSiteVersion(value, fallback = "3.1.0") {
+  const version = String(value ?? "").trim().replace(/^ver\.\s*/i, "");
+  return /^\d+\.\d+\.\d+$/.test(version) ? version : fallback;
+}
+
+async function updateSiteVersion(payload) {
+  if (!payload || typeof payload !== "object") {
+    throw new AdminError("バージョン表記が正しくありません。");
+  }
+  const version = normalizedSiteVersion(payload.version, "");
+  if (!version) throw new AdminError("バージョンは3桁（例：3.1.0）で入力してください。");
+  return withWriteLock(async () => {
+    const site = await readJson(sitePath, { heroImage: null, heroImages: [] });
+    site.version = version;
+    await writeJsonIfChanged(sitePath, site);
+    return version;
+  });
+}
+
 function serializeAsset(asset, heroImageSet) {
   const imageUrl = asset.imageUrl || "";
   return {
@@ -621,8 +640,16 @@ async function deleteMedia(assetId) {
     let spotsChanged = false;
     for (const spot of spots) {
       if (spot.imageUrl === imageUrl) {
-        delete spot.imageUrl;
-        delete spot.imagePosition;
+        const replacement = nextMedia.find((item) =>
+          item.placement === "spot" && item.spotId === spot.id && item.imageUrl,
+        );
+        if (replacement) {
+          spot.imageUrl = replacement.imageUrl;
+          spot.imagePosition = "center center";
+        } else {
+          delete spot.imageUrl;
+          delete spot.imagePosition;
+        }
         spotsChanged = true;
       }
     }
@@ -715,6 +742,7 @@ async function requestHandler(request, response, initialSpots) {
           sendJson(response, {
             spots,
             assets: media.map((asset) => serializeAsset(asset, heroImageSet)),
+            siteVersion: normalizedSiteVersion(site.version),
             writeToken,
             lanUrl: lanAdminUrl,
           });
@@ -734,6 +762,13 @@ async function requestHandler(request, response, initialSpots) {
         if (!requireWriteAccess(request, response)) return;
         const spotId = pathname.slice("/api/admin/spots/".length);
         sendJson(response, { spot: await updateSpot(spotId, await readJsonBody(request, 1024 * 1024)) });
+        return;
+      }
+
+      if (request.method === "PUT" && pathname === "/api/admin/site-version") {
+        if (!requireWriteAccess(request, response)) return;
+        const version = await updateSiteVersion(await readJsonBody(request, 32 * 1024));
+        sendJson(response, { version });
         return;
       }
 

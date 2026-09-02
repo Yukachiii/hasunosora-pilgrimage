@@ -16,7 +16,7 @@ export default async function Home() {
   };
 
   let spots = baseSpots;
-  const spotImages: Record<string, string> = {};
+  const spotPhotoGroups: Record<string, string[]> = {};
   const heroImages: string[] = [];
 
   try {
@@ -31,12 +31,11 @@ export default async function Home() {
       if (asset.placement === "hero") {
         heroImages.push(imageUrl);
       }
-      if (
-        asset.placement === "spot" &&
-        asset.spotId &&
-        !spotImages[asset.spotId]
-      ) {
-        spotImages[asset.spotId] = imageUrl;
+      if (asset.placement === "spot" && asset.spotId) {
+        spotPhotoGroups[asset.spotId] ??= [];
+        if (!spotPhotoGroups[asset.spotId].includes(imageUrl)) {
+          spotPhotoGroups[asset.spotId].push(imageUrl);
+        }
       }
     }
   } catch {
@@ -53,9 +52,10 @@ export default async function Home() {
       mapboxConfig={mapboxConfig}
       routeServiceUrl="/api/routes/plan"
       spots={spots}
-      spotImages={spotImages}
+      spotPhotoGroups={spotPhotoGroups}
       heroImages={heroImages}
       initialHeroIndex={initialHeroIndex}
+      siteVersion={siteSettings.version}
     />
   );
 }
