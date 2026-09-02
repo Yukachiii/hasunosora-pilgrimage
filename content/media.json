@@ -1,5 +1,16 @@
 [
   {
+    "id": "17f6920c6d11deef",
+    "displayName": "近江町海鮮丼家 ひら井 公開画像",
+    "placement": "spot",
+    "spotId": "hirai-seafood-bowl",
+    "createdAt": "2026-09-02T09:57:04.168Z",
+    "imageUrl": "/photos/hirai-seafood-bowl/20260902-095704-17f6920c6d11deef-watermarked.webp",
+    "cropX": 50,
+    "cropY": 50,
+    "zoom": 1
+  },
+  {
     "id": "78b958e5201d8916",
     "displayName": "タイトル背景",
     "placement": "hero",
