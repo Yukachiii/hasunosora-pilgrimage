@@ -225,7 +225,6 @@ export function PilgrimageApp({
   const [currentJapanMinutes, setCurrentJapanMinutes] = useState(() => japanClockMinutes());
   const [transitLegProgress, setTransitLegProgress] = useState<TransitLegProgress>({});
   const [activePage, setActivePage] = useState<AppPage>("explore");
-  const [plannerStep, setPlannerStep] = useState<1 | 2 | 3>(1);
   const [isEditingItineraryOrder, setIsEditingItineraryOrder] = useState(false);
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
@@ -1051,7 +1050,6 @@ export function PilgrimageApp({
     const nextDay = createPlannerDay(plannerDays.length, dateAfter(previousDay.visitDate, 1));
     setPlannerDays((current) => [...current, nextDay]);
     setActiveDayIndex(plannerDays.length);
-    setPlannerStep(1);
     setRouteRequest(null);
     setRouteResult({ state: "idle" });
     setTodayOffsetMinutes(0);
@@ -1072,7 +1070,6 @@ export function PilgrimageApp({
     setActiveDayIndex(nextIndex);
     const nextSpotId = remainingDays[nextIndex]?.itineraryIds[0];
     if (nextSpotId) setSelectedId(nextSpotId);
-    setPlannerStep(1);
     setRouteRequest(null);
     setRouteResult({ state: "idle" });
     setTodayOffsetMinutes(0);
@@ -1336,7 +1333,7 @@ export function PilgrimageApp({
           </div>
         </div>
         <div className="hero-magazine-side" aria-hidden="true">
-          HASUNOSORA PILGRIMAGE · VER. 1.1.7
+          HASUNOSORA PILGRIMAGE · VER. 2.0.0
         </div>
       </section>
 
@@ -1431,27 +1428,26 @@ export function PilgrimageApp({
         ) : null}
 
         {activePage === "planner" ? (
-          <nav className="planner-steps" aria-label="予定作成の手順">
-            {([1, 2, 3] as const).map((step) => (
-              <button
-                type="button"
-                key={step}
-                className={plannerStep === step ? "is-current" : undefined}
-                aria-current={plannerStep === step ? "step" : undefined}
-                disabled={step > 1 && itineraryIds.length < 2}
-                onClick={() => setPlannerStep(step)}
-              >
-                <span>{step}</span>
-                {step === 1 ? "場所" : step === 2 ? "日時" : "確認"}
-              </button>
-            ))}
-          </nav>
+          <div className="planner-overview" aria-label="現在の予定概要">
+            <span>
+              <small>訪問先</small>
+              <strong>{itineraryIds.length}か所</strong>
+            </span>
+            <span>
+              <small>訪問日</small>
+              <strong>{visitDate.replaceAll("-", "/")}</strong>
+            </span>
+            <span>
+              <small>移動手段</small>
+              <strong>{travelModes.find((mode) => mode.value === travelMode)?.label ?? "未設定"}</strong>
+            </span>
+          </div>
         ) : null}
 
         <div className="map-layout">
           <div
             className={`map-column${activePage === "planner" ? " map-column--route" : ""}`}
-            hidden={activePage !== "explore" && !(activePage === "planner" && plannerStep === 3)}
+            hidden={activePage !== "explore" && activePage !== "planner"}
           >
             {activePage === "explore" ? (
             <div className="map-search">
@@ -1516,7 +1512,7 @@ export function PilgrimageApp({
               onRouteResult={handleRouteResult}
               accessToken={mapboxConfig.accessToken}
               routeServiceUrl={routeServiceUrl}
-              isVisible={activePage === "explore" || (activePage === "planner" && plannerStep === 3)}
+              isVisible={activePage === "explore" || activePage === "planner"}
             />
           </div>
           <div className="selected-map-detail" hidden={activePage !== "explore"}>
@@ -1572,7 +1568,7 @@ export function PilgrimageApp({
               ) : null}
           </div>
 
-          <aside className="route-planner" aria-label="訪問するスポット" hidden={activePage !== "planner" || plannerStep !== 1}>
+          <aside className="route-planner" aria-label="訪問するスポット" hidden={activePage !== "planner"}>
             <div className="itinerary-editor">
               <div className="itinerary-editor__heading">
                 <div>
@@ -1642,26 +1638,22 @@ export function PilgrimageApp({
                 </select>
                 <button type="button" onClick={() => addSpot()} disabled={!availableSpots.length || itineraryIds.length >= maximumItineraryStops}>追加</button>
               </div>
-              <div className="planner-step-actions">
-                <button type="button" className="is-secondary" onClick={() => navigateToPage("explore")}>スポットを探す</button>
-                <button type="button" onClick={() => setPlannerStep(2)} disabled={itineraryIds.length < 2}>日時を設定する</button>
-              </div>
+              <button type="button" className="planner-find-spots" onClick={() => navigateToPage("explore")}>スポットを追加・変更する</button>
             </div>
           </aside>
         </div>
 
-        <section className="route-workspace" id="planner" aria-label="ルート条件と一日の予定" hidden={activePage !== "planner" || plannerStep === 1}>
-          <div className="route-workspace__heading">
-            <div>
-              <h3>{plannerStep === 2 ? "訪問日時" : "予定の確認"}</h3>
-            </div>
-            <span className="route-badge">
-              {travelMode === "TRANSIT" ? "Yahoo!乗換案内" : "Mapbox"}
-            </span>
-          </div>
-
+        <section className="route-workspace" id="planner" aria-label="ルート条件と一日の予定" hidden={activePage !== "planner"}>
           <div className="route-workspace__controls">
-            <div className="journey-start" hidden={plannerStep !== 2}>
+            <details className="planner-conditions">
+              <summary>
+                <span>
+                  <small>DATE &amp; ROUTE</small>
+                  <strong>予定条件</strong>
+                </span>
+                <em>{visitDate.replaceAll("-", "/")} · {startTime}出発</em>
+              </summary>
+              <div className="journey-start">
               <fieldset className="travel-modes travel-modes--compact">
                 <legend>移動手段</legend>
                 <div>
@@ -1854,13 +1846,10 @@ export function PilgrimageApp({
                   </section>
                 </div>
               </details>
-              <div className="planner-step-actions">
-                <button type="button" className="is-secondary" onClick={() => setPlannerStep(1)}>場所へ戻る</button>
-                <button type="button" onClick={() => setPlannerStep(3)}>確認へ進む</button>
               </div>
-            </div>
+            </details>
 
-            <div className="route-workspace__options" hidden={plannerStep !== 3}>
+            <div className="route-workspace__options">
 
             <div className="planner-review">
               <span>
@@ -1920,29 +1909,29 @@ export function PilgrimageApp({
 
             </details>
 
-            <button
-              className="route-search-button"
-              type="button"
-              onClick={searchRoute}
-              disabled={dayTimeWindowInvalid || routeResult.state === "loading" || routeIsCurrent}
-            >
-              {dayTimeWindowInvalid
-                ? "日時を修正してください"
-                : routeResult.state === "loading"
-                ? "計算しています…"
-                : routeIsCurrent
-                  ? travelMode === "TRANSIT" ? "検索リンクを作成済みです" : "この内容は計算済みです"
-                  : travelMode === "TRANSIT" ? "Yahoo!検索リンクを作る" : "この内容で予定を計算する"}
-              <span aria-hidden="true">→</span>
-            </button>
-
-            <p className="route-api-note">
-              {travelMode === "TRANSIT"
-                ? "指定順に区間検索を作ります。検索結果はYahoo!乗換案内で確認してください。"
-                : "移動時間と訪問順を計算し、一日の予定として表示します。"}
-            </p>
-            <div className="planner-step-actions">
-              <button type="button" className="is-secondary" onClick={() => setPlannerStep(2)}>日時へ戻る</button>
+            <div className="planner-create-bar">
+              <button
+                className="route-search-button"
+                type="button"
+                onClick={searchRoute}
+                disabled={itineraryIds.length < 2 || dayTimeWindowInvalid || routeResult.state === "loading" || routeIsCurrent}
+              >
+                {itineraryIds.length < 2
+                  ? "訪問先を2か所以上選んでください"
+                  : dayTimeWindowInvalid
+                    ? "日時を修正してください"
+                    : routeResult.state === "loading"
+                      ? "作成しています…"
+                      : routeIsCurrent
+                        ? travelMode === "TRANSIT" ? "検索リンクを作成済みです" : "この予定は作成済みです"
+                        : travelMode === "TRANSIT" ? "乗換検索を含む予定を作る" : "この内容で予定を作る"}
+                <span aria-hidden="true">→</span>
+              </button>
+              <p className="route-api-note">
+                {travelMode === "TRANSIT"
+                  ? "指定順に区間検索を作ります。検索結果はYahoo!乗換案内で確認してください。"
+                  : "移動時間と訪問順を計算し、一日の予定として表示します。"}
+              </p>
             </div>
             </div>
           </div>
@@ -1950,13 +1939,14 @@ export function PilgrimageApp({
             <div
               className={`route-result route-result--${routeResult.state}`}
               aria-live="polite"
-              hidden={plannerStep !== 3}
             >
               {routeResult.state === "idle" && (
                 <>
                   <span className="result-symbol">＋</span>
                   <p>
-                    2か所以上を選び、滞在時間と訪問順を決めてください。
+                    {itineraryIds.length < 2
+                      ? "訪問先を2か所以上選び、滞在時間と訪問順を決めてください。"
+                      : "内容を確認し、「この内容で予定を作る」を押してください。"}
                   </p>
                 </>
               )}
@@ -1998,7 +1988,7 @@ export function PilgrimageApp({
               )}
             </div>
 
-            {transitLegs.length && plannerStep === 3 ? (
+            {transitLegs.length ? (
               <details className="transit-search-panel">
                 <summary className="transit-search-panel__heading">
                   <div>
@@ -2097,7 +2087,7 @@ export function PilgrimageApp({
               </details>
             ) : null}
 
-            {schedule && routeResult.state === "success" && plannerStep === 3 && (
+            {schedule && routeResult.state === "success" && (
               <section className="day-schedule" aria-label="作成した一日予定">
                 <div className="day-schedule__heading">
                   <div>
@@ -2226,7 +2216,6 @@ export function PilgrimageApp({
                     type="button"
                     onClick={() => {
                       fillItineraryFromCollaboration(collaboration.id);
-                      setPlannerStep(1);
                       navigateToPage("planner");
                     }}
                   >
@@ -2770,7 +2759,7 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. 1.1.7 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. 2.0.0 · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
       </footer>
       </main>
 
@@ -2977,7 +2966,6 @@ export function PilgrimageApp({
               <button
                 type="button"
                 onClick={() => {
-                  setPlannerStep(itinerarySpots.length >= 2 ? 2 : 1);
                   navigateToPage("planner");
                 }}
               >

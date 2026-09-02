@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 1\.1\.7/);
+  assert.match(html, /Ver\. 2\.0\.0/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -200,7 +200,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "1.1.7");
+  assert.equal(JSON.parse(packageJson).version, "2.0.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -585,7 +585,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(storage, /v:\s*3/);
   assert.match(storage, /optimizeOrder: candidate\.optimizeOrder === true/);
   assert.match(app, /sanitizePlannerSnapshot/);
-  assert.match(app, /この内容は計算済みです/);
+  assert.match(app, /この予定は作成済みです/);
   assert.match(app, /当日の予定/);
   assert.match(app, /日程を追加/);
   assert.match(app, /plannerDays\.length > 1/);
@@ -689,8 +689,14 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /className="route-workspace" id="planner"/);
   assert.match(app, /予定の経路/);
   assert.match(app, /activePage === "planner" \? itinerarySpots : spots/);
-  assert.match(app, /activePage === "planner" && plannerStep === 3/);
-  assert.match(css, /\.app-page--planner \.map-column--route \.map-shell\s*\{[^}]*height:\s*480px/s);
+  assert.match(app, /className="planner-overview"/);
+  assert.match(app, /className="planner-conditions"/);
+  assert.match(app, /className="planner-create-bar"/);
+  assert.match(app, /この内容で予定を作る/);
+  assert.doesNotMatch(app, /plannerStep|planner-steps/);
+  assert.match(css, /\.app-page--planner \.map-column--route \.map-shell\s*\{[^}]*height:\s*340px/s);
+  assert.match(css, /\.planner-create-bar\s*\{[^}]*position:\s*sticky/s);
+  assert.match(css, /\.app-page--planner \.itinerary-editor > ol\s*\{[^}]*overflow:\s*visible/s);
 });
 
 test("Mapbox is the main map and the comparison version is removed", async () => {
