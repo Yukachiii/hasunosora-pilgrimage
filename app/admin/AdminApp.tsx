@@ -25,6 +25,7 @@ export type AdminAsset = {
   spotId: string | null;
   createdAt: string;
   imageUrl: string;
+  heroCandidate?: boolean;
 };
 
 type Props = {
@@ -390,13 +391,26 @@ export function AdminApp({
       </header>
 
       <section className="admin-intro">
-        <p>ADMIN MVP</p>
-        <h1>写真とスポット情報を、<br />落ち着いて整える場所。</h1>
-        <p>
-          {localMode
-            ? "変更はこのPC内の公開用ファイルへ保存されます。GitHub Pagesへ反映するまでは外部公開されません。"
-            : "元写真は非公開で保管し、公開用画像からはEXIFを除去して透かしを入れます。スポット名などの修正は公開画面へすぐ反映されます。"}
-        </p>
+        <div className="admin-intro__cover">
+          <div className="admin-intro__grid" aria-hidden="true" />
+          <div className="admin-intro__number" aria-hidden="true">A</div>
+          <div className="admin-intro__copy">
+            <p>ADMIN / CONTENT MANAGEMENT</p>
+            <h1>写真とスポット情報を、<br />落ち着いて整える場所。</h1>
+            <div className="admin-intro__rule" aria-label="4つの管理項目">
+              <span>04 SECTIONS</span>
+              <span>LOCAL / PRIVATE</span>
+            </div>
+            <p>
+              {localMode
+                ? "変更はこのPC内の公開用ファイルへ保存されます。GitHub Pagesへ反映するまでは外部公開されません。"
+                : "元写真は非公開で保管し、公開用画像からはEXIFを除去して透かしを入れます。スポット名などの修正は公開画面へすぐ反映されます。"}
+            </p>
+          </div>
+          <div className="admin-intro__side" aria-hidden="true">
+            HASUNOSORA PILGRIMAGE · ADMIN
+          </div>
+        </div>
         {localMode ? (
           <div className="admin-lan-access">
             <div>
@@ -774,6 +788,7 @@ function PhotoManager({
   const [zoom, setZoom] = useState(1);
   const [gpsState, setGpsState] = useState<GpsState>({ state: "none" });
   const [saving, setSaving] = useState(false);
+  const [changingHeroCandidateId, setChangingHeroCandidateId] = useState("");
   const [message, setMessage] = useState("");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const queuedUrlsRef = useRef(new Set<string>());
@@ -854,11 +869,11 @@ function PhotoManager({
     event.target.value = "";
   }
 
-  function resetPhotoEditor() {
+  function resetPhotoEditor(resetPlacement = true) {
     setCropX(50);
     setCropY(50);
     setZoom(1);
-    setPlacement("spot");
+    if (resetPlacement) setPlacement("spot");
     setGpsState({ state: "loading" });
     setMessage("");
   }
@@ -869,7 +884,7 @@ function PhotoManager({
       queuedUrlsRef.current.delete(currentPhoto.url);
     }
     setQueue((current) => current.slice(1));
-    if (queue.length > 1) resetPhotoEditor();
+    if (queue.length > 1) resetPhotoEditor(false);
     else setGpsState({ state: "none" });
   }
 
@@ -949,10 +964,13 @@ function PhotoManager({
   }
 
   async function deleteAsset(asset: AdminAsset) {
+    const heroWarning = (asset.heroCandidate ?? asset.placement === "hero")
+      ? "\nこの画像は現在トップ画像候補にも使われています。"
+      : "";
     if (!window.confirm(
       localMode
-        ? `「${asset.originalName}」をローカルの公開用ファイルから削除しますか？`
-        : `「${asset.originalName}」を公開一覧と非公開保管領域から削除しますか？`,
+        ? `「${asset.originalName}」をローカルの公開用ファイルから削除しますか？${heroWarning}`
+        : `「${asset.originalName}」を公開一覧と非公開保管領域から削除しますか？${heroWarning}`,
     )) return;
     const response = await fetch(`/api/admin/media/${asset.id}`, {
       method: "DELETE",
@@ -967,11 +985,43 @@ function PhotoManager({
     setMessage("画像を削除しました。");
   }
 
+  async function changeHeroCandidate(asset: AdminAsset, enabled: boolean) {
+    if (!localMode || changingHeroCandidateId) return;
+    setChangingHeroCandidateId(asset.id);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/media/${asset.id}/hero-candidate`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-local-admin-token": localToken,
+        },
+        body: JSON.stringify({ enabled }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        asset?: AdminAsset;
+        error?: string;
+      };
+      if (!response.ok || !result.asset) {
+        throw new Error(result.error ?? "トップ画像候補を変更できませんでした。");
+      }
+      setAssets((current) => current.map((item) =>
+        item.id === result.asset!.id ? result.asset! : item,
+      ));
+      setMessage(enabled ? "トップ画像候補に追加しました。" : "トップ画像候補から外しました。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "トップ画像候補を変更できませんでした。");
+    } finally {
+      setChangingHeroCandidateId("");
+    }
+  }
+
   const currentSpot = spots.find((spot) => spot.id === spotId);
   const nearest =
     gpsState.state === "found"
       ? spots.find((spot) => spot.id === gpsState.nearestSpotId)
       : null;
+  const heroAssets = assets.filter((asset) => asset.heroCandidate ?? asset.placement === "hero");
 
   return (
     <section className="admin-workspace">
@@ -1004,7 +1054,7 @@ function PhotoManager({
               </div>
               <div className="placement-switch">
                 <label><input type="radio" checked={placement === "spot"} onChange={() => setPlacement("spot")} />スポットカード</label>
-                <label><input type="radio" checked={placement === "hero"} onChange={() => setPlacement("hero")} />タイトル背景</label>
+                <label><input type="radio" checked={placement === "hero"} onChange={() => setPlacement("hero")} />トップ画像候補</label>
               </div>
               {placement === "spot" && (
                 <label className="admin-field">
@@ -1014,13 +1064,20 @@ function PhotoManager({
                   </select>
                 </label>
               )}
-              <div className={`gps-note gps-note--${gpsState.state}`}>
-                {gpsState.state === "loading" && "EXIFの位置情報を確認しています…"}
-                {gpsState.state === "none" && "GPS情報は見つかりませんでした。配置先を手動で選んでください。"}
-                {gpsState.state === "found" && nearest && (
-                  <>最寄り候補は <strong>{nearest.name}</strong>（{formatDistance(gpsState.distanceM)}）です。必要なら変更してください。</>
-                )}
-              </div>
+              {placement === "spot" ? (
+                <div className={`gps-note gps-note--${gpsState.state}`}>
+                  {gpsState.state === "loading" && "EXIFの位置情報を確認しています…"}
+                  {gpsState.state === "none" && "GPS情報は見つかりませんでした。配置先を手動で選んでください。"}
+                  {gpsState.state === "found" && nearest && (
+                    <>最寄り候補は <strong>{nearest.name}</strong>（{formatDistance(gpsState.distanceM)}）です。必要なら変更してください。</>
+                  )}
+                </div>
+              ) : (
+                <div className="hero-placement-note">
+                  <strong>トップ画像のランダム候補へ追加します</strong>
+                  <span>ページを開くたびに候補から1枚が選ばれます。公開中に自動で切り替わることはありません。</span>
+                </div>
+              )}
             </div>
 
             <div className="admin-panel admin-panel--preview">
@@ -1032,7 +1089,7 @@ function PhotoManager({
                 <canvas ref={canvasRef} />
                 <div className="crop-preview__shade" />
                 <div className="crop-preview__copy">
-                  <small>{placement === "hero" ? "TITLE BACKGROUND" : currentSpot?.area}</small>
+                  <small>{placement === "hero" ? "RANDOM HERO CANDIDATE" : currentSpot?.area}</small>
                   <strong>{placement === "hero" ? "蓮ノ旅" : currentSpot?.name}</strong>
                 </div>
               </div>
@@ -1042,7 +1099,11 @@ function PhotoManager({
                 <label><span>拡大</span><input type="range" min="1" max="2.5" step="0.05" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>
               </div>
               <button className="admin-publish" type="button" disabled={saving} onClick={publishCurrent}>
-                {saving ? "公開用画像を作成中…" : "この内容で公開する"}<span>→</span>
+                {saving
+                  ? "公開用画像を作成中…"
+                  : placement === "hero"
+                    ? "トップ画像候補に追加する"
+                    : "この内容で公開する"}<span>→</span>
               </button>
               <p className="privacy-note">
                 公開用画像はWebP/JPEGへ再生成され、{watermarkText}の透かしを焼き込みます。
@@ -1056,17 +1117,58 @@ function PhotoManager({
       </div>
 
       <aside className="admin-panel published-panel">
-        <div className="admin-panel__heading"><div><span>LIVE</span><h2>公開済み</h2></div><small>{assets.length}枚</small></div>
+        <div className="admin-panel__heading"><div><span>LIVE ASSETS</span><h2>公開済み</h2></div><small>{assets.length}枚</small></div>
+        <section className="hero-candidate-summary" aria-label="トップ画像候補">
+          <div>
+            <span>RANDOM HERO</span>
+            <strong>トップ画像候補</strong>
+            <small>{heroAssets.length}枚</small>
+          </div>
+          <p>ページを開くたび、この中から前回とは違う1枚を表示します。</p>
+          {heroAssets.length ? (
+            <div className="hero-candidate-thumbnails">
+              {heroAssets.map((asset) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={asset.id} src={asset.imageUrl} alt={asset.originalName} />
+              ))}
+            </div>
+          ) : (
+            <p className="empty-note">トップ画像候補がありません。</p>
+          )}
+        </section>
         {assets.length ? (
           <div className="published-list">
             {assets.map((asset) => {
               const spot = spots.find((item) => item.id === asset.spotId);
+              const isHeroCandidate = asset.heroCandidate ?? asset.placement === "hero";
               return (
-                <article key={asset.id}>
+                <article key={asset.id} className={isHeroCandidate ? "is-hero-candidate" : undefined}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={asset.imageUrl} alt="" />
-                  <div><strong>{asset.placement === "hero" ? "タイトル背景" : spot?.name ?? "未設定"}</strong><span>{asset.originalName}</span></div>
-                  <button type="button" onClick={() => deleteAsset(asset)}>削除</button>
+                  <div className="published-list__copy">
+                    <div>
+                      {isHeroCandidate ? <small>トップ候補</small> : null}
+                      <strong>{asset.placement === "hero" ? "トップ画像" : spot?.name ?? "未設定"}</strong>
+                    </div>
+                    <span>{asset.originalName}</span>
+                  </div>
+                  <div className="published-list__actions">
+                    {localMode ? (
+                      <button
+                        type="button"
+                        aria-pressed={isHeroCandidate}
+                        disabled={changingHeroCandidateId === asset.id}
+                        onClick={() => changeHeroCandidate(asset, !isHeroCandidate)}
+                      >
+                        {changingHeroCandidateId === asset.id
+                          ? "変更中…"
+                          : isHeroCandidate
+                            ? "候補から外す"
+                            : "候補に追加"}
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => deleteAsset(asset)}>削除</button>
+                  </div>
                 </article>
               );
             })}

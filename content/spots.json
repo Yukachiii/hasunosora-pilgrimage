@@ -1305,7 +1305,9 @@
     "sourceUrl": "https://www.google.com/maps/search/?api=1&query=%E8%87%AA%E9%81%8A%E8%8A%B1%E4%BA%BA%E6%B0%B4%E5%BC%95%E3%83%9F%E3%83%A5%E3%83%BC%E3%82%B8%E3%82%A2%E3%83%A0%20%E7%9F%B3%E5%B7%9D%E7%9C%8C%E9%87%91%E6%B2%A2%E5%B8%82%E6%B8%85%E5%B7%9D%E7%94%BA7-9",
     "appearances": [
       "カード：［蓮ノ空歌留多］安養寺姫芽"
-    ]
+    ],
+    "imageUrl": "/photos/jiyukajin-mizuhiki/20260902-095944-8452ea5ec8136fc5-watermarked.webp",
+    "imagePosition": "center center"
   },
   {
     "id": "nakataya-kintsuba",
@@ -1619,6 +1621,8 @@
     "recommendedStayMinutes": 20,
     "appearances": [
       "カード：［太陽であれ！］村野さやか（北國花火2025金沢大会開催時）"
-    ]
+    ],
+    "imageUrl": "/photos/mameda-ground/20260902-095949-1d824a53e51a130a-watermarked.webp",
+    "imagePosition": "center center"
   }
 ]

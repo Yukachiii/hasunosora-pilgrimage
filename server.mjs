@@ -288,14 +288,32 @@ function validateSpot(value, spotId, current) {
   };
 }
 
-function serializeAsset(asset) {
+function siteHeroImages(site) {
+  return Array.from(new Set([
+    site?.heroImage,
+    ...(Array.isArray(site?.heroImages) ? site.heroImages : []),
+  ].filter((imageUrl) => typeof imageUrl === "string" && imageUrl.startsWith("/photos/"))));
+}
+
+function updateSiteHeroImages(site, imageUrls) {
+  const [heroImage = null, ...heroImages] = Array.from(new Set(imageUrls));
+  site.heroImage = heroImage;
+  site.heroImages = heroImages;
+  return site;
+}
+
+function serializeAsset(asset, heroImageSet) {
+  const imageUrl = asset.imageUrl || "";
   return {
     id: asset.id,
     originalName: asset.displayName || "公開画像",
     placement: asset.placement || "spot",
     spotId: asset.spotId ?? null,
     createdAt: asset.createdAt || "",
-    imageUrl: asset.imageUrl || "",
+    imageUrl,
+    heroCandidate: heroImageSet
+      ? heroImageSet.has(imageUrl)
+      : asset.placement === "hero",
   };
 }
 
@@ -536,8 +554,10 @@ async function saveMedia(payload) {
         spot.imagePosition = "center center";
         await writeJsonIfChanged(spotsPath, spots);
       } else {
-        const site = await readJson(sitePath, { heroImage: null });
-        site.heroImage = imageUrl;
+        const site = await readJson(sitePath, { heroImage: null, heroImages: [] });
+        const heroImages = siteHeroImages(site);
+        if (!heroImages.includes(imageUrl)) heroImages.push(imageUrl);
+        updateSiteHeroImages(site, heroImages);
         await writeJsonIfChanged(sitePath, site);
       }
       await writeJsonIfChanged(mediaPath, media);
@@ -545,7 +565,38 @@ async function saveMedia(payload) {
       await rm(imagePath, { force: true });
       throw error;
     }
-    return serializeAsset(asset);
+    return serializeAsset(asset, placement === "hero" ? new Set([imageUrl]) : undefined);
+  });
+}
+
+async function setMediaHeroCandidate(assetId, enabled) {
+  if (!assetIdPattern.test(assetId)) throw new AdminError("画像IDが正しくありません。");
+  if (typeof enabled !== "boolean") throw new AdminError("トップ画像候補の設定が正しくありません。");
+
+  return withWriteLock(async () => {
+    const media = await readJson(mediaPath, []);
+    const asset = media.find((item) => item.id === assetId);
+    if (!asset) throw new AdminError("画像が見つかりません。");
+    const imageUrl = String(asset.imageUrl || "");
+    if (!imageUrl.startsWith("/photos/")) throw new AdminError("公開用画像の場所が正しくありません。");
+
+    const site = await readJson(sitePath, { heroImage: null, heroImages: [] });
+    const currentHeroImages = siteHeroImages(site);
+    let nextHeroImages = currentHeroImages;
+    if (enabled) {
+      nextHeroImages = currentHeroImages.includes(imageUrl)
+        ? currentHeroImages
+        : [...currentHeroImages, imageUrl];
+    } else {
+      if (currentHeroImages.includes(imageUrl) && currentHeroImages.length <= 1) {
+        throw new AdminError("トップ画像は1枚以上残してください。");
+      }
+      nextHeroImages = currentHeroImages.filter((current) => current !== imageUrl);
+    }
+
+    updateSiteHeroImages(site, nextHeroImages);
+    await writeJsonIfChanged(sitePath, site);
+    return serializeAsset(asset, new Set(nextHeroImages));
   });
 }
 
@@ -556,6 +607,11 @@ async function deleteMedia(assetId) {
     const asset = media.find((item) => item.id === assetId);
     if (!asset) throw new AdminError("画像が見つかりません。");
     const imageUrl = String(asset.imageUrl || "");
+    const site = await readJson(sitePath, { heroImage: null, heroImages: [] });
+    const currentHeroImages = siteHeroImages(site);
+    if (currentHeroImages.includes(imageUrl) && currentHeroImages.length <= 1) {
+      throw new AdminError("最後のトップ画像候補は削除できません。先に別の候補を追加してください。");
+    }
     if (imageUrl.startsWith("/photos/")) {
       const imagePath = safeChild(photosDirectory, imageUrl.slice("/photos/".length));
       if (imagePath) await rm(imagePath, { force: true });
@@ -570,9 +626,9 @@ async function deleteMedia(assetId) {
         spotsChanged = true;
       }
     }
-    const site = await readJson(sitePath, { heroImage: null });
-    const siteChanged = site.heroImage === imageUrl;
-    if (siteChanged) site.heroImage = null;
+    const nextHeroImages = currentHeroImages.filter((current) => current !== imageUrl);
+    const siteChanged = nextHeroImages.length !== currentHeroImages.length;
+    if (siteChanged) updateSiteHeroImages(site, nextHeroImages);
     await writeJsonIfChanged(mediaPath, nextMedia);
     if (spotsChanged) await writeJsonIfChanged(spotsPath, spots);
     if (siteChanged) await writeJsonIfChanged(sitePath, site);
@@ -650,13 +706,15 @@ async function requestHandler(request, response, initialSpots) {
       if (request.method === "GET") {
         if (!requireLocal(request, response)) return;
         if (pathname === "/api/admin/state") {
-          const [spots, media] = await Promise.all([
+          const [spots, media, site] = await Promise.all([
             readJson(spotsPath, []),
             readJson(mediaPath, []),
+            readJson(sitePath, { heroImage: null, heroImages: [] }),
           ]);
+          const heroImageSet = new Set(siteHeroImages(site));
           sendJson(response, {
             spots,
-            assets: media.map(serializeAsset),
+            assets: media.map((asset) => serializeAsset(asset, heroImageSet)),
             writeToken,
             lanUrl: lanAdminUrl,
           });
@@ -696,6 +754,19 @@ async function requestHandler(request, response, initialSpots) {
         if (!requireWriteAccess(request, response)) return;
         await deleteMedia(pathname.slice("/api/admin/media/".length));
         sendEmpty(response);
+        return;
+      }
+
+      if (
+        request.method === "PATCH" &&
+        pathname.startsWith("/api/admin/media/") &&
+        pathname.endsWith("/hero-candidate")
+      ) {
+        if (!requireWriteAccess(request, response)) return;
+        const suffix = "/hero-candidate";
+        const assetId = pathname.slice("/api/admin/media/".length, -suffix.length);
+        const body = await readJsonBody(request, 32 * 1024);
+        sendJson(response, { asset: await setMediaHeroCandidate(assetId, body.enabled) });
         return;
       }
 

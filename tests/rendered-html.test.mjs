@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 2\.1\.0/);
+  assert.match(html, /Ver\. 3\.0\.0/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -200,7 +200,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "2.1.0");
+  assert.equal(JSON.parse(packageJson).version, "3.0.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -546,13 +546,14 @@ test("spot photos can be used as readable card backgrounds", async () => {
 });
 
 test("local admin writes publishable files before an explicit GitHub push", async () => {
-  const [adminApp, localMain, localServer, startScript, pagesMain] =
+  const [adminApp, localMain, localServer, startScript, pagesMain, adminCss] =
     await Promise.all([
       readFile(new URL("../app/admin/AdminApp.tsx", import.meta.url), "utf8"),
       readFile(new URL("../local-admin/main.tsx", import.meta.url), "utf8"),
       readFile(new URL("../server.mjs", import.meta.url), "utf8"),
       readFile(new URL("../start-admin.ps1", import.meta.url), "utf8"),
       readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     ]);
 
   assert.match(adminApp, /exifr/);
@@ -566,6 +567,16 @@ test("local admin writes publishable files before an explicit GitHub push", asyn
   assert.match(adminApp, /スマホから管理画面を開く/);
   assert.match(localServer, /writeJsonIfChanged/);
   assert.match(localServer, /writeToken/);
+  assert.match(localServer, /siteHeroImages/);
+  assert.match(localServer, /hero-candidate/);
+  assert.match(localServer, /トップ画像は1枚以上残してください/);
+  assert.match(adminApp, /トップ画像候補/);
+  assert.match(adminApp, /changeHeroCandidate/);
+  assert.match(adminApp, /RANDOM HERO/);
+  assert.match(adminApp, /ADMIN \/ CONTENT MANAGEMENT/);
+  assert.match(adminCss, /\.admin-intro__cover/);
+  assert.match(adminCss, /\.hero-candidate-summary/);
+  assert.match(adminCss, /@media \(max-width: 600px\)[\s\S]*?\.admin-tabs\s*\{[^}]*position:\s*fixed/s);
   assert.match(localServer, /"add", "--", "content", "public\/photos"/);
   assert.match(startScript, /build:admin/);
   assert.match(startScript, /\$BindHost = "0\.0\.0\.0"/);

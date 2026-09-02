@@ -79,6 +79,7 @@ async function AdminGate() {
         spotId: asset.spotId,
         createdAt: asset.createdAt,
         imageUrl: `/api/media/${asset.id}`,
+        heroCandidate: asset.placement === "hero",
       }))}
     />
   );

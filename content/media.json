@@ -1,5 +1,27 @@
 [
   {
+    "id": "1d824a53e51a130a",
+    "displayName": "石川県営まめだ簡易グラウンド 公開画像",
+    "placement": "spot",
+    "spotId": "mameda-ground",
+    "createdAt": "2026-09-02T09:59:49.389Z",
+    "imageUrl": "/photos/mameda-ground/20260902-095949-1d824a53e51a130a-watermarked.webp",
+    "cropX": 50,
+    "cropY": 50,
+    "zoom": 1
+  },
+  {
+    "id": "8452ea5ec8136fc5",
+    "displayName": "自遊花人水引ミュージアム 公開画像",
+    "placement": "spot",
+    "spotId": "jiyukajin-mizuhiki",
+    "createdAt": "2026-09-02T09:59:44.714Z",
+    "imageUrl": "/photos/jiyukajin-mizuhiki/20260902-095944-8452ea5ec8136fc5-watermarked.webp",
+    "cropX": 50,
+    "cropY": 50,
+    "zoom": 1
+  },
+  {
     "id": "17f6920c6d11deef",
     "displayName": "近江町海鮮丼家 ひら井 公開画像",
     "placement": "spot",

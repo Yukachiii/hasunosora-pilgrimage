@@ -51,6 +51,7 @@ function serializeAsset(asset: Awaited<ReturnType<typeof insertMediaAsset>>) {
     status: asset.status,
     createdAt: asset.createdAt,
     imageUrl: `/api/media/${asset.id}`,
+    heroCandidate: asset.placement === "hero",
   };
 }
 
