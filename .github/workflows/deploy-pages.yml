@@ -54,5 +54,5 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
         with:
-          # GitHub Pages側の反映が10分を超えることがあるため、既定値より長く待つ。
-          timeout: 1800000
+          # v5で許可されている上限まで待つ。
+          timeout: 600000
