@@ -1,5 +1,7 @@
+import { randomInt } from "node:crypto";
 import { PilgrimageApp } from "./PilgrimageApp";
 import { spots as baseSpots } from "./spots";
+import siteSettings from "../content/site.json";
 import {
   applySpotOverrides,
   listPublishedMedia,
@@ -15,7 +17,7 @@ export default async function Home() {
 
   let spots = baseSpots;
   const spotImages: Record<string, string> = {};
-  let heroImage: string | null = null;
+  const heroImages: string[] = [];
 
   try {
     const [overrides, media] = await Promise.all([
@@ -26,8 +28,8 @@ export default async function Home() {
 
     for (const asset of media) {
       const imageUrl = `/api/media/${asset.id}`;
-      if (asset.placement === "hero" && !heroImage) {
-        heroImage = imageUrl;
+      if (asset.placement === "hero") {
+        heroImages.push(imageUrl);
       }
       if (
         asset.placement === "spot" &&
@@ -41,7 +43,10 @@ export default async function Home() {
     // Local tests and the first deployment can run before D1 is available.
   }
 
-  heroImage ??= "/photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp";
+  for (const imageUrl of [siteSettings.heroImage, ...siteSettings.heroImages]) {
+    if (!heroImages.includes(imageUrl)) heroImages.push(imageUrl);
+  }
+  const initialHeroIndex = heroImages.length ? randomInt(heroImages.length) : 0;
 
   return (
     <PilgrimageApp
@@ -49,7 +54,8 @@ export default async function Home() {
       routeServiceUrl="/api/routes/plan"
       spots={spots}
       spotImages={spotImages}
-      heroImage={heroImage}
+      heroImages={heroImages}
+      initialHeroIndex={initialHeroIndex}
     />
   );
 }

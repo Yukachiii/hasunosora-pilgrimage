@@ -1,3 +1,8 @@
 {
-  "heroImage": "/photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp"
+  "heroImage": "/photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp",
+  "heroImages": [
+    "/photos/hirai-seafood-bowl/20260902-095704-17f6920c6d11deef-watermarked.webp",
+    "/photos/jiyukajin-mizuhiki/20260902-095944-8452ea5ec8136fc5-watermarked.webp",
+    "/photos/mameda-ground/20260902-095949-1d824a53e51a130a-watermarked.webp"
+  ]
 }

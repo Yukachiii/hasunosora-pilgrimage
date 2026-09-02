@@ -50,7 +50,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\. 2\.0\.2/);
+  assert.match(html, /Ver\. 2\.1\.0/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -200,20 +200,23 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "2.0.2");
+  assert.equal(JSON.parse(packageJson).version, "2.1.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
 });
 
 test("GitHub Pages ships public release metadata", async () => {
-  const [index, robots, sitemap, manifestRaw] = await Promise.all([
+  const [index, robots, sitemap, manifestRaw, pagesMain, siteRaw] = await Promise.all([
     readFile(new URL("../github-pages/index.html", import.meta.url), "utf8"),
     readFile(new URL("../public/robots.txt", import.meta.url), "utf8"),
     readFile(new URL("../public/sitemap.xml", import.meta.url), "utf8"),
     readFile(new URL("../public/site.webmanifest", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../content/site.json", import.meta.url), "utf8"),
   ]);
   const manifest = JSON.parse(manifestRaw);
+  const site = JSON.parse(siteRaw);
 
   assert.match(index, /rel="canonical" href="https:\/\/yukachiii\.github\.io\/hasunosora-pilgrimage\/"/);
   assert.match(index, /property="og:image"/);
@@ -224,6 +227,14 @@ test("GitHub Pages ships public release metadata", async () => {
   assert.match(sitemap, /<loc>https:\/\/yukachiii\.github\.io\/hasunosora-pilgrimage\/<\/loc>/);
   assert.equal(manifest.start_url, "/hasunosora-pilgrimage/");
   assert.equal(manifest.short_name, "蓮ノ旅");
+  assert.equal(site.heroImages.length, 3);
+  assert.match(pagesMain, /chooseHeroIndex/);
+  assert.match(pagesMain, /image === previousImage/);
+  await Promise.all(
+    [site.heroImage, ...site.heroImages].map((image) =>
+      access(new URL(`../public${image}`, import.meta.url)),
+    ),
+  );
   await access(new URL("../public/favicon.svg", import.meta.url));
 });
 
