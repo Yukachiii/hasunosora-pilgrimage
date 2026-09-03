@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from "react";
@@ -48,6 +49,7 @@ import {
   buildYahooTransitUrl,
   createYahooTransitLegs,
 } from "./yahoo-transit";
+import { reorderIdsForInsertion, sameIdOrder } from "./itinerary-order";
 
 const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v2";
 const LEGACY_PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1";
@@ -229,7 +231,8 @@ export function PilgrimageApp({
   const [currentJapanMinutes, setCurrentJapanMinutes] = useState(() => japanClockMinutes());
   const [transitLegProgress, setTransitLegProgress] = useState<TransitLegProgress>({});
   const [activePage, setActivePage] = useState<AppPage>("explore");
-  const [isEditingItineraryOrder, setIsEditingItineraryOrder] = useState(false);
+  const [itineraryDragPreview, setItineraryDragPreview] = useState<string[] | null>(null);
+  const [draggedItinerarySpotId, setDraggedItinerarySpotId] = useState<string | null>(null);
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
   const [activeExplorePanel, setActiveExplorePanel] = useState<ExplorePanel | null>(null);
   const [isExplorePickerOpen, setIsExplorePickerOpen] = useState(false);
@@ -260,6 +263,15 @@ export function PilgrimageApp({
   const exploreSheetCloseTimerRef = useRef<number | null>(null);
   const exploreSheetSettleTimerRef = useRef<number | null>(null);
   const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const itineraryDragRef = useRef<{
+    pointerId: number;
+    spotId: string;
+    originalIds: string[];
+    previewIds: string[];
+    list: HTMLOListElement;
+    pointerY: number;
+  } | null>(null);
+  const itineraryDragScrollFrameRef = useRef<number | null>(null);
   const automaticRouteAttemptRef = useRef("");
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
@@ -337,6 +349,9 @@ export function PilgrimageApp({
     }
     if (exploreSheetSettleTimerRef.current !== null) {
       window.clearTimeout(exploreSheetSettleTimerRef.current);
+    }
+    if (itineraryDragScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(itineraryDragScrollFrameRef.current);
     }
   }, []);
 
@@ -731,6 +746,12 @@ export function PilgrimageApp({
     () => itineraryIds.map((id) => spots.find((spot) => spot.id === id)).filter((spot): spot is PilgrimageSpot => Boolean(spot)),
     [itineraryIds, spots],
   );
+  const displayedItinerarySpots = useMemo(
+    () => (itineraryDragPreview ?? itineraryIds)
+      .map((id) => spots.find((spot) => spot.id === id))
+      .filter((spot): spot is PilgrimageSpot => Boolean(spot)),
+    [itineraryDragPreview, itineraryIds, spots],
+  );
   const allPlannedSpotCount = useMemo(
     () => plannerDays.reduce((total, day) => total + day.itineraryIds.length, 0),
     [plannerDays],
@@ -984,6 +1005,7 @@ export function PilgrimageApp({
     if (
       !hasRestoredPlannerStorage ||
       activeExplorePanel !== null ||
+      draggedItinerarySpotId !== null ||
       itinerarySpots.length < 2 ||
       dayTimeWindowInvalid ||
       routeIsCurrent ||
@@ -997,7 +1019,7 @@ export function PilgrimageApp({
       searchRoute();
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [activeDayId, activeExplorePanel, activePage, currentRouteSignature, dayTimeWindowInvalid, hasRestoredPlannerStorage, itinerarySpots.length, routeIsCurrent, routeResult.state, searchRoute]);
+  }, [activeDayId, activeExplorePanel, activePage, currentRouteSignature, dayTimeWindowInvalid, draggedItinerarySpotId, hasRestoredPlannerStorage, itinerarySpots.length, routeIsCurrent, routeResult.state, searchRoute]);
 
   function focusItinerarySpot(spotId: string) {
     setSelectedId(spotId);
@@ -1078,6 +1100,127 @@ export function PilgrimageApp({
       return next;
     });
     invalidateRoute();
+  }
+
+  function updateItineraryDragPreview(clientY: number) {
+    const drag = itineraryDragRef.current;
+    if (!drag || !drag.list.isConnected) return;
+    const remainingRows = Array.from(
+      drag.list.querySelectorAll<HTMLElement>("li[data-itinerary-spot-id]"),
+    ).filter((row) => row.dataset.itinerarySpotId !== drag.spotId);
+    const firstRowBelowPointer = remainingRows.findIndex((row) => {
+      const bounds = row.getBoundingClientRect();
+      return clientY < bounds.top + bounds.height / 2;
+    });
+    const insertionIndex = firstRowBelowPointer < 0 ? remainingRows.length : firstRowBelowPointer;
+    const nextOrder = reorderIdsForInsertion(drag.previewIds, drag.spotId, insertionIndex);
+    if (sameIdOrder(nextOrder, drag.previewIds)) return;
+    drag.previewIds = nextOrder;
+    setItineraryDragPreview(nextOrder);
+  }
+
+  function itineraryDragScrollAmount(clientY: number) {
+    const scrollEdge = Math.min(88, window.innerHeight * 0.18);
+    if (clientY < scrollEdge) {
+      return -Math.min(18, Math.ceil((scrollEdge - clientY) / 4));
+    }
+    if (clientY > window.innerHeight - scrollEdge) {
+      return Math.min(18, Math.ceil((clientY - (window.innerHeight - scrollEdge)) / 4));
+    }
+    return 0;
+  }
+
+  function stopItineraryDragAutoScroll() {
+    if (itineraryDragScrollFrameRef.current === null) return;
+    window.cancelAnimationFrame(itineraryDragScrollFrameRef.current);
+    itineraryDragScrollFrameRef.current = null;
+  }
+
+  function runItineraryDragAutoScroll() {
+    itineraryDragScrollFrameRef.current = null;
+    const drag = itineraryDragRef.current;
+    if (!drag) return;
+    const amount = itineraryDragScrollAmount(drag.pointerY);
+    if (!amount) return;
+    const scrollingElement = document.scrollingElement ?? document.documentElement;
+    const previousScrollTop = scrollingElement.scrollTop;
+    scrollingElement.scrollTop += amount;
+    updateItineraryDragPreview(drag.pointerY);
+    if (scrollingElement.scrollTop === previousScrollTop) return;
+    itineraryDragScrollFrameRef.current = window.requestAnimationFrame(runItineraryDragAutoScroll);
+  }
+
+  function syncItineraryDragAutoScroll(clientY: number) {
+    if (!itineraryDragScrollAmount(clientY)) {
+      stopItineraryDragAutoScroll();
+      return;
+    }
+    if (itineraryDragScrollFrameRef.current === null) {
+      itineraryDragScrollFrameRef.current = window.requestAnimationFrame(runItineraryDragAutoScroll);
+    }
+  }
+
+  function startItineraryDrag(event: ReactPointerEvent<HTMLButtonElement>, spotId: string) {
+    if (!event.isPrimary || event.button !== 0 || itineraryIds.length < 2) return;
+    const list = event.currentTarget.closest("ol") as HTMLOListElement | null;
+    if (!list) return;
+    event.preventDefault();
+    const previewIds = [...itineraryIds];
+    itineraryDragRef.current = {
+      pointerId: event.pointerId,
+      spotId,
+      originalIds: previewIds,
+      previewIds,
+      list,
+      pointerY: event.clientY,
+    };
+    list.setPointerCapture(event.pointerId);
+    setItineraryDragPreview(previewIds);
+    setDraggedItinerarySpotId(spotId);
+  }
+
+  function moveItineraryDrag(event: ReactPointerEvent<HTMLOListElement>) {
+    const drag = itineraryDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    drag.pointerY = event.clientY;
+    updateItineraryDragPreview(event.clientY);
+    syncItineraryDragAutoScroll(event.clientY);
+  }
+
+  function finishItineraryDrag(event: ReactPointerEvent<HTMLOListElement>) {
+    const drag = itineraryDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    stopItineraryDragAutoScroll();
+    itineraryDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setDraggedItinerarySpotId(null);
+    setItineraryDragPreview(null);
+    if (sameIdOrder(drag.previewIds, drag.originalIds)) return;
+    setItineraryIds(drag.previewIds);
+    invalidateRoute();
+  }
+
+  function cancelItineraryDrag(event: ReactPointerEvent<HTMLOListElement>) {
+    const drag = itineraryDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    stopItineraryDragAutoScroll();
+    itineraryDragRef.current = null;
+    setDraggedItinerarySpotId(null);
+    setItineraryDragPreview(null);
+  }
+
+  function handleItineraryDragKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    spotId: string,
+  ) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const index = itineraryIds.indexOf(spotId);
+    if (index < 0) return;
+    moveSpot(index, event.key === "ArrowUp" ? -1 : 1);
   }
 
   function changeStayMinutes(id: string, value: number) {
@@ -1689,23 +1832,23 @@ export function PilgrimageApp({
                   <strong>訪問するスポット</strong>
                   <span>{itineraryIds.length} / {maximumItineraryStops}</span>
                 </div>
-                {itineraryIds.length > 1 ? (
-                  <button
-                    type="button"
-                    className={isEditingItineraryOrder ? "is-active" : undefined}
-                    aria-pressed={isEditingItineraryOrder}
-                    onClick={() => setIsEditingItineraryOrder((current) => !current)}
-                  >
-                    {isEditingItineraryOrder ? "順序変更を完了" : "順序を変更"}
-                  </button>
-                ) : null}
+                <small id="itinerary-reorder-hint">右端をドラッグして並べ替え</small>
               </div>
-              <ol>
+              <ol
+                onPointerMove={moveItineraryDrag}
+                onPointerUp={finishItineraryDrag}
+                onPointerCancel={cancelItineraryDrag}
+                onLostPointerCapture={cancelItineraryDrag}
+              >
                 {!itinerarySpots.length ? (
                   <li className="itinerary-editor__empty">下の「探す」からスポットを追加してください。</li>
                 ) : null}
-                {itinerarySpots.map((spot, index) => (
-                  <li key={spot.id}>
+                {displayedItinerarySpots.map((spot, index) => (
+                  <li
+                    key={spot.id}
+                    className={draggedItinerarySpotId === spot.id ? "is-dragging" : undefined}
+                    data-itinerary-spot-id={spot.id}
+                  >
                     <button
                       type="button"
                       className="itinerary-spot-focus"
@@ -1721,7 +1864,7 @@ export function PilgrimageApp({
                       </span>
                     </button>
                     <label>
-                      滞在
+                      <span>滞在</span>
                       <input
                         type="number"
                         min="0"
@@ -1730,15 +1873,28 @@ export function PilgrimageApp({
                         value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}
                         onChange={(event) => changeStayMinutes(spot.id, Number(event.target.value))}
                       />
-                      分
+                      <span>分</span>
                     </label>
-                    {isEditingItineraryOrder ? (
-                      <div className="itinerary-actions">
-                        <button type="button" disabled={index === 0} onClick={() => moveSpot(index, -1)} aria-label={`${spot.name}を一つ前へ`}>↑</button>
-                        <button type="button" disabled={index === itinerarySpots.length - 1} onClick={() => moveSpot(index, 1)} aria-label={`${spot.name}を一つ後ろへ`}>↓</button>
-                        <button type="button" onClick={() => removeSpot(index)} aria-label={`${spot.name}を予定から外す`}>×</button>
-                      </div>
-                    ) : null}
+                    <button
+                      type="button"
+                      className="itinerary-remove"
+                      disabled={draggedItinerarySpotId !== null}
+                      onClick={() => removeSpot(index)}
+                      aria-label={`${spot.name}を予定から外す`}
+                    >
+                      ×
+                    </button>
+                    <button
+                      type="button"
+                      className="itinerary-drag-handle"
+                      disabled={itineraryIds.length < 2}
+                      aria-label={`${spot.name}を並べ替え。現在${index + 1}番目`}
+                      aria-describedby="itinerary-reorder-hint"
+                      onPointerDown={(event) => startItineraryDrag(event, spot.id)}
+                      onKeyDown={(event) => handleItineraryDragKeyDown(event, spot.id)}
+                    >
+                      <span aria-hidden="true"><i /><i /><i /></span>
+                    </button>
                   </li>
                 ))}
               </ol>
@@ -2194,14 +2350,6 @@ export function PilgrimageApp({
                   滞在込み <strong>{formatDuration(schedule.finish - schedule.start)}</strong>
                   {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · 最適化した順で表示" : ""}
                 </p>
-                <button
-                  type="button"
-                  className="today-mode-open"
-                  onClick={() => navigateToPage("today")}
-                >
-                  当日ページを開く
-                  <span aria-hidden="true">→</span>
-                </button>
               </section>
             )}
         </section>

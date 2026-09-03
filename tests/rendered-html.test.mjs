@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { reorderIdsForInsertion, sameIdOrder } from "../app/itinerary-order.ts";
+
+test("itinerary order helper moves an id to each insertion point", () => {
+  const original = ["station", "market", "park", "museum"];
+  assert.deepEqual(
+    reorderIdsForInsertion(original, "station", 2),
+    ["market", "park", "station", "museum"],
+  );
+  assert.deepEqual(
+    reorderIdsForInsertion(original, "museum", 0),
+    ["museum", "station", "market", "park"],
+  );
+  assert.deepEqual(
+    reorderIdsForInsertion(original, "market", 99),
+    ["station", "park", "museum", "market"],
+  );
+  assert.deepEqual(reorderIdsForInsertion(original, "missing", 0), original);
+  assert.equal(sameIdOrder(reorderIdsForInsertion(original, "market", 1), original), true);
+  assert.equal(sameIdOrder(reorderIdsForInsertion(original, "market", 3), original), false);
+});
 
 async function requestApp(request) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -50,7 +70,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\.\s*(?:<!-- -->)?3\.1\.1/);
+  assert.match(html, /Ver\.\s*(?:<!-- -->)?3\.2\.0/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -200,7 +220,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "3.1.1");
+  assert.equal(JSON.parse(packageJson).version, "3.2.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -227,7 +247,8 @@ test("GitHub Pages ships public release metadata", async () => {
   assert.match(sitemap, /<loc>https:\/\/yukachiii\.github\.io\/hasunosora-pilgrimage\/<\/loc>/);
   assert.equal(manifest.start_url, "/hasunosora-pilgrimage/");
   assert.equal(manifest.short_name, "蓮ノ旅");
-  assert.equal(site.heroImages.length, 3);
+  assert.ok(site.heroImages.length >= 3);
+  assert.equal(new Set(site.heroImages).size, site.heroImages.length);
   assert.match(pagesMain, /chooseHeroIndex/);
   assert.match(pagesMain, /image === previousImage/);
   await Promise.all(
@@ -619,7 +640,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(storage, /v:\s*3/);
   assert.match(storage, /optimizeOrder: candidate\.optimizeOrder === true/);
   assert.match(app, /sanitizePlannerSnapshot/);
-  assert.match(app, /当日の予定を見る/);
+  assert.equal((app.match(/当日の予定を見る/g) ?? []).length, 1);
+  assert.doesNotMatch(app, /当日ページを開く|today-mode-open/);
   assert.match(app, /当日の予定/);
   assert.match(app, /日程を追加/);
   assert.match(app, /plannerDays\.length > 1/);
@@ -653,8 +675,26 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /aria-pressed=\{activeExplorePanel === "spots"\}/);
   assert.match(app, /aria-pressed=\{activeExplorePanel === "card-models"\}/);
   assert.match(app, /mobile-nav--sheet-open/);
-  assert.match(app, /isEditingItineraryOrder/);
-  assert.match(app, /順序を変更/);
+  assert.match(app, /className="itinerary-drag-handle"/);
+  assert.match(app, /data-itinerary-spot-id=\{spot\.id\}/);
+  assert.match(app, /onPointerDown=\{\(event\) => startItineraryDrag\(event, spot\.id\)\}/);
+  assert.match(app, /list\.setPointerCapture\(event\.pointerId\)/);
+  assert.match(app, /setItineraryDragPreview\(nextOrder\)/);
+  const moveItineraryDrag = app.match(/function moveItineraryDrag\([\s\S]*?\n  \}/)?.[0] ?? "";
+  assert.doesNotMatch(moveItineraryDrag, /setItineraryIds|invalidateRoute/);
+  const finishItineraryDrag = app.match(/function finishItineraryDrag\([\s\S]*?\n  \}/)?.[0] ?? "";
+  assert.match(finishItineraryDrag, /setItineraryIds\(drag\.previewIds\);/);
+  assert.match(finishItineraryDrag, /invalidateRoute\(\);/);
+  assert.match(finishItineraryDrag, /sameIdOrder\(drag\.previewIds, drag\.originalIds\)/);
+  assert.match(app, /onPointerUp=\{finishItineraryDrag\}/);
+  assert.match(app, /onPointerCancel=\{cancelItineraryDrag\}/);
+  assert.match(app, /onLostPointerCapture=\{cancelItineraryDrag\}/);
+  assert.match(app, /window\.requestAnimationFrame\(runItineraryDragAutoScroll\)/);
+  assert.match(app, /scrollingElement\.scrollTop \+= amount/);
+  assert.doesNotMatch(app, /function runItineraryDragAutoScroll\([\s\S]*?window\.scrollBy/);
+  assert.match(app, /draggedItinerarySpotId !== null \|\|[\s\S]*?itinerarySpots\.length < 2/);
+  assert.match(app, /event\.key === "ArrowUp" \? -1 : 1/);
+  assert.doesNotMatch(app, /isEditingItineraryOrder|順序変更を完了|順序を変更/);
   assert.match(app, /className="transit-search-panel" id="transit-search-panel"/);
   assert.match(app, /className="today-mode__tools"/);
   assert.doesNotMatch(app, /className="selection-tray"/);
@@ -719,6 +759,9 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.map-layout\s*\{[^}]*align-items:\s*stretch/s);
   assert.match(css, /\.route-planner\s*\{[^}]*align-self:\s*stretch[^}]*height:\s*auto[^}]*max-height:\s*none/s);
   assert.match(css, /\.route-workspace__controls/);
+  assert.match(css, /\.itinerary-drag-handle\s*\{[^}]*touch-action:\s*none/s);
+  assert.match(css, /\.itinerary-editor li\.is-dragging\s*\{[^}]*box-shadow:/s);
+  assert.match(css, /grid-template-areas:\s*"spot remove drag"\s*"stay remove drag"/s);
   assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.planner-overview\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
   assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.selected-spot-bar strong\s*\{[^}]*white-space:\s*normal/s);
   assert.doesNotMatch(css, /scroll-snap-(?:type|align)/);

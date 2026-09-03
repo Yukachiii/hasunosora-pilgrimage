@@ -1317,22 +1317,12 @@ button {
   font-size: 10px;
 }
 
-.itinerary-editor__heading button {
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: white;
-  color: var(--ink);
-  cursor: pointer;
+.itinerary-editor__heading small {
+  color: var(--ice-deep);
   font-size: 8px;
   font-weight: 800;
-}
-
-.itinerary-editor__heading button.is-active {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: white;
+  letter-spacing: 0.04em;
+  text-align: right;
 }
 
 .itinerary-editor ol,
@@ -1375,14 +1365,23 @@ button {
 }
 
 .itinerary-editor li {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto 28px 36px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 5px;
   background: #fafaf7;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.itinerary-editor li.is-dragging {
+  z-index: 2;
+  border-color: var(--ice-deep);
+  background: white;
+  box-shadow: 0 10px 24px rgba(18, 29, 43, 0.16);
 }
 
 .itinerary-editor li.itinerary-editor__empty {
@@ -1455,17 +1454,11 @@ button {
   font-size: 10px;
 }
 
-.itinerary-actions {
-  display: flex;
-  grid-column: 1 / -1;
-  justify-content: flex-end;
-  gap: 3px;
-}
-
-.itinerary-actions button {
+.itinerary-remove,
+.itinerary-drag-handle {
   display: grid;
-  width: 25px;
-  height: 25px;
+  width: 28px;
+  height: 30px;
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 3px;
@@ -1475,9 +1468,41 @@ button {
   font-size: 10px;
 }
 
-.itinerary-actions button:disabled {
+.itinerary-remove:disabled,
+.itinerary-drag-handle:disabled {
   cursor: default;
   opacity: 0.3;
+}
+
+.itinerary-drag-handle {
+  width: 36px;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.itinerary-drag-handle:active,
+.itinerary-editor li.is-dragging .itinerary-drag-handle {
+  cursor: grabbing;
+}
+
+.itinerary-drag-handle > span {
+  display: grid;
+  width: 17px;
+  gap: 3px;
+}
+
+.itinerary-drag-handle i {
+  display: block;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.itinerary-remove:focus-visible,
+.itinerary-drag-handle:focus-visible {
+  outline: 2px solid var(--ice-deep);
+  outline-offset: 2px;
 }
 
 
@@ -2078,24 +2103,6 @@ button {
 .opening-status--warning {
   background: rgba(255, 225, 172, 0.5);
   color: #855d18 !important;
-}
-
-.today-mode-open {
-  display: flex;
-  width: calc(100% - 28px);
-  min-height: 40px;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 14px 14px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 4px;
-  background: var(--ice-deep);
-  color: white;
-  font: inherit;
-  font-size: 9px;
-  font-weight: 800;
-  cursor: pointer;
 }
 
 .collaborations-section {
@@ -4038,10 +4045,6 @@ footer > span {
     max-height: min(44vh, 390px);
   }
 
-  .itinerary-actions {
-    grid-column: 1 / -1;
-  }
-
   .collaboration-grid {
     grid-template-columns: 1fr;
   }
@@ -4502,8 +4505,40 @@ footer > span {
   }
 
   .itinerary-editor li {
-    gap: 8px;
+    gap: 6px;
     padding: 11px 9px;
+  }
+
+  .itinerary-editor li:not(.itinerary-editor__empty) {
+    grid-template-areas:
+      "spot remove drag"
+      "stay remove drag";
+    grid-template-columns: minmax(0, 1fr) 44px 44px;
+  }
+
+  .itinerary-spot-focus {
+    grid-area: spot;
+  }
+
+  .itinerary-editor li label {
+    grid-area: stay;
+  }
+
+  .itinerary-remove {
+    grid-area: remove;
+  }
+
+  .itinerary-drag-handle {
+    grid-area: drag;
+  }
+
+  .itinerary-editor__heading {
+    align-items: flex-start;
+  }
+
+  .itinerary-editor__heading small {
+    max-width: 120px;
+    line-height: 1.45;
   }
 
   .itinerary-spot-focus strong {
@@ -4516,13 +4551,10 @@ footer > span {
     font-size: 16px;
   }
 
-  .itinerary-actions {
-    gap: 6px;
-  }
-
-  .itinerary-actions button {
-    width: 38px;
-    height: 38px;
+  .itinerary-remove,
+  .itinerary-drag-handle {
+    width: 44px;
+    height: 44px;
     font-size: 13px;
   }
 
@@ -4536,8 +4568,7 @@ footer > span {
     height: 20px;
   }
 
-  .route-search-button,
-  .today-mode-open {
+  .route-search-button {
     min-height: 52px;
   }
 
