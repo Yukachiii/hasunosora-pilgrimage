@@ -1,16 +1,5 @@
 [
   {
-    "id": "40587f50919d5252",
-    "displayName": "金沢駅・鼓門 公開画像",
-    "placement": "spot",
-    "spotId": "kanazawa-station",
-    "createdAt": "2026-09-03T10:26:06.911Z",
-    "imageUrl": "/photos/kanazawa-station/20260903-102606-40587f50919d5252-watermarked.webp",
-    "cropX": 50,
-    "cropY": 50,
-    "zoom": 1
-  },
-  {
     "id": "a4adb27af04ec90b",
     "displayName": "金沢ゲーマーズ 公開画像",
     "placement": "spot",
