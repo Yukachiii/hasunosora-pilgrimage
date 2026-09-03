@@ -1323,7 +1323,7 @@ export function PilgrimageApp({
           onClick={() => {
             if (activeExplorePanel) {
               closeExplorePanel();
-              setIsExplorePickerOpen(false);
+              setIsExplorePickerOpen(true);
               return;
             }
             setIsExplorePickerOpen((current) => !current);

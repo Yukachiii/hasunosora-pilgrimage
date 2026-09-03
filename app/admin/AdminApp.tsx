@@ -279,7 +279,7 @@ export function AdminApp({
   localMode = false,
   localToken = "",
   localNetworkUrl = "",
-  initialSiteVersion = "3.1.0",
+  initialSiteVersion = "3.1.1",
 }: Props) {
   const [tab, setTab] = useState<"photos" | "spots" | "cards" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);

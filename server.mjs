@@ -302,7 +302,7 @@ function updateSiteHeroImages(site, imageUrls) {
   return site;
 }
 
-function normalizedSiteVersion(value, fallback = "3.1.0") {
+function normalizedSiteVersion(value, fallback = "3.1.1") {
   const version = String(value ?? "").trim().replace(/^ver\.\s*/i, "");
   return /^\d+\.\d+\.\d+$/.test(version) ? version : fallback;
 }
