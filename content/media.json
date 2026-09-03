@@ -1,5 +1,16 @@
 [
   {
+    "id": "9a9d53aba5f7e98b",
+    "displayName": "タイトル背景",
+    "placement": "hero",
+    "spotId": null,
+    "createdAt": "2026-09-03T10:17:32.955Z",
+    "imageUrl": "/photos/hero/20260903-101732-9a9d53aba5f7e98b-watermarked.webp",
+    "cropX": 50,
+    "cropY": 50,
+    "zoom": 1
+  },
+  {
     "id": "1d824a53e51a130a",
     "displayName": "石川県営まめだ簡易グラウンド 公開画像",
     "placement": "spot",
