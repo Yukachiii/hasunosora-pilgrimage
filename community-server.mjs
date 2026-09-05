@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
+import { isIP } from "node:net";
 import {
   mkdir,
   open,
@@ -199,14 +200,32 @@ function singleHeader(request, name) {
   return Array.isArray(value) ? value[0] ?? "" : String(value ?? "");
 }
 
-function clientAddress(request) {
-  const cloudflareAddress = singleHeader(request, "cf-connecting-ip").trim();
-  if (cloudflareAddress) return cloudflareAddress.slice(0, 128);
-  const forwardedAddress = singleHeader(request, "x-forwarded-for")
-    .split(",")[0]
-    .trim();
-  if (forwardedAddress) return forwardedAddress.slice(0, 128);
-  return String(request.socket.remoteAddress ?? "unknown").slice(0, 128);
+function normalizeIpAddress(value) {
+  const address = String(value ?? "").trim();
+  const mappedIpv4 = address.toLowerCase().startsWith("::ffff:")
+    ? address.slice(7)
+    : "";
+  if (mappedIpv4 && isIP(mappedIpv4) === 4) return mappedIpv4;
+  return isIP(address) ? address : "";
+}
+
+function isLoopbackAddress(value) {
+  const address = normalizeIpAddress(value);
+  if (address === "::1") return true;
+  return isIP(address) === 4 && address.split(".")[0] === "127";
+}
+
+export function clientAddress(request) {
+  const socketAddress = normalizeIpAddress(request.socket.remoteAddress);
+  if (isLoopbackAddress(socketAddress)) {
+    const forwardedAddresses = singleHeader(request, "x-forwarded-for")
+      .split(",")
+      .map((address) => normalizeIpAddress(address))
+      .filter(Boolean);
+    const forwardedAddress = forwardedAddresses.at(-1);
+    if (forwardedAddress) return forwardedAddress;
+  }
+  return socketAddress || "unknown";
 }
 
 export function makeDailyRateKey(ipAddress, date, secret) {

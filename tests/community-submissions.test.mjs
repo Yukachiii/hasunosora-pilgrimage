@@ -10,6 +10,7 @@ import {
 } from "../app/community-submissions.ts";
 import {
   acceptCommunitySubmission,
+  clientAddress,
   createCommunitySubmissionServer,
   makeDailyRateKey,
   pruneReviewedCommunitySubmissions,
@@ -115,6 +116,36 @@ test("daily rate keys rotate by date and do not contain the raw address", () => 
   assert.match(first, /^[a-f0-9]{64}$/);
   assert.notEqual(first, second);
   assert.equal(first.includes("203.0.113.10"), false);
+});
+
+test("client address accepts only a valid forwarded address from the loopback proxy", () => {
+  assert.equal(
+    clientAddress({
+      headers: {
+        "cf-connecting-ip": "198.51.100.99",
+        "x-forwarded-for": "198.51.100.10, 203.0.113.25",
+      },
+      socket: { remoteAddress: "127.0.0.1" },
+    }),
+    "203.0.113.25",
+  );
+  assert.equal(
+    clientAddress({
+      headers: { "x-forwarded-for": "198.51.100.10" },
+      socket: { remoteAddress: "203.0.113.50" },
+    }),
+    "203.0.113.50",
+  );
+  assert.equal(
+    clientAddress({
+      headers: {
+        "cf-connecting-ip": "198.51.100.99",
+        "x-forwarded-for": "not-an-address",
+      },
+      socket: { remoteAddress: "::ffff:127.0.0.1" },
+    }),
+    "127.0.0.1",
+  );
 });
 
 test("public receiver startup requires an origin, rate secret, and Turnstile secret", () => {

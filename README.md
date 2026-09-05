@@ -60,7 +60,16 @@ COMMUNITY_RATE_LIMIT_SECRET=十分に長いランダム値
 .\start-community.ps1
 ```
 
-受付プロセスは必ず `127.0.0.1:8790` だけで待ち受けます。インターネットへ公開するときは、Cloudflare TunnelなどのHTTPSリバースプロキシからこのポートだけへ接続してください。管理画面の `8765` 番ポートはTunnelへ設定しないでください。
+受付プロセスは必ず `127.0.0.1:8790` だけで待ち受けます。インターネットへ公開するときは、Tailscale FunnelやCloudflare TunnelなどのHTTPSリバースプロキシからこのポートだけへ接続してください。管理画面の `8765` 番ポートはTunnelへ設定しないでください。
+
+独自ドメインを使わずTailscale Funnelで公開する場合は、Tailscaleへログインした自宅サーバーで次を実行します。`--bg` の設定は再起動後も維持されます。
+
+```powershell
+tailscale funnel --bg 8790
+tailscale funnel status
+```
+
+受付サーバーはループバックから接続したリバースプロキシが設定する `X-Forwarded-For` だけを送信元判定へ利用します。外部から直接送られた転送ヘッダーや `CF-Connecting-IP` は信用しません。
 
 Cloudflare Tunnelで固定ホスト名を使う場合の接続先は `http://127.0.0.1:8790` です。公開後、GitHubリポジトリのActions用Variablesへ次を設定すると、Pagesの投稿フォームが有効になります。
 
