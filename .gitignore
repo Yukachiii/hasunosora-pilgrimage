@@ -49,3 +49,5 @@ __pycache__/
 /.wrangler/
 /outputs/
 /work/
+/private/community-submissions/
+/.community-admin-test-*/

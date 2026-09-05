@@ -7,6 +7,15 @@ import mediaAssets from "../content/media.json";
 import siteSettings from "../content/site.json";
 import "../app/globals.css";
 
+type PublicMediaAsset = {
+  placement: string;
+  spotId?: string | null;
+  imageUrl?: string | null;
+  creditName?: string;
+};
+
+const publicMediaAssets = mediaAssets as PublicMediaAsset[];
+
 const photoModules = import.meta.glob(
   "../public/photos/**/*.{jpg,jpeg,png,webp}",
   { eager: true, query: "?url", import: "default" },
@@ -50,7 +59,7 @@ const publicSpots = spots.map((spot) => ({
   imageUrl: resolvePhotoUrl(spot.imageUrl),
 }));
 
-const spotPhotoGroups = mediaAssets.reduce<Record<string, string[]>>((groups, asset) => {
+const spotPhotoGroups = publicMediaAssets.reduce<Record<string, string[]>>((groups, asset) => {
   if (asset.placement !== "spot" || !asset.spotId) return groups;
   const imageUrl = resolvePhotoUrl(asset.imageUrl);
   if (!imageUrl) return groups;
@@ -59,11 +68,19 @@ const spotPhotoGroups = mediaAssets.reduce<Record<string, string[]>>((groups, as
   return groups;
 }, {});
 
+const photoCredits = publicMediaAssets.reduce<Record<string, string>>((credits, asset) => {
+  const imageUrl = resolvePhotoUrl(asset.imageUrl);
+  if (imageUrl && asset.creditName?.trim()) credits[imageUrl] = asset.creditName.trim();
+  return credits;
+}, {});
+
 const heroImages = uniquePhotoUrls([
   resolvePhotoUrl(siteSettings.heroImage),
   ...siteSettings.heroImages.map(resolvePhotoUrl),
 ]);
 const initialHeroIndex = chooseHeroIndex(heroImages);
+const communityApiUrl = import.meta.env.VITE_COMMUNITY_API_URL?.trim() ?? "";
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -73,9 +90,13 @@ createRoot(document.getElementById("root")!).render(
       }}
       spots={publicSpots}
       spotPhotoGroups={spotPhotoGroups}
+      photoCredits={photoCredits}
       heroImages={heroImages}
       initialHeroIndex={initialHeroIndex}
       siteVersion={siteSettings.version}
+      communityApiUrl={communityApiUrl}
+      turnstileSiteKey={turnstileSiteKey}
+      communitySubmissionsEnabled={Boolean(communityApiUrl)}
     />
   </StrictMode>,
 );

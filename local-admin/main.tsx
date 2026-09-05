@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AdminApp, type AdminAsset } from "../app/admin/AdminApp";
+import type { AdminCommunitySubmission } from "../app/admin/CommunitySubmissionReview";
 import type { PilgrimageSpot } from "../app/spots";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "../app/globals.css";
@@ -8,6 +9,7 @@ import "../app/globals.css";
 type AdminState = {
   spots: PilgrimageSpot[];
   assets: AdminAsset[];
+  submissions: AdminCommunitySubmission[];
   siteVersion: string;
   writeToken: string;
   lanUrl: string;
@@ -64,6 +66,7 @@ function LocalAdminRoot() {
       initialSpots={state.spots}
       overriddenSpotIds={[]}
       initialAssets={state.assets}
+      initialSubmissions={state.submissions}
       localMode
       localToken={state.writeToken}
       localNetworkUrl={state.lanUrl}

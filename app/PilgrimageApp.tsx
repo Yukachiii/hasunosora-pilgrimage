@@ -50,6 +50,13 @@ import {
   createYahooTransitLegs,
 } from "./yahoo-transit";
 import { reorderIdsForInsertion, sameIdOrder } from "./itinerary-order";
+import {
+  createSharedPlanSnapshot,
+  decodeSharedPlanSnapshot,
+  encodeSharedPlanSnapshot,
+  type SharedPlanSnapshot,
+} from "./planner-share";
+import { CommunityContributionPanel } from "./CommunityContributionPanel";
 
 const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v2";
 const LEGACY_PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1";
@@ -58,11 +65,12 @@ const CARD_MODEL_SPOT_IDS = Array.from(new Set(
   cardModels.flatMap((card) => card.spotId ? [card.spotId] : []),
 ));
 
-type AppPage = "explore" | "planner" | "today" | "guide";
+type NavigableAppPage = "explore" | "planner" | "today" | "guide";
+type AppPage = NavigableAppPage | "shared";
 type ExplorePanel = "spots" | "card-models";
 type SpotSourceFilter = "すべて" | "activity-records" | "sehas" | "with-meets";
 
-const appPageLabels: Record<AppPage, string> = {
+const appPageLabels: Record<NavigableAppPage, string> = {
   explore: "探す",
   planner: "予定",
   today: "当日",
@@ -71,7 +79,9 @@ const appPageLabels: Record<AppPage, string> = {
 
 function pageFromHash(hash: string): AppPage {
   const page = hash.replace(/^#\/?/, "").split("/")[0];
-  return page === "planner" || page === "today" || page === "guide" ? page : "explore";
+  return page === "planner" || page === "today" || page === "guide" || page === "shared"
+    ? page
+    : "explore";
 }
 
 const travelModes: Array<{
@@ -182,9 +192,13 @@ type Props = {
   routeServiceUrl?: string;
   spots: PilgrimageSpot[];
   spotPhotoGroups: Record<string, string[]>;
+  photoCredits?: Record<string, string>;
   heroImages: string[];
   initialHeroIndex?: number;
   siteVersion: string;
+  communityApiUrl?: string;
+  turnstileSiteKey?: string;
+  communitySubmissionsEnabled?: boolean;
 };
 
 export function PilgrimageApp({
@@ -192,9 +206,13 @@ export function PilgrimageApp({
   routeServiceUrl = "",
   spots,
   spotPhotoGroups,
+  photoCredits = {},
   heroImages,
   initialHeroIndex = 0,
   siteVersion,
+  communityApiUrl = "",
+  turnstileSiteKey = "",
+  communitySubmissionsEnabled = false,
 }: Props) {
   const heroImage = heroImages[initialHeroIndex] ?? heroImages[0] ?? null;
   const [hasAcceptedVisitorNotice, setHasAcceptedVisitorNotice] = useState(false);
@@ -231,6 +249,13 @@ export function PilgrimageApp({
   const [currentJapanMinutes, setCurrentJapanMinutes] = useState(() => japanClockMinutes());
   const [transitLegProgress, setTransitLegProgress] = useState<TransitLegProgress>({});
   const [activePage, setActivePage] = useState<AppPage>("explore");
+  const [sharedPlan, setSharedPlan] = useState<SharedPlanSnapshot | null>(null);
+  const [sharedPlanLoaded, setSharedPlanLoaded] = useState(false);
+  const [sharedPlanDayIndex, setSharedPlanDayIndex] = useState(0);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [includeDatesInShare, setIncludeDatesInShare] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareFeedback, setShareFeedback] = useState("");
   const [itineraryDragPreview, setItineraryDragPreview] = useState<string[] | null>(null);
   const [draggedItinerarySpotId, setDraggedItinerarySpotId] = useState<string | null>(null);
   const [mapReturnSection, setMapReturnSection] = useState<"explore-menu" | "spots" | "card-models">("explore-menu");
@@ -242,6 +267,7 @@ export function PilgrimageApp({
     src: string;
     alt: string;
     variant?: "guide" | "card" | "spot";
+    credit?: string;
   } | null>(null);
   const [mapFocusRequest, setMapFocusRequest] = useState<{
     spotId: string;
@@ -263,6 +289,9 @@ export function PilgrimageApp({
   const exploreSheetCloseTimerRef = useRef<number | null>(null);
   const exploreSheetSettleTimerRef = useRef<number | null>(null);
   const guideImageCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const shareDialogCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const shareDialogRef = useRef<HTMLElement>(null);
+  const shareDialogTriggerRef = useRef<HTMLButtonElement>(null);
   const itineraryDragRef = useRef<{
     pointerId: number;
     spotId: string;
@@ -477,6 +506,18 @@ export function PilgrimageApp({
       setActivePage(nextPage);
       setIsExplorePickerOpen(false);
       const sectionId = window.location.hash.replace(/^#\/?[^/]+\/?/, "");
+      if (nextPage === "shared") {
+        const plan = decodeSharedPlanSnapshot(
+          sectionId,
+          new Set(spots.map((spot) => spot.id)),
+        );
+        setSharedPlan(plan);
+        setSharedPlanDayIndex(plan?.activeDayIndex ?? 0);
+        setSharedPlanLoaded(true);
+      } else {
+        setSharedPlan(null);
+        setSharedPlanLoaded(false);
+      }
       const nextExplorePanel =
         nextPage === "explore" && (sectionId === "spots" || sectionId === "card-models")
           ? sectionId
@@ -489,7 +530,9 @@ export function PilgrimageApp({
         exploreSheetSwipeStartYRef.current = null;
       }
       window.setTimeout(() => {
-        if (sectionId && sectionId !== "spots" && sectionId !== "card-models") {
+        if (nextPage === "shared") {
+          window.scrollTo({ top: 0 });
+        } else if (sectionId && sectionId !== "spots" && sectionId !== "card-models") {
           document.getElementById(sectionId)?.scrollIntoView({ block: "start" });
         } else if (!sectionId) {
           window.scrollTo({ top: 0 });
@@ -500,7 +543,7 @@ export function PilgrimageApp({
     syncPage();
     window.addEventListener("hashchange", syncPage);
     return () => window.removeEventListener("hashchange", syncPage);
-  }, []);
+  }, [spots]);
 
   useEffect(() => {
     let wasAccepted = false;
@@ -558,6 +601,43 @@ export function PilgrimageApp({
   }, [activeGuideImage]);
 
   useEffect(() => {
+    if (!isShareDialogOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const shareDialogTrigger = shareDialogTriggerRef.current;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => shareDialogCloseButtonRef.current?.focus(), 0);
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsShareDialogOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        shareDialogRef.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]",
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleDialogKeyDown);
+      shareDialogTrigger?.focus();
+    };
+  }, [isShareDialogOpen]);
+
+  useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
       const validSpotIds = new Set(spots.map((spot) => spot.id));
       try {
@@ -598,7 +678,7 @@ export function PilgrimageApp({
   }, [spots]);
 
   useEffect(() => {
-    if (!hasRestoredPlannerStorage) return;
+    if (!hasRestoredPlannerStorage || activePage === "shared") return;
     const snapshot: PlannerSnapshot = {
       itineraryIds,
       stayMinutes,
@@ -621,7 +701,7 @@ export function PilgrimageApp({
     } catch {
       // 自動保存に失敗しても、画面上の編集中データは維持します。
     }
-  }, [activeDayIndex, completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, plannerDays, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode, visitDate]);
+  }, [activeDayIndex, activePage, completedSpotIds, hasRestoredPlannerStorage, itineraryCollaborationId, itineraryIds, optimizeOrder, plannerDays, sourceStationId, startTime, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode, visitDate]);
 
   useEffect(() => {
     if (activePage !== "today") return undefined;
@@ -756,6 +836,16 @@ export function PilgrimageApp({
     () => plannerDays.reduce((total, day) => total + day.itineraryIds.length, 0),
     [plannerDays],
   );
+  const sharedActiveDay = sharedPlan?.days[sharedPlanDayIndex] ?? sharedPlan?.days[0] ?? null;
+  const sharedDaySpots = useMemo(
+    () => (sharedActiveDay?.itineraryIds ?? [])
+      .map((id) => spots.find((spot) => spot.id === id))
+      .filter((spot): spot is PilgrimageSpot => Boolean(spot)),
+    [sharedActiveDay, spots],
+  );
+  const sharedTravelModeLabel = sharedPlan
+    ? travelModes.find((mode) => mode.value === sharedPlan.travelMode)?.label ?? "徒歩"
+    : "";
   const plannedSpots = useMemo(() => {
     if (routeResult.state !== "success" || !routeResult.orderedStopIds?.length || !routeRequest) {
       return routeRequest?.stops ?? itinerarySpots;
@@ -886,7 +976,77 @@ export function PilgrimageApp({
     setTransitLegProgress({});
   }
 
-  function navigateToPage(page: AppPage, sectionId?: string) {
+  function createPlannerShareUrl(includeDates: boolean) {
+    const snapshot: PlannerSnapshot = {
+      itineraryIds,
+      stayMinutes,
+      travelMode,
+      optimizeOrder,
+      sourceStationId,
+      visitDate,
+      startTime,
+      itineraryCollaborationId,
+      completedSpotIds,
+      todayOffsetMinutes,
+      transitLegProgress,
+      plannerDays,
+      activeDayIndex,
+    };
+    const validSpotIds = new Set(spots.map((spot) => spot.id));
+    const publicSnapshot = createSharedPlanSnapshot(snapshot, validSpotIds, {
+      includeDates,
+    });
+    if (!publicSnapshot) return "";
+    const token = encodeSharedPlanSnapshot(publicSnapshot, validSpotIds);
+    if (!token) return "";
+    const url = new URL(window.location.href);
+    url.hash = `#/shared/${token}`;
+    return url.toString();
+  }
+
+  function openShareDialog() {
+    const nextIncludeDates = false;
+    setIncludeDatesInShare(nextIncludeDates);
+    setShareUrl(createPlannerShareUrl(nextIncludeDates));
+    setShareFeedback("");
+    setIsShareDialogOpen(true);
+  }
+
+  function updateShareDates(includeDates: boolean) {
+    setIncludeDatesInShare(includeDates);
+    setShareUrl(createPlannerShareUrl(includeDates));
+    setShareFeedback("");
+  }
+
+  async function copyShareUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareFeedback("共有URLをコピーしました。");
+    } catch {
+      setShareFeedback("コピーできませんでした。上のURLを選択してコピーしてください。");
+    }
+  }
+
+  async function shareCurrentPlan() {
+    if (!shareUrl) return;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "蓮ノ旅の予定",
+          text: "訪問予定を共有します。",
+          url: shareUrl,
+        });
+        setShareFeedback("共有画面を開きました。");
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    await copyShareUrl();
+  }
+
+  function navigateToPage(page: NavigableAppPage, sectionId?: string) {
     cancelExploreSheetClose();
     setIsExplorePickerOpen(false);
     if (page === "explore" && (sectionId === "spots" || sectionId === "card-models")) {
@@ -1397,7 +1557,7 @@ export function PilgrimageApp({
           </span>
         </a>
         <nav className="desktop-nav" aria-label="メインナビゲーション">
-          {(Object.keys(appPageLabels) as AppPage[]).map((page) => (
+          {(Object.keys(appPageLabels) as NavigableAppPage[]).map((page) => (
             <a
               href={`#/${page}`}
               key={page}
@@ -1480,7 +1640,7 @@ export function PilgrimageApp({
                 : "探す"}
           </span>
         </button>
-        {(["planner", "today", "guide"] as AppPage[]).map((page) => (
+        {(["planner", "today", "guide"] as NavigableAppPage[]).map((page) => (
           <a
             href={`#/${page}`}
             key={page}
@@ -1624,6 +1784,7 @@ export function PilgrimageApp({
         ) : null}
 
         {activePage === "planner" ? (
+          <>
           <div className="planner-overview" aria-label="現在の予定概要">
             <span className="planner-overview__static">
               <small>訪問先</small>
@@ -1671,6 +1832,23 @@ export function PilgrimageApp({
               </select>
             </label>
           </div>
+          <section className="planner-share-launch" aria-label="予定の共有">
+            <div>
+              <small>READ ONLY LINK</small>
+              <strong>この予定を共有</strong>
+              <span>宿泊地・自由予定・進捗・出発駅は共有されません。</span>
+            </div>
+            <button
+              type="button"
+              ref={shareDialogTriggerRef}
+              onClick={openShareDialog}
+              disabled={!allPlannedSpotCount}
+            >
+              予定を共有
+              <span aria-hidden="true">↗</span>
+            </button>
+          </section>
+          </>
         ) : null}
 
         <div className="map-layout">
@@ -1787,11 +1965,17 @@ export function PilgrimageApp({
                           src: imageUrl,
                           alt: `${selectedSpot.name}の写真 ${index + 1}`,
                           variant: "spot",
+                          credit: photoCredits[imageUrl],
                         })}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imageUrl} alt="" loading="lazy" decoding="async" />
                         <span>{String(index + 1).padStart(2, "0")}</span>
+                        {photoCredits[imageUrl] ? (
+                          <small className="selected-map-detail__photo-credit">
+                            写真：{photoCredits[imageUrl]}
+                          </small>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -2563,6 +2747,7 @@ export function PilgrimageApp({
           {filteredSpots.map((spot) => {
             const index = spots.findIndex((item) => item.id === spot.id);
             const imageUrl = spotPhotoGroups[spot.id]?.[0] ?? spot.imageUrl;
+            const imageCredit = imageUrl ? photoCredits[imageUrl] : undefined;
             const spotCollaborations = collaborationsForSpot(spot);
             return (
             <article
@@ -2594,6 +2779,7 @@ export function PilgrimageApp({
                   </small>
                 </div>
                 <h3>{spot.name}</h3>
+                {imageCredit ? <small className="spot-card__photo-credit">写真：{imageCredit}</small> : null}
                 <p>{spot.description}</p>
                 <div className={`spot-card__hours${spot.openingTime && spot.closingTime ? " is-known" : ""}`}>
                   <strong>{formatOpeningHours(spot)}</strong>
@@ -2891,6 +3077,15 @@ export function PilgrimageApp({
         </p>
       </section>
 
+      {activePage === "guide" ? (
+        <CommunityContributionPanel
+          spots={spots}
+          apiBaseUrl={communityApiUrl}
+          turnstileSiteKey={turnstileSiteKey}
+          enabled={communitySubmissionsEnabled}
+        />
+      ) : null}
+
       <section className="site-disclaimer" id="site-notice" aria-labelledby="site-notice-title" hidden={activePage !== "guide"}>
         <div className="site-disclaimer__heading">
           <h2 id="site-notice-title">ご利用上の注意</h2>
@@ -2924,9 +3119,115 @@ export function PilgrimageApp({
               地図の表示・ルート作成では、表示範囲や選択した地点などがMapboxへ送信されます。
               サーバー経由のルート検索を利用できる環境では、出発地・目的地・移動条件がGoogle Routesへ送信されます。
             </p>
+            {communitySubmissionsEnabled ? (
+              <p>
+                写真・スポットを投稿すると、入力内容と再生成した画像が運営者の投稿受付サーバーへ送信されます。
+                不正送信対策の確認にはCloudflare Turnstileを使用し、確認トークンと接続元IPがCloudflareへ送信されます。
+                投稿は運営者が確認するまで公開されません。
+              </p>
+            ) : null}
             <p>本サイトはアクセス解析および広告トラッキングを導入していません。</p>
           </div>
         </div>
+      </section>
+
+      <section
+        className="shared-plan-page"
+        aria-labelledby="shared-plan-title"
+        hidden={activePage !== "shared"}
+      >
+        <header className="shared-plan-page__header">
+          <small>SHARED PLAN</small>
+          <h1 id="shared-plan-title">共有された予定</h1>
+          <p>共有時点の訪問先と滞在時間を、閲覧専用で表示しています。</p>
+        </header>
+
+        {!sharedPlanLoaded ? (
+          <p className="shared-plan-page__status">予定を読み込んでいます…</p>
+        ) : !sharedPlan ? (
+          <section className="shared-plan-page__error" role="alert">
+            <strong>この共有URLを読み込めませんでした</strong>
+            <p>URLが途中で切れているか、共有データが古い可能性があります。</p>
+            <a href="#/explore" onClick={(event) => { event.preventDefault(); navigateToPage("explore"); }}>
+              ホームへ戻る
+            </a>
+          </section>
+        ) : (
+          <>
+            <div className="shared-plan-summary" aria-label="共有予定の概要">
+              <span>
+                <small>日程</small>
+                <strong>{sharedPlan.days.length}日間</strong>
+              </span>
+              <span>
+                <small>訪問先</small>
+                <strong>{sharedPlan.days.reduce((total, day) => total + day.itineraryIds.length, 0)}か所</strong>
+              </span>
+              <span>
+                <small>移動手段</small>
+                <strong>{sharedTravelModeLabel}</strong>
+              </span>
+              <span>
+                <small>訪問日</small>
+                <strong>{sharedPlan.days.some((day) => day.visitDate) ? "共有あり" : "非公開"}</strong>
+              </span>
+            </div>
+
+            {sharedPlan.days.length > 1 ? (
+              <nav className="shared-plan-days" aria-label="表示する日程">
+                {sharedPlan.days.map((day, index) => (
+                  <button
+                    type="button"
+                    key={`${day.startTime}-${index}`}
+                    aria-current={index === sharedPlanDayIndex ? "date" : undefined}
+                    onClick={() => setSharedPlanDayIndex(index)}
+                  >
+                    <strong>{index + 1}日目</strong>
+                    <span>{day.visitDate?.replaceAll("-", "/") ?? "日付非公開"}</span>
+                  </button>
+                ))}
+              </nav>
+            ) : null}
+
+            {sharedActiveDay ? (
+              <article className="shared-plan-day">
+                <header>
+                  <div>
+                    <small>DAY {String(sharedPlanDayIndex + 1).padStart(2, "0")}</small>
+                    <h2>{sharedActiveDay.visitDate?.replaceAll("-", ".") ?? `${sharedPlanDayIndex + 1}日目`}</h2>
+                  </div>
+                  <span>{sharedActiveDay.startTime}開始 · {sharedActiveDay.endTime}終了目安</span>
+                </header>
+                <ol>
+                  {sharedDaySpots.map((spot, index) => (
+                    <li key={spot.id}>
+                      <span className="shared-plan-day__number">{String(index + 1).padStart(2, "0")}</span>
+                      <div>
+                        <strong>{spot.name}</strong>
+                        <small>{spot.address}</small>
+                      </div>
+                      <span className="shared-plan-day__stay">
+                        {sharedPlan.stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}分滞在
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <p>
+                  {sharedPlan.optimizeOrder ? "訪問順最適化を使用する設定" : "表示順に訪問する設定"}
+                  <span>経路と移動時間は共有画面では再計算しません。</span>
+                </p>
+              </article>
+            ) : null}
+
+            <aside className="shared-plan-privacy">
+              <strong>このリンクに含まれない情報</strong>
+              <p>宿泊地、予約・待ち合わせなどの自由予定、訪問済みの進捗、出発駅は共有されません。</p>
+            </aside>
+            <a className="shared-plan-home" href="#/explore" onClick={(event) => { event.preventDefault(); navigateToPage("explore"); }}>
+              蓮ノ旅を開く <span aria-hidden="true">→</span>
+            </a>
+          </>
+        )}
       </section>
 
       <footer hidden={activePage === "today"}>
@@ -2942,9 +3243,88 @@ export function PilgrimageApp({
         <p>
           本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
         </p>
-        <span>Ver. {siteVersion} · © 2026 Yukachiii・写真の無断転載／二次利用禁止</span>
+        <span>Ver. {siteVersion} · © 2026 Yukachiii・写真の権利は各画像の表記に準拠</span>
       </footer>
       </main>
+
+      {isShareDialogOpen ? (
+        <div
+          className="planner-share-modal"
+          role="presentation"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) setIsShareDialogOpen(false);
+          }}
+        >
+          <section
+            ref={shareDialogRef}
+            className="planner-share-modal__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="planner-share-title"
+          >
+            <header>
+              <div>
+                <small>READ ONLY LINK</small>
+                <h2 id="planner-share-title">予定を共有</h2>
+              </div>
+              <button
+                type="button"
+                ref={shareDialogCloseButtonRef}
+                onClick={() => setIsShareDialogOpen(false)}
+                aria-label="共有画面を閉じる"
+              >
+                ×
+              </button>
+            </header>
+            <p>
+              訪問先、表示順、滞在時間、開始・終了時刻、移動手段だけを閲覧専用URLにします。
+              この端末の予定そのものは送信されません。
+            </p>
+            <label className="planner-share-modal__date-option">
+              <input
+                type="checkbox"
+                checked={includeDatesInShare}
+                onChange={(event) => updateShareDates(event.target.checked)}
+              />
+              <span>
+                <strong>訪問日も共有する</strong>
+                <small>訪問予定日がリンクを知っている相手に伝わります。既定では共有しません。</small>
+              </span>
+            </label>
+            <div className="planner-share-modal__privacy">
+              <strong>共有しない情報</strong>
+              <span>宿泊地・自由予定・訪問済みの進捗・出発駅</span>
+            </div>
+            {shareUrl ? (
+              <label className="planner-share-modal__url">
+                <span>共有URL</span>
+                <input
+                  type="text"
+                  readOnly
+                  value={shareUrl}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onClick={(event) => event.currentTarget.select()}
+                />
+              </label>
+            ) : (
+              <p className="planner-share-modal__error" role="alert">
+                共有URLを作成できませんでした。訪問先を減らして、もう一度お試しください。
+              </p>
+            )}
+            <div className="planner-share-modal__actions">
+              <button type="button" onClick={shareCurrentPlan} disabled={!shareUrl}>
+                {typeof navigator !== "undefined" && typeof navigator.share === "function"
+                  ? "共有メニューを開く"
+                  : "URLをコピー"}
+              </button>
+              <button type="button" className="is-secondary" onClick={copyShareUrl} disabled={!shareUrl}>
+                URLをコピー
+              </button>
+            </div>
+            <p className="planner-share-modal__feedback" aria-live="polite">{shareFeedback}</p>
+          </section>
+        </div>
+      ) : null}
 
       {activeGuideImage ? (
         <div
@@ -2990,6 +3370,11 @@ export function PilgrimageApp({
                     >
                       ©PL!HS
                     </a>
+                  </span>
+                ) : null}
+                {activeGuideImage.credit ? (
+                  <span className="guide-image-modal__photo-credit">
+                    写真：{activeGuideImage.credit}
                   </span>
                 ) : null}
               </div>

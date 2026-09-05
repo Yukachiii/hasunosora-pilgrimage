@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { randomBytes, timingSafeEqual } from "node:crypto";
-import { readFile, rename, rm, mkdir, writeFile } from "node:fs/promises";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { open, readFile, rename, rm, mkdir, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
@@ -17,7 +17,13 @@ const contentDirectory = path.join(projectDirectory, "content");
 const spotsPath = path.join(contentDirectory, "spots.json");
 const mediaPath = path.join(contentDirectory, "media.json");
 const sitePath = path.join(contentDirectory, "site.json");
+const transitNamesPath = path.join(contentDirectory, "transit-search-names.json");
 const photosDirectory = path.join(projectDirectory, "public", "photos");
+const communitySubmissionsDirectory = path.resolve(
+  process.env.COMMUNITY_SUBMISSIONS_DIRECTORY ||
+    path.join(projectDirectory, "private", "community-submissions"),
+);
+const communitySubmissionIndexPath = path.join(communitySubmissionsDirectory, "index.json");
 const writeToken = randomBytes(32).toString("base64url");
 const maximumJsonBody = 8 * 1024 * 1024;
 const allowedCategories = new Set([
@@ -26,6 +32,7 @@ const allowedCategories = new Set([
 ]);
 const spotIdPattern = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const assetIdPattern = /^(?:[a-f0-9]{16}|kanazawa-station-20260724)$/;
+const submissionIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 let writeQueue = Promise.resolve();
 
 class AdminError extends Error {}
@@ -72,6 +79,88 @@ async function writeBytesAtomic(filePath, bytes) {
   } finally {
     await rm(temporary, { force: true }).catch(() => undefined);
   }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function acquireCommunityIndexLock() {
+  await mkdir(communitySubmissionsDirectory, { recursive: true });
+  const lockPath = `${communitySubmissionIndexPath}.lock`;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 5_000) {
+    try {
+      const handle = await open(lockPath, "wx", 0o600);
+      const token = `${process.pid}:${randomUUID()}`;
+      try {
+        await handle.writeFile(`${token}\n`, "utf8");
+      } catch (error) {
+        await handle.close().catch(() => undefined);
+        await rm(lockPath, { force: true }).catch(() => undefined);
+        throw error;
+      }
+      return async () => {
+        await handle.close().catch(() => undefined);
+        const currentToken = await readFile(lockPath, "utf8").catch(() => "");
+        if (currentToken.trim() === token) {
+          await rm(lockPath, { force: true }).catch(() => undefined);
+        }
+      };
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      try {
+        const details = await stat(lockPath);
+        if (Date.now() - details.mtimeMs > 120_000) {
+          await rm(lockPath, { force: true });
+          continue;
+        }
+      } catch (statError) {
+        if (statError?.code === "ENOENT") continue;
+        throw statError;
+      }
+      await wait(25 + Math.floor(Math.random() * 25));
+    }
+  }
+  throw new AdminError("投稿受付が保存処理中です。少し待ってから再度お試しください。");
+}
+
+async function readCommunitySubmissions() {
+  const submissions = await readJson(communitySubmissionIndexPath, []);
+  if (!Array.isArray(submissions)) throw new AdminError("投稿審査データが正しくありません。");
+  return submissions;
+}
+
+function serializeCommunitySubmission(submission) {
+  return {
+    id: String(submission.id || ""),
+    kind: submission.kind === "spot" ? "spot" : "photo",
+    status: ["pending", "approved", "rejected", "imported"].includes(submission.status)
+      ? submission.status
+      : "pending",
+    payload: submission.payload && typeof submission.payload === "object" ? submission.payload : {},
+    creditName: typeof submission.creditName === "string" ? submission.creditName : null,
+    imageKey: typeof submission.imageKey === "string" ? submission.imageKey : null,
+    imageMime: typeof submission.imageMime === "string" ? submission.imageMime : null,
+    imageSize: Number.isFinite(submission.imageSize) ? submission.imageSize : null,
+    createdAt: typeof submission.createdAt === "string" ? submission.createdAt : "",
+    reviewedAt: typeof submission.reviewedAt === "string" ? submission.reviewedAt : null,
+    reviewNote: typeof submission.reviewNote === "string" ? submission.reviewNote : null,
+  };
+}
+
+async function withCommunitySubmissionIndex(operation) {
+  return withWriteLock(async () => {
+    const releaseLock = await acquireCommunityIndexLock();
+    try {
+      const submissions = await readCommunitySubmissions();
+      const result = await operation(submissions);
+      await writeJsonIfChanged(communitySubmissionIndexPath, submissions);
+      return result;
+    } finally {
+      await releaseLock();
+    }
+  });
 }
 
 function withWriteLock(operation) {
@@ -302,7 +391,7 @@ function updateSiteHeroImages(site, imageUrls) {
   return site;
 }
 
-function normalizedSiteVersion(value, fallback = "3.2.0") {
+function normalizedSiteVersion(value, fallback = "4.0.0") {
   const version = String(value ?? "").trim().replace(/^ver\.\s*/i, "");
   return /^\d+\.\d+\.\d+$/.test(version) ? version : fallback;
 }
@@ -330,6 +419,9 @@ function serializeAsset(asset, heroImageSet) {
     spotId: asset.spotId ?? null,
     createdAt: asset.createdAt || "",
     imageUrl,
+    creditName: typeof asset.creditName === "string" ? asset.creditName : undefined,
+    source: typeof asset.source === "string" ? asset.source : undefined,
+    submissionId: typeof asset.submissionId === "string" ? asset.submissionId : undefined,
     heroCandidate: heroImageSet
       ? heroImageSet.has(imageUrl)
       : asset.placement === "hero",
@@ -724,6 +816,221 @@ async function proxyRouteUsage(response) {
   }
 }
 
+function communityReviewNote(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return requiredText(value, "審査メモ", 500);
+}
+
+function communitySubmissionById(submissions, submissionId) {
+  if (!submissionIdPattern.test(submissionId)) {
+    throw new AdminError("投稿IDが正しくありません。");
+  }
+  const submission = submissions.find((item) => item?.id === submissionId);
+  if (!submission) throw new AdminError("投稿が見つかりません。");
+  return submission;
+}
+
+async function readCommunityImage(submission) {
+  const relative = typeof submission.imageKey === "string" ? submission.imageKey : "";
+  const imagePath = safeChild(communitySubmissionsDirectory, relative);
+  if (!imagePath || path.extname(imagePath).toLowerCase() !== ".webp") {
+    throw new AdminError("投稿画像の保存先が正しくありません。");
+  }
+  let bytes;
+  try {
+    bytes = await readFile(imagePath);
+  } catch (error) {
+    if (error?.code === "ENOENT") throw new AdminError("投稿画像が見つかりません。");
+    throw error;
+  }
+  if (!bytes.length || bytes.length > 8 * 1024 * 1024) {
+    throw new AdminError("投稿画像のサイズが正しくありません。");
+  }
+  const expectedHash = String(submission.imageSha256 || "");
+  const actualHash = createHash("sha256").update(bytes).digest("hex");
+  if (!expectedHash || !safeCompare(actualHash, expectedHash)) {
+    throw new AdminError("投稿画像の整合性を確認できませんでした。");
+  }
+  return bytes;
+}
+
+function escapeSvgText(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+async function createAttributedCommunityImage(imageBytes, creditName) {
+  const { default: sharp } = await import("sharp");
+  const input = sharp(imageBytes, { failOn: "error", animated: false });
+  const metadata = await input.metadata();
+  const width = metadata.width;
+  const height = metadata.height;
+  if (!width || !height) throw new AdminError("投稿画像の大きさを確認できませんでした。");
+  const fontSize = Math.max(18, Math.min(42, Math.round(width * 0.024)));
+  const padding = Math.max(12, Math.round(fontSize * 0.72));
+  const bandHeight = fontSize + padding * 2;
+  const label = escapeSvgText(`写真：${requiredText(creditName, "写真の掲載名", 60)}`);
+  const overlay = Buffer.from(
+    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">` +
+      `<rect x="0" y="${height - bandHeight}" width="${width}" height="${bandHeight}" fill="#0f172a" fill-opacity="0.72"/>` +
+      `<text x="${width - padding}" y="${height - padding}" text-anchor="end" fill="white" ` +
+      `font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="${fontSize}" font-weight="700">${label}</text>` +
+      `</svg>`,
+  );
+  return input
+    .composite([{ input: overlay, top: 0, left: 0 }])
+    .webp({ quality: 84, effort: 4 })
+    .toBuffer();
+}
+
+function communityPhotoAsset(submission, spot, assetId, imageUrl, createdAt) {
+  const creditName = requiredText(submission.creditName, "写真の掲載名", 60);
+  return {
+    id: assetId,
+    displayName: `${spot.name} 投稿写真（${creditName}）`,
+    placement: "spot",
+    spotId: spot.id,
+    createdAt,
+    imageUrl,
+    cropX: 50,
+    cropY: 50,
+    zoom: 1,
+    creditName,
+    source: "community",
+    submissionId: submission.id,
+  };
+}
+
+async function rejectCommunitySubmission(submissionId, payload) {
+  return withCommunitySubmissionIndex(async (submissions) => {
+    const submission = communitySubmissionById(submissions, submissionId);
+    if (submission.status !== "pending") {
+      throw new AdminError("この投稿はすでに審査済みです。");
+    }
+    submission.status = "rejected";
+    submission.reviewedAt = new Date().toISOString();
+    submission.reviewedBy = "local-admin";
+    submission.reviewNote = communityReviewNote(payload?.reviewNote);
+    return serializeCommunitySubmission(submission);
+  });
+}
+
+async function importCommunitySubmission(submissionId, payload) {
+  return withCommunitySubmissionIndex(async (submissions) => {
+    const submission = communitySubmissionById(submissions, submissionId);
+    if (submission.status !== "pending") {
+      throw new AdminError("この投稿はすでに審査済みです。");
+    }
+    const now = new Date();
+    const createdAt = now.toISOString();
+    const spots = await readJson(spotsPath, []);
+    const media = await readJson(mediaPath, []);
+    const transitNames = await readJson(transitNamesPath, {});
+    if (!Array.isArray(spots) || !Array.isArray(media) || !transitNames || typeof transitNames !== "object") {
+      throw new AdminError("公開データを読み込めませんでした。");
+    }
+
+    let importedSpot;
+    let asset;
+    let publicImagePath = "";
+    const originalSpots = structuredClone(spots);
+    const originalMedia = structuredClone(media);
+    const originalTransitNames = structuredClone(transitNames);
+
+    try {
+      if (submission.kind === "photo") {
+        const spotId = requiredText(payload?.spotId, "取り込み先スポット", 80);
+        if (!spotIdPattern.test(spotId)) throw new AdminError("取り込み先スポットが正しくありません。");
+        const spot = spots.find((item) => item.id === spotId);
+        if (!spot) throw new AdminError("取り込み先スポットが見つかりません。");
+        const imageBytes = await createAttributedCommunityImage(
+          await readCommunityImage(submission),
+          submission.creditName,
+        );
+        const assetId = randomBytes(8).toString("hex");
+        const timestamp = createdAt.replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
+        const filename = `${timestamp}-${assetId}-community.webp`;
+        const imageUrl = `/photos/${spot.id}/${filename}`;
+        publicImagePath = safeChild(photosDirectory, `${spot.id}/${filename}`) || "";
+        if (!publicImagePath) throw new AdminError("公開画像の保存先が正しくありません。");
+        asset = communityPhotoAsset(submission, spot, assetId, imageUrl, createdAt);
+        media.unshift(asset);
+        if (!spot.imageUrl) {
+          spot.imageUrl = imageUrl;
+          spot.imagePosition = "center center";
+        }
+        await writeBytesAtomic(publicImagePath, imageBytes);
+      } else if (submission.kind === "spot") {
+        const requestedSpot = payload?.spot;
+        if (!requestedSpot || typeof requestedSpot !== "object" || Array.isArray(requestedSpot)) {
+          throw new AdminError("スポット情報が正しくありません。");
+        }
+        const spotId = requiredText(requestedSpot.id, "スポットID", 80);
+        if (!spotIdPattern.test(spotId)) throw new AdminError("スポットIDが正しくありません。");
+        if (spots.some((item) => item.id === spotId)) throw new AdminError("同じスポットIDがすでにあります。");
+        importedSpot = validateSpot(requestedSpot, spotId, {});
+        const transitSearchName = requiredText(
+          requestedSpot.transitSearchName || requestedSpot.name,
+          "経路検索名",
+          160,
+        );
+
+        if (submission.imageKey) {
+          const imageBytes = await createAttributedCommunityImage(
+            await readCommunityImage(submission),
+            submission.creditName,
+          );
+          const assetId = randomBytes(8).toString("hex");
+          const timestamp = createdAt.replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
+          const filename = `${timestamp}-${assetId}-community.webp`;
+          const imageUrl = `/photos/${spotId}/${filename}`;
+          publicImagePath = safeChild(photosDirectory, `${spotId}/${filename}`) || "";
+          if (!publicImagePath) throw new AdminError("公開画像の保存先が正しくありません。");
+          asset = communityPhotoAsset(submission, importedSpot, assetId, imageUrl, createdAt);
+          importedSpot.imageUrl = imageUrl;
+          importedSpot.imagePosition = "center center";
+          media.unshift(asset);
+          await writeBytesAtomic(publicImagePath, imageBytes);
+        }
+        spots.push(importedSpot);
+        transitNames[spotId] = transitSearchName;
+      } else {
+        throw new AdminError("投稿の種類が正しくありません。");
+      }
+
+      await writeJsonIfChanged(spotsPath, spots);
+      await writeJsonIfChanged(mediaPath, media);
+      await writeJsonIfChanged(transitNamesPath, transitNames);
+
+      submission.status = "imported";
+      submission.reviewedAt = createdAt;
+      submission.reviewedBy = "local-admin";
+      submission.reviewNote = communityReviewNote(payload?.reviewNote);
+      const result = {
+        submission: serializeCommunitySubmission(submission),
+        spot: importedSpot,
+        asset: asset ? serializeAsset(asset) : undefined,
+      };
+
+      // 公開データと審査状態を同じ失敗境界に置きます。審査状態の保存に
+      // 失敗した場合は catch 側で公開データも元に戻し、再取り込みによる
+      // 二重登録を防ぎます。外側の保存は同内容のため no-op になります。
+      await writeJsonIfChanged(communitySubmissionIndexPath, submissions);
+      return result;
+    } catch (error) {
+      if (publicImagePath) await rm(publicImagePath, { force: true }).catch(() => undefined);
+      await writeJsonIfChanged(spotsPath, originalSpots).catch(() => undefined);
+      await writeJsonIfChanged(mediaPath, originalMedia).catch(() => undefined);
+      await writeJsonIfChanged(transitNamesPath, originalTransitNames).catch(() => undefined);
+      throw error;
+    }
+  });
+}
+
 async function requestHandler(request, response, initialSpots) {
   const requestUrl = new URL(request.url || "/", "http://localhost");
   const pathname = decodeURIComponent(requestUrl.pathname);
@@ -732,16 +1039,41 @@ async function requestHandler(request, response, initialSpots) {
     if (pathname.startsWith("/api/admin/")) {
       if (request.method === "GET") {
         if (!requireLocal(request, response)) return;
+        const submissionImageMatch = pathname.match(
+          /^\/api\/admin\/submissions\/([a-f0-9-]+)\/image$/i,
+        );
+        if (submissionImageMatch) {
+          const submissions = await readCommunitySubmissions();
+          const submission = communitySubmissionById(submissions, submissionImageMatch[1]);
+          const imagePath = safeChild(
+            communitySubmissionsDirectory,
+            typeof submission.imageKey === "string" ? submission.imageKey : "",
+          );
+          if (!imagePath) {
+            sendJson(response, { error: "投稿画像が見つかりません。" }, 404);
+            return;
+          }
+          await sendFile(response, imagePath);
+          return;
+        }
         if (pathname === "/api/admin/state") {
-          const [spots, media, site] = await Promise.all([
+          const [spots, media, site, communitySubmissions] = await Promise.all([
             readJson(spotsPath, []),
             readJson(mediaPath, []),
             readJson(sitePath, { heroImage: null, heroImages: [] }),
+            readCommunitySubmissions(),
           ]);
           const heroImageSet = new Set(siteHeroImages(site));
           sendJson(response, {
             spots,
             assets: media.map((asset) => serializeAsset(asset, heroImageSet)),
+            submissions: communitySubmissions
+              .map(serializeCommunitySubmission)
+              .sort((left, right) => {
+                if (left.status === "pending" && right.status !== "pending") return -1;
+                if (left.status !== "pending" && right.status === "pending") return 1;
+                return right.createdAt.localeCompare(left.createdAt);
+              }),
             siteVersion: normalizedSiteVersion(site.version),
             writeToken,
             lanUrl: lanAdminUrl,
@@ -782,6 +1114,34 @@ async function requestHandler(request, response, initialSpots) {
       if (request.method === "POST" && pathname === "/api/admin/media") {
         if (!requireWriteAccess(request, response)) return;
         sendJson(response, { asset: await saveMedia(await readJsonBody(request)) }, 201);
+        return;
+      }
+
+      const rejectSubmissionMatch = pathname.match(
+        /^\/api\/admin\/submissions\/([a-f0-9-]+)\/reject$/i,
+      );
+      if (request.method === "POST" && rejectSubmissionMatch) {
+        if (!requireWriteAccess(request, response)) return;
+        const submission = await rejectCommunitySubmission(
+          rejectSubmissionMatch[1],
+          await readJsonBody(request, 64 * 1024),
+        );
+        sendJson(response, { submission });
+        return;
+      }
+
+      const importSubmissionMatch = pathname.match(
+        /^\/api\/admin\/submissions\/([a-f0-9-]+)\/import$/i,
+      );
+      if (request.method === "POST" && importSubmissionMatch) {
+        if (!requireWriteAccess(request, response)) return;
+        sendJson(
+          response,
+          await importCommunitySubmission(
+            importSubmissionMatch[1],
+            await readJsonBody(request, 256 * 1024),
+          ),
+        );
         return;
       }
 

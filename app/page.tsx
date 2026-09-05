@@ -53,9 +53,13 @@ export default async function Home() {
       routeServiceUrl="/api/routes/plan"
       spots={spots}
       spotPhotoGroups={spotPhotoGroups}
+      photoCredits={{}}
       heroImages={heroImages}
       initialHeroIndex={initialHeroIndex}
       siteVersion={siteSettings.version}
+      communityApiUrl={process.env.COMMUNITY_API_URL?.trim() ?? ""}
+      turnstileSiteKey={process.env.TURNSTILE_SITE_KEY?.trim() ?? ""}
+      communitySubmissionsEnabled={Boolean(process.env.COMMUNITY_API_URL?.trim())}
     />
   );
 }

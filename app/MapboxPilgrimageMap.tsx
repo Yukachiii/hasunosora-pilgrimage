@@ -1,6 +1,7 @@
 "use client";
 
 import mapboxgl from "mapbox-gl";
+import type * as GeoJSON from "geojson";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ServerRoutePlanError, ServerRoutePlanResponse } from "./route-api";
 import type { PilgrimageSpot } from "./spots";

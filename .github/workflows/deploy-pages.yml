@@ -33,6 +33,8 @@ jobs:
       - name: Build public site
         env:
           VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          VITE_COMMUNITY_API_URL: ${{ vars.COMMUNITY_API_URL }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
         run: npm run build:pages
 
       - name: Configure GitHub Pages

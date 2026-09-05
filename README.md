@@ -29,6 +29,50 @@ PowerShellから起動する場合は次のとおりです。
 
 スポット情報は `content/spots.json`、画像一覧は `content/media.json`、タイトル背景は `content/site.json` に保存します。公開ページはこれらのファイルをビルド時に読み込みます。
 
+## 利用者からの写真・スポット投稿
+
+公開ページの「ガイド」から、写真と新しいスポット候補を送れます。投稿は直接公開されず、自宅サーバー内の `private/community-submissions/` に `pending`（未確認）として保存されます。
+
+1. 利用者が公開ページから送信する
+2. 管理画面の「投稿を審査」で根拠・場所・写真の権利を確認する
+3. 「承認して公開候補へ取り込む」でローカルの `content/` と `public/photos/` へ反映する
+4. 公開内容をもう一度確認する
+5. 上部の「GitHub Pagesへ公開」を押す
+
+却下した場合、公開データは変更されません。承認操作とGitHubへの公開を分離しているため、利用者の投稿が無確認でサイトへ出ることはありません。
+
+### 自宅の投稿受付サーバーを起動する
+
+`.env.example` を参考に `.env.local` へ次を設定します。
+
+```dotenv
+COMMUNITY_ALLOWED_ORIGINS=https://yukachiii.github.io
+COMMUNITY_SERVER_PORT=8790
+COMMUNITY_CONSENT_VERSION=2026-09-04
+COMMUNITY_RETENTION_DAYS=30
+TURNSTILE_SECRET_KEY=Cloudflare Turnstileの秘密キー
+COMMUNITY_RATE_LIMIT_SECRET=十分に長いランダム値
+```
+
+その後、`start-community.bat` をダブルクリックするか、PowerShellで実行します。
+
+```powershell
+.\start-community.ps1
+```
+
+受付プロセスは必ず `127.0.0.1:8790` だけで待ち受けます。インターネットへ公開するときは、Cloudflare TunnelなどのHTTPSリバースプロキシからこのポートだけへ接続してください。管理画面の `8765` 番ポートはTunnelへ設定しないでください。
+
+Cloudflare Tunnelで固定ホスト名を使う場合の接続先は `http://127.0.0.1:8790` です。公開後、GitHubリポジトリのActions用Variablesへ次を設定すると、Pagesの投稿フォームが有効になります。
+
+- `COMMUNITY_API_URL`: 受付サーバーのHTTPS URL（例 `https://contribute.example.jp`）
+- `TURNSTILE_SITE_KEY`: Turnstileの公開用サイトキー
+
+Turnstile側の許可ホスト名には `yukachiii.github.io` を指定してください。秘密キーと `COMMUNITY_RATE_LIMIT_SECRET` は自宅サーバーだけに置き、GitHubへ登録しません。
+
+受付時は元画像を保存せず、向きを補正して最大2560pxのWebPへ再生成します。EXIF、端末名、元ファイル名、生のIPアドレスは保存しません。IPは1日5件の制限に使う日替わりハッシュだけを残します。受付サーバーからの外部API呼び出しは投稿1回につきTurnstile確認1回です（ローカル開発時の確認省略を除く）。これとは別に、投稿画面のTurnstileウィジェットがCloudflareと通信します。
+
+`private/community-submissions/` はGitの対象外です。却下・取込済みのデータと画像は既定で30日後に削除し、未確認の投稿は審査するまで保持します。自宅サーバーの故障に備え、このフォルダーは公開されない保存先へ定期的にバックアップしてください。
+
 ## 写真の扱い
 
 - 選択した元写真はプロジェクト内へ保存しない
@@ -36,6 +80,8 @@ PowerShellから起動する場合は次のとおりです。
 - GPS・端末名・ISO・撮影日時などのEXIFを除去する
 - `© Yukachiii` の透かしを焼き込む
 - 透かし済みWebP/JPEGだけを `public/photos/` へ保存する
+
+利用者から投稿された写真は、受付時にEXIFを除去してWebPへ再生成し、承認時に投稿者が指定した掲載名を画像下部へ焼き込みます。運営者名の透かしは使用しません。
 
 ## GitHub Pages用ビルド
 

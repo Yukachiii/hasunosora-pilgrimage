@@ -19,6 +19,10 @@ import {
   type PilgrimageSpot,
 } from "@/app/spots";
 import type { TravelMode } from "@/app/route-planner";
+import {
+  CommunitySubmissionReview,
+  type AdminCommunitySubmission,
+} from "./CommunitySubmissionReview";
 import type { RouteUsageResponse } from "./route-usage-types";
 
 export type AdminAsset = {
@@ -29,6 +33,9 @@ export type AdminAsset = {
   createdAt: string;
   imageUrl: string;
   heroCandidate?: boolean;
+  creditName?: string;
+  source?: string;
+  submissionId?: string;
 };
 
 type Props = {
@@ -38,6 +45,7 @@ type Props = {
   initialSpots: PilgrimageSpot[];
   overriddenSpotIds: string[];
   initialAssets: AdminAsset[];
+  initialSubmissions?: AdminCommunitySubmission[];
   localMode?: boolean;
   localToken?: string;
   localNetworkUrl?: string;
@@ -276,15 +284,19 @@ export function AdminApp({
   initialSpots,
   overriddenSpotIds,
   initialAssets,
+  initialSubmissions = [],
   localMode = false,
   localToken = "",
   localNetworkUrl = "",
-  initialSiteVersion = "3.2.0",
+  initialSiteVersion = "4.0.0",
 }: Props) {
-  const [tab, setTab] = useState<"photos" | "spots" | "cards" | "usage">("photos");
+  const [tab, setTab] = useState<"photos" | "spots" | "submissions" | "cards" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
   const [overrideIds, setOverrideIds] = useState(new Set(overriddenSpotIds));
   const [assets, setAssets] = useState(initialAssets);
+  const [submissionPendingCount, setSubmissionPendingCount] = useState(
+    initialSubmissions.filter((submission) => submission.status === "pending").length,
+  );
   const [publishStatus, setPublishStatus] = useState<PublishStatus | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishMessage, setPublishMessage] = useState("");
@@ -465,8 +477,8 @@ export function AdminApp({
           <div className="admin-intro__copy">
             <p>ADMIN / CONTENT MANAGEMENT</p>
             <h1>写真とスポット情報を、<br />落ち着いて整える場所。</h1>
-            <div className="admin-intro__rule" aria-label="4つの管理項目">
-              <span>04 SECTIONS</span>
+            <div className="admin-intro__rule" aria-label={`${localMode ? 5 : 4}つの管理項目`}>
+              <span>{localMode ? "05" : "04"} SECTIONS</span>
               <span>LOCAL / PRIVATE</span>
             </div>
             <p>
@@ -526,7 +538,7 @@ export function AdminApp({
         {localMode && publishStatus?.error && <p className="admin-message" role="status">{publishStatus.error}</p>}
       </section>
 
-      <nav className="admin-tabs" aria-label="管理項目">
+      <nav className={`admin-tabs${localMode ? " admin-tabs--local" : ""}`} aria-label="管理項目">
         <button
           type="button"
           className={tab === "photos" ? "is-active" : ""}
@@ -541,19 +553,29 @@ export function AdminApp({
         >
           <span>02</span>スポットを編集
         </button>
+        {localMode ? (
+          <button
+            type="button"
+            className={tab === "submissions" ? "is-active" : ""}
+            onClick={() => setTab("submissions")}
+          >
+            <span>03</span>投稿を審査
+            {submissionPendingCount ? <b>{submissionPendingCount}</b> : null}
+          </button>
+        ) : null}
         <button
           type="button"
           className={tab === "cards" ? "is-active" : ""}
           onClick={() => setTab("cards")}
         >
-          <span>03</span>カードを確認
+          <span>{localMode ? "04" : "03"}</span>カードを確認
         </button>
         <button
           type="button"
           className={tab === "usage" ? "is-active" : ""}
           onClick={() => setTab("usage")}
         >
-          <span>04</span>API使用状況
+          <span>{localMode ? "05" : "04"}</span>API使用状況
         </button>
       </nav>
 
@@ -577,6 +599,21 @@ export function AdminApp({
         />
       ) : tab === "cards" ? (
         <CardModelDashboard cards={cardModels} />
+      ) : tab === "submissions" ? (
+        <CommunitySubmissionReview
+          initialSubmissions={initialSubmissions}
+          spots={managedSpots}
+          localToken={localToken}
+          onPendingCountChange={setSubmissionPendingCount}
+          onSpotImported={(spot) => {
+            setManagedSpots((current) => [...current, spot]);
+            setPublishStatus((current) => current ? { ...current, hasLocalChanges: true } : current);
+          }}
+          onAssetImported={(asset) => {
+            setAssets((current) => [asset, ...current]);
+            setPublishStatus((current) => current ? { ...current, hasLocalChanges: true } : current);
+          }}
+        />
       ) : (
         <ApiUsageDashboard localMode={localMode} />
       )}
@@ -1255,6 +1292,7 @@ function PhotoManager({
               <div>
                 {queue.map((photo, index) => {
                   const assignedSpot = spots.find((spot) => spot.id === photo.spotId);
+                  const gpsState = photo.gpsState;
                   return (
                     <article className={photo.id === currentPhoto?.id ? "is-current" : undefined} key={photo.id}>
                       <button
@@ -1283,13 +1321,13 @@ function PhotoManager({
                         ) : (
                           <strong>トップ画像候補</strong>
                         )}
-                        <small className={`is-${photo.gpsState.state}`}>
-                          {photo.gpsState.state === "loading"
+                        <small className={`is-${gpsState.state}`}>
+                          {gpsState.state === "loading"
                             ? "位置情報を確認中…"
-                            : photo.gpsState.state === "found"
-                              ? `GPSから自動選択：${assignedSpot?.name ?? "候補なし"}（${formatDistance(photo.gpsState.distanceM)}）`
-                              : photo.gpsState.state === "far"
-                                ? `GPS候補が遠いため手動選択：${spots.find((spot) => spot.id === photo.gpsState.nearestSpotId)?.name ?? "候補なし"}（${formatDistance(photo.gpsState.distanceM)}）`
+                            : gpsState.state === "found"
+                              ? `GPSから自動選択：${assignedSpot?.name ?? "候補なし"}（${formatDistance(gpsState.distanceM)}）`
+                              : gpsState.state === "far"
+                                ? `GPS候補が遠いため手動選択：${spots.find((spot) => spot.id === gpsState.nearestSpotId)?.name ?? "候補なし"}（${formatDistance(gpsState.distanceM)}）`
                                 : "GPSなし・手動選択"}
                         </small>
                       </div>
