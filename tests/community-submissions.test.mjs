@@ -10,11 +10,14 @@ import {
 } from "../app/community-submissions.ts";
 import {
   acceptCommunitySubmission,
+  appendTurnstileFailureDiagnostic,
   clientAddress,
   createCommunitySubmissionServer,
   makeDailyRateKey,
   pruneReviewedCommunitySubmissions,
   reencodeCommunityImage,
+  sanitizeTurnstileDiagnostic,
+  turnstileDiagnosticLogPath,
   validateCommunityServerConfig,
   validateUploadedImage,
 } from "../community-server.mjs";
@@ -430,6 +433,475 @@ test("Turnstile verification must match the contribution action and origin hostn
   }
 });
 
+test("Turnstile diagnostics persist only allowlisted operational details", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-diagnostics-"));
+  const config = { submissionsDirectory: temporaryDirectory };
+  const sentinels = [
+    "SECRET_SENTINEL",
+    "TOKEN_SENTINEL",
+    "IP_SENTINEL",
+    "ORIGIN_SENTINEL",
+    "BODY_SENTINEL",
+    "MESSAGE_SENTINEL",
+  ];
+  try {
+    const entry = await appendTurnstileFailureDiagnostic(
+      config,
+      {
+        reason: "network_error",
+        durationMs: 123,
+        networkErrorCode: "ECONNRESET",
+        serviceErrorCodes: ["internal-error", "PRIVATE_UNKNOWN_CODE"],
+        successCheck: false,
+        actionCheck: null,
+        hostnameCheck: null,
+        secret: sentinels[0],
+        token: sentinels[1],
+        ipAddress: sentinels[2],
+        origin: sentinels[3],
+        body: sentinels[4],
+        message: sentinels[5],
+      },
+      { now: new Date("2026-09-06T00:00:00.000Z") },
+    );
+    assert.deepEqual(entry, {
+      schemaVersion: 1,
+      occurredAt: "2026-09-06T00:00:00.000Z",
+      event: "turnstile_verification_failed",
+      reason: "network_error",
+      httpStatus: null,
+      durationMs: 123,
+      attemptCount: null,
+      networkErrorCode: "ECONNRESET",
+      serviceErrorCodes: ["internal-error"],
+      hasUnknownServiceErrorCode: true,
+      checks: { success: false, action: null, hostname: null },
+    });
+    const contents = await readFile(turnstileDiagnosticLogPath(config), "utf8");
+    assert.deepEqual(JSON.parse(contents.trim()), entry);
+    for (const sentinel of sentinels) assert.equal(contents.includes(sentinel), false);
+
+    await appendTurnstileFailureDiagnostic(
+      config,
+      { reason: "http_error", httpStatus: 503, attemptCount: 2 },
+      {
+        now: new Date("2026-09-06T00:00:00.500Z"),
+        maximumBytes: 256,
+        maximumBackups: 3,
+      },
+    );
+    assert.deepEqual(
+      JSON.parse((await readFile(`${turnstileDiagnosticLogPath(config)}.1`, "utf8")).trim()),
+      entry,
+    );
+
+    assert.deepEqual(
+      sanitizeTurnstileDiagnostic({
+        reason: "ATTACKER_REASON",
+        httpStatus: 9_999,
+        durationMs: 99_999,
+        networkErrorCode: "PRIVATE_NETWORK_CODE",
+      }, new Date("2026-09-06T00:00:01.000Z")),
+      {
+        schemaVersion: 1,
+        occurredAt: "2026-09-06T00:00:01.000Z",
+        event: "turnstile_verification_failed",
+        reason: "network_error",
+        httpStatus: 599,
+        durationMs: 60_000,
+        attemptCount: null,
+        networkErrorCode: "OTHER",
+        serviceErrorCodes: [],
+        hasUnknownServiceErrorCode: false,
+        checks: { success: null, action: null, hostname: null },
+      },
+    );
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("Turnstile verification classifies failures without leaking response details", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-log-"));
+  const origin = "https://guide.example.test";
+  const config = {
+    allowedOrigins: new Set([origin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "SECRET_SENTINEL",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  const diagnostics = [];
+  const makeForm = () => submissionForm({
+    kind: "spot",
+    payload: {
+      name: "候補地",
+      address: "石川県金沢市",
+      sourceUrl: "https://example.com/source",
+    },
+    creditName: null,
+    turnstileToken: "TOKEN_SENTINEL",
+  });
+  const context = (fetchImplementation) => ({
+    config,
+    origin,
+    ipAddress: "IP_SENTINEL",
+    now: new Date("2026-09-04T12:00:00.000Z"),
+    fetchImplementation,
+    recordTurnstileFailure: async (diagnostic) => diagnostics.push(diagnostic),
+    imageProcessor: async () => Buffer.from("unused"),
+  });
+
+  try {
+    await assert.rejects(
+      acceptCommunitySubmission(makeForm(), context(async () => {
+        const error = new Error("MESSAGE_SENTINEL");
+        error.cause = { code: "ECONNRESET", message: "CAUSE_SENTINEL" };
+        throw error;
+      })),
+      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
+    );
+    await assert.rejects(
+      acceptCommunitySubmission(
+        makeForm(),
+        context(async () => new Response(JSON.stringify({
+          "error-codes": ["internal-error", "PRIVATE_RESPONSE_CODE"],
+          detail: "BODY_SENTINEL",
+        }), { status: 502, headers: { "content-type": "application/json" } })),
+      ),
+      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
+    );
+    await assert.rejects(
+      acceptCommunitySubmission(
+        makeForm(),
+        context(async () => new Response("BODY_SENTINEL", { status: 200 })),
+      ),
+      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
+    );
+    await assert.rejects(
+      acceptCommunitySubmission(
+        makeForm(),
+        context(async () => new Response(JSON.stringify({
+          success: false,
+          "error-codes": ["timeout-or-duplicate", "PRIVATE_RESPONSE_CODE"],
+        }), { status: 200, headers: { "content-type": "application/json" } })),
+      ),
+      (error) => error?.code === "TURNSTILE_FAILED" && error?.status === 400,
+    );
+
+    assert.equal(diagnostics.length, 4);
+    assert.equal(diagnostics[0].reason, "network_error");
+    assert.equal(diagnostics[0].networkErrorCode, "ECONNRESET");
+    assert.equal(diagnostics[1].reason, "http_error");
+    assert.equal(diagnostics[1].httpStatus, 502);
+    assert.equal(diagnostics[1].attemptCount, 2);
+    assert.deepEqual(diagnostics[1].serviceErrorCodes, ["internal-error"]);
+    assert.equal(diagnostics[1].hasUnknownServiceErrorCode, true);
+    assert.equal(diagnostics[2].reason, "invalid_response");
+    assert.equal(diagnostics[3].reason, "rejected");
+    assert.deepEqual(diagnostics[3].serviceErrorCodes, ["timeout-or-duplicate"]);
+    assert.equal(diagnostics[3].hasUnknownServiceErrorCode, true);
+    const serializedDiagnostics = JSON.stringify(diagnostics);
+    for (const sentinel of [
+      "SECRET_SENTINEL",
+      "TOKEN_SENTINEL",
+      "IP_SENTINEL",
+      "ORIGIN_SENTINEL",
+      "BODY_SENTINEL",
+      "MESSAGE_SENTINEL",
+      "CAUSE_SENTINEL",
+      "PRIVATE_RESPONSE_CODE",
+    ]) {
+      assert.equal(serializedDiagnostics.includes(sentinel), false);
+    }
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("Turnstile verification retries one transient failure with one idempotency key", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-retry-"));
+  const origin = "https://guide.example.test";
+  const requestBodies = [];
+  let requestCount = 0;
+  const config = {
+    allowedOrigins: new Set([origin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "turnstile-secret",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  try {
+    const accepted = await acceptCommunitySubmission(
+      submissionForm({
+        kind: "spot",
+        payload: {
+          name: "候補地",
+          address: "石川県金沢市",
+          sourceUrl: "https://example.com/source",
+        },
+        creditName: null,
+        turnstileToken: "verified-token",
+      }),
+      {
+        config,
+        origin,
+        ipAddress: "203.0.113.40",
+        now: new Date("2026-09-04T12:00:00.000Z"),
+        fetchImplementation: async (_url, init) => {
+          requestCount += 1;
+          requestBodies.push(String(init.body));
+          if (requestCount === 1) throw new Error("transient network failure");
+          return new Response(JSON.stringify({
+            success: true,
+            action: "community_submission",
+            hostname: "guide.example.test",
+          }), { status: 200, headers: { "content-type": "application/json" } });
+        },
+        recordTurnstileFailure: async () => {
+          throw new Error("successful retry must not be logged as a final failure");
+        },
+        imageProcessor: async () => Buffer.from("unused"),
+      },
+    );
+    assert.equal(accepted.status, "pending");
+    assert.equal(requestCount, 2);
+    const idempotencyKeys = requestBodies.map(
+      (body) => new URLSearchParams(body).get("idempotency_key"),
+    );
+    assert.ok(idempotencyKeys[0]);
+    assert.equal(idempotencyKeys[0], idempotencyKeys[1]);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("Turnstile verification retries an internal service error with the same idempotency key", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-internal-"));
+  const origin = "https://guide.example.test";
+  const requestBodies = [];
+  const config = {
+    allowedOrigins: new Set([origin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "turnstile-secret",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  try {
+    const accepted = await acceptCommunitySubmission(
+      submissionForm({
+        kind: "spot",
+        payload: {
+          name: "候補地",
+          address: "石川県金沢市",
+          sourceUrl: "https://example.com/source",
+        },
+        creditName: null,
+        turnstileToken: "verified-token",
+      }),
+      {
+        config,
+        origin,
+        ipAddress: "203.0.113.40",
+        now: new Date("2026-09-04T12:00:00.000Z"),
+        fetchImplementation: async (_url, init) => {
+          requestBodies.push(String(init.body));
+          const result = requestBodies.length === 1
+            ? { success: false, "error-codes": ["internal-error"] }
+            : {
+                success: true,
+                action: "community_submission",
+                hostname: "guide.example.test",
+              };
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        },
+        recordTurnstileFailure: async () => {
+          throw new Error("successful retry must not be logged as a final failure");
+        },
+        imageProcessor: async () => Buffer.from("unused"),
+      },
+    );
+    assert.equal(accepted.status, "pending");
+    assert.equal(requestBodies.length, 2);
+    const idempotencyKeys = requestBodies.map(
+      (body) => new URLSearchParams(body).get("idempotency_key"),
+    );
+    assert.ok(idempotencyKeys[0]);
+    assert.equal(idempotencyKeys[0], idempotencyKeys[1]);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("Turnstile verification records a repeated internal error as unavailable", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-service-"));
+  const origin = "https://guide.example.test";
+  const diagnostics = [];
+  let requestCount = 0;
+  const config = {
+    allowedOrigins: new Set([origin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "turnstile-secret",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  try {
+    await assert.rejects(
+      acceptCommunitySubmission(
+        submissionForm({
+          kind: "spot",
+          payload: {
+            name: "候補地",
+            address: "石川県金沢市",
+            sourceUrl: "https://example.com/source",
+          },
+          creditName: null,
+          turnstileToken: "verified-token",
+        }),
+        {
+          config,
+          origin,
+          ipAddress: "203.0.113.40",
+          now: new Date("2026-09-04T12:00:00.000Z"),
+          fetchImplementation: async () => {
+            requestCount += 1;
+            return new Response(JSON.stringify({
+              success: false,
+              "error-codes": ["internal-error"],
+            }), { status: 200, headers: { "content-type": "application/json" } });
+          },
+          recordTurnstileFailure: async (diagnostic) => diagnostics.push(diagnostic),
+          imageProcessor: async () => Buffer.from("unused"),
+        },
+      ),
+      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
+    );
+    assert.equal(requestCount, 2);
+    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics[0].reason, "service_error");
+    assert.equal(diagnostics[0].attemptCount, 2);
+    assert.deepEqual(diagnostics[0].serviceErrorCodes, ["internal-error"]);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("Turnstile verification does not retry HTTP 429", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-limit-"));
+  const origin = "https://guide.example.test";
+  const diagnostics = [];
+  let requestCount = 0;
+  const config = {
+    allowedOrigins: new Set([origin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "turnstile-secret",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  try {
+    await assert.rejects(
+      acceptCommunitySubmission(
+        submissionForm({
+          kind: "spot",
+          payload: {
+            name: "候補地",
+            address: "石川県金沢市",
+            sourceUrl: "https://example.com/source",
+          },
+          creditName: null,
+          turnstileToken: "verified-token",
+        }),
+        {
+          config,
+          origin,
+          ipAddress: "203.0.113.40",
+          now: new Date("2026-09-04T12:00:00.000Z"),
+          fetchImplementation: async () => {
+            requestCount += 1;
+            return new Response(JSON.stringify({ "error-codes": ["internal-error"] }), {
+              status: 429,
+              headers: { "content-type": "application/json" },
+            });
+          },
+          recordTurnstileFailure: async (diagnostic) => diagnostics.push(diagnostic),
+          imageProcessor: async () => Buffer.from("unused"),
+        },
+      ),
+      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
+    );
+    assert.equal(requestCount, 1);
+    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics[0].reason, "http_error");
+    assert.equal(diagnostics[0].httpStatus, 429);
+    assert.equal(diagnostics[0].attemptCount, 1);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("Turnstile diagnostic write failure does not replace the verification result", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-log-fail-"));
+  const origin = "https://guide.example.test";
+  const config = {
+    allowedOrigins: new Set([origin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "turnstile-secret",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  const makeContext = (fetchImplementation) => ({
+    config,
+    origin,
+    ipAddress: "203.0.113.40",
+    now: new Date("2026-09-04T12:00:00.000Z"),
+    fetchImplementation,
+    recordTurnstileFailure: async () => {
+      throw new Error("simulated diagnostic write failure");
+    },
+    imageProcessor: async () => Buffer.from("unused"),
+  });
+  const makeForm = () => submissionForm({
+    kind: "spot",
+    payload: {
+      name: "候補地",
+      address: "石川県金沢市",
+      sourceUrl: "https://example.com/source",
+    },
+    creditName: null,
+    turnstileToken: "verified-token",
+  });
+  try {
+    await assert.rejects(
+      acceptCommunitySubmission(makeForm(), makeContext(async () => new Response(
+        JSON.stringify({
+          success: true,
+          action: "different_action",
+          hostname: "guide.example.test",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ))),
+      (error) => error?.code === "TURNSTILE_FAILED" && error?.status === 400,
+    );
+    await assert.rejects(
+      acceptCommunitySubmission(makeForm(), makeContext(async () => new Response("", {
+        status: 429,
+      }))),
+      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
+    );
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
 test("submission HTTP endpoint applies exact CORS and returns no private fields", async () => {
   const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-http-"));
   const allowedOrigin = "https://guide.example.test";
@@ -484,6 +956,72 @@ test("submission HTTP endpoint applies exact CORS and returns no private fields"
     assert.deepEqual(await response.json(), {
       error: "投稿受付の認証設定が完了していません。",
     });
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("submission HTTP endpoint writes a private Turnstile diagnostic on final failure", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-http-diagnostic-"));
+  const allowedOrigin = "https://guide.example.test";
+  const config = {
+    allowedOrigins: new Set([allowedOrigin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "SECRET_SENTINEL",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  const server = createCommunitySubmissionServer({
+    config,
+    now: () => new Date("2026-09-04T12:00:00.000Z"),
+    fetchImplementation: async () => {
+      const error = new Error("MESSAGE_SENTINEL");
+      error.cause = { code: "ECONNRESET", message: "CAUSE_SENTINEL" };
+      throw error;
+    },
+    imageProcessor: async () => Buffer.from("unused"),
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.equal(typeof address, "object");
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/submissions`, {
+      method: "POST",
+      headers: { origin: allowedOrigin },
+      body: submissionForm({
+        kind: "spot",
+        payload: {
+          name: "候補地",
+          address: "石川県金沢市",
+          sourceUrl: "https://example.com/source",
+        },
+        creditName: null,
+        turnstileToken: "TOKEN_SENTINEL",
+      }),
+    });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      error: "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
+    });
+    const logContents = await readFile(turnstileDiagnosticLogPath(config), "utf8");
+    const diagnostic = JSON.parse(logContents.trim());
+    assert.equal(diagnostic.reason, "network_error");
+    assert.equal(diagnostic.networkErrorCode, "ECONNRESET");
+    assert.equal(diagnostic.attemptCount, 2);
+    for (const sentinel of [
+      "SECRET_SENTINEL",
+      "TOKEN_SENTINEL",
+      "MESSAGE_SENTINEL",
+      "CAUSE_SENTINEL",
+    ]) {
+      assert.equal(logContents.includes(sentinel), false);
+    }
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(temporaryDirectory, { recursive: true, force: true });

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { isIP } from "node:net";
 import {
+  appendFile,
   mkdir,
   open,
   readFile,
@@ -35,7 +36,50 @@ const minimumFormDurationMs = 3_000;
 const maximumFormDurationMs = 24 * 60 * 60 * 1_000;
 const fileLockTimeoutMs = 5_000;
 const staleFileLockMs = 120_000;
+const turnstileVerificationTimeoutMs = 10_000;
+const turnstileVerificationMaximumAttempts = 2;
+const turnstileVerificationRetryDelayMs = 1_000;
+const turnstileDiagnosticMaximumBytes = 512 * 1024;
+const turnstileDiagnosticMaximumBackups = 3;
 const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const allowedTurnstileDiagnosticReasons = new Set([
+  "network_error",
+  "timeout",
+  "http_error",
+  "invalid_response",
+  "service_error",
+  "rejected",
+]);
+const allowedTurnstileServiceErrorCodes = new Set([
+  "missing-input-secret",
+  "invalid-input-secret",
+  "missing-input-response",
+  "invalid-input-response",
+  "bad-request",
+  "timeout-or-duplicate",
+  "internal-error",
+]);
+const allowedTurnstileNetworkErrorCodes = new Set([
+  "ABORT_ERR",
+  "CERT_HAS_EXPIRED",
+  "CERT_UNTRUSTED",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "ERR_PROXY_TUNNEL",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_SOCKET",
+]);
 
 export class CommunityRequestError extends Error {
   constructor(status, message, code = "INVALID_REQUEST") {
@@ -47,6 +91,7 @@ export class CommunityRequestError extends Error {
 }
 
 let fileWriteQueue = Promise.resolve();
+let turnstileDiagnosticWriteQueue = Promise.resolve();
 let activeSubmissionRequests = 0;
 
 function withFileWriteLock(task) {
@@ -133,6 +178,152 @@ export function validateCommunityServerConfig(config) {
     throw new Error("TURNSTILE_SECRET_KEY is required for a public submission origin.");
   }
   return config;
+}
+
+function normalizedDiagnosticDate(now) {
+  const value = typeof now === "function" ? now() : now;
+  return value instanceof Date && Number.isFinite(value.getTime()) ? value : new Date();
+}
+
+function normalizedDiagnosticInteger(value, minimum, maximum) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.min(maximum, Math.max(minimum, Math.round(number)));
+}
+
+function normalizedDiagnosticCheck(value) {
+  return typeof value === "boolean" ? value : null;
+}
+
+function turnstileNetworkErrorCode(error) {
+  const rawCode = typeof error?.cause?.code === "string"
+    ? error.cause.code
+    : typeof error?.code === "string"
+      ? error.code
+      : "";
+  if (allowedTurnstileNetworkErrorCodes.has(rawCode)) return rawCode;
+  return rawCode ? "OTHER" : null;
+}
+
+function isTurnstileTimeout(error) {
+  return error?.name === "TimeoutError" ||
+    error?.name === "AbortError" ||
+    error?.code === "ABORT_ERR" ||
+    error?.cause?.code === "ETIMEDOUT" ||
+    error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT";
+}
+
+export function sanitizeTurnstileDiagnostic(diagnostic, now = new Date()) {
+  const rawServiceErrorCodes = Array.isArray(diagnostic?.serviceErrorCodes)
+    ? diagnostic.serviceErrorCodes
+    : [];
+  const serviceErrorCodes = Array.from(new Set(rawServiceErrorCodes.filter(
+    (code) => typeof code === "string" && allowedTurnstileServiceErrorCodes.has(code),
+  )));
+  const reason = allowedTurnstileDiagnosticReasons.has(diagnostic?.reason)
+    ? diagnostic.reason
+    : "network_error";
+  const rawNetworkErrorCode = typeof diagnostic?.networkErrorCode === "string"
+    ? diagnostic.networkErrorCode
+    : "";
+  return {
+    schemaVersion: 1,
+    occurredAt: normalizedDiagnosticDate(now).toISOString(),
+    event: "turnstile_verification_failed",
+    reason,
+    httpStatus: normalizedDiagnosticInteger(diagnostic?.httpStatus, 100, 599),
+    durationMs: normalizedDiagnosticInteger(diagnostic?.durationMs, 0, 60_000),
+    attemptCount: normalizedDiagnosticInteger(
+      diagnostic?.attemptCount,
+      1,
+      turnstileVerificationMaximumAttempts,
+    ),
+    networkErrorCode: allowedTurnstileNetworkErrorCodes.has(rawNetworkErrorCode)
+      ? rawNetworkErrorCode
+      : rawNetworkErrorCode
+        ? "OTHER"
+        : null,
+    serviceErrorCodes,
+    hasUnknownServiceErrorCode: diagnostic?.hasUnknownServiceErrorCode === true ||
+      rawServiceErrorCodes.some(
+        (code) => typeof code !== "string" || !allowedTurnstileServiceErrorCodes.has(code),
+      ),
+    checks: {
+      success: normalizedDiagnosticCheck(
+        diagnostic?.checks?.success ?? diagnostic?.successCheck,
+      ),
+      action: normalizedDiagnosticCheck(
+        diagnostic?.checks?.action ?? diagnostic?.actionCheck,
+      ),
+      hostname: normalizedDiagnosticCheck(
+        diagnostic?.checks?.hostname ?? diagnostic?.hostnameCheck,
+      ),
+    },
+  };
+}
+
+export function turnstileDiagnosticLogPath(config) {
+  return path.join(
+    path.resolve(config.submissionsDirectory),
+    "diagnostics",
+    "turnstile-failures.jsonl",
+  );
+}
+
+async function rotateTurnstileDiagnosticLog(logPath, maximumBackups) {
+  for (let index = maximumBackups; index >= 1; index -= 1) {
+    const source = index === 1 ? logPath : `${logPath}.${index - 1}`;
+    const destination = `${logPath}.${index}`;
+    await rm(destination, { force: true });
+    try {
+      await rename(source, destination);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+}
+
+export function appendTurnstileFailureDiagnostic(config, diagnostic, options = {}) {
+  const maximumBytes = normalizedDiagnosticInteger(
+    options.maximumBytes ?? turnstileDiagnosticMaximumBytes,
+    256,
+    5 * 1024 * 1024,
+  ) ?? turnstileDiagnosticMaximumBytes;
+  const maximumBackups = normalizedDiagnosticInteger(
+    options.maximumBackups ?? turnstileDiagnosticMaximumBackups,
+    1,
+    10,
+  ) ?? turnstileDiagnosticMaximumBackups;
+  const diagnosticDate = options.now ??
+    (typeof diagnostic?.occurredAt === "string" ? new Date(diagnostic.occurredAt) : new Date());
+  const entry = sanitizeTurnstileDiagnostic(diagnostic, diagnosticDate);
+  const line = `${JSON.stringify(entry)}\n`;
+  const logPath = turnstileDiagnosticLogPath(config);
+  const task = async () => {
+    await mkdir(path.dirname(logPath), { recursive: true, mode: 0o700 });
+    const existingSize = await stat(logPath).then((details) => details.size).catch((error) => {
+      if (error?.code === "ENOENT") return 0;
+      throw error;
+    });
+    if (existingSize > 0 && existingSize + Buffer.byteLength(line) > maximumBytes) {
+      await rotateTurnstileDiagnosticLog(logPath, maximumBackups);
+    }
+    await appendFile(logPath, line, { encoding: "utf8", flag: "a", mode: 0o600 });
+    return entry;
+  };
+  const result = turnstileDiagnosticWriteQueue.then(task, task);
+  turnstileDiagnosticWriteQueue = result.catch(() => undefined);
+  return result;
+}
+
+async function tryRecordTurnstileFailure(recordFailure, diagnostic) {
+  if (typeof recordFailure !== "function") return;
+  try {
+    await recordFailure(sanitizeTurnstileDiagnostic(diagnostic));
+  } catch {
+    console.error("Turnstile diagnostic log write failed");
+  }
 }
 
 export function pruneReviewedCommunitySubmissions(submissions, now, retentionDays) {
@@ -436,12 +627,17 @@ function validateBotFields(form, now) {
   }
 }
 
+function isRetryableTurnstileStatus(status) {
+  return status === 408 || status === 425 || status >= 500;
+}
+
 async function verifyTurnstile(
   token,
   ipAddress,
   origin,
   config,
   fetchImplementation,
+  recordFailure,
 ) {
   if (!config.turnstileSecret) {
     throw new CommunityRequestError(
@@ -461,33 +657,8 @@ async function verifyTurnstile(
     secret: config.turnstileSecret,
     response: token,
     remoteip: ipAddress,
+    idempotency_key: randomUUID(),
   });
-  let response;
-  try {
-    response = await fetchImplementation(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: verificationBody,
-        signal: AbortSignal.timeout(8_000),
-      },
-    );
-  } catch {
-    throw new CommunityRequestError(
-      503,
-      "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
-      "TURNSTILE_UNAVAILABLE",
-    );
-  }
-  if (!response.ok) {
-    throw new CommunityRequestError(
-      503,
-      "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
-      "TURNSTILE_UNAVAILABLE",
-    );
-  }
-  const result = await response.json().catch(() => null);
   const allowedHostnames = new Set(
     [...config.allowedOrigins, origin]
       .map((allowedOrigin) => {
@@ -499,20 +670,142 @@ async function verifyTurnstile(
       })
       .filter(Boolean),
   );
-  const verifiedHostname = typeof result?.hostname === "string"
-    ? result.hostname.toLowerCase().replace(/\.$/, "")
-    : "";
-  if (
-    !result?.success ||
-    result.action !== "community_submission" ||
-    !allowedHostnames.has(verifiedHostname)
-  ) {
+  const startedAt = Date.now();
+  for (let attempt = 1; attempt <= turnstileVerificationMaximumAttempts; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImplementation(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: verificationBody,
+          signal: AbortSignal.timeout(turnstileVerificationTimeoutMs),
+        },
+      );
+    } catch (error) {
+      if (attempt < turnstileVerificationMaximumAttempts) {
+        await wait(turnstileVerificationRetryDelayMs);
+        continue;
+      }
+      await tryRecordTurnstileFailure(recordFailure, {
+        reason: isTurnstileTimeout(error) ? "timeout" : "network_error",
+        durationMs: Date.now() - startedAt,
+        attemptCount: attempt,
+        networkErrorCode: turnstileNetworkErrorCode(error),
+      });
+      throw new CommunityRequestError(
+        503,
+        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
+        "TURNSTILE_UNAVAILABLE",
+      );
+    }
+    if (!response.ok) {
+      if (
+        attempt < turnstileVerificationMaximumAttempts &&
+        isRetryableTurnstileStatus(response.status)
+      ) {
+        await response.body?.cancel().catch(() => undefined);
+        await wait(turnstileVerificationRetryDelayMs);
+        continue;
+      }
+      const failureResult = await response.json().catch(() => null);
+      await tryRecordTurnstileFailure(recordFailure, {
+        reason: "http_error",
+        httpStatus: response.status,
+        durationMs: Date.now() - startedAt,
+        attemptCount: attempt,
+        serviceErrorCodes: failureResult?.["error-codes"],
+      });
+      throw new CommunityRequestError(
+        503,
+        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
+        "TURNSTILE_UNAVAILABLE",
+      );
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      if (attempt < turnstileVerificationMaximumAttempts) {
+        await wait(turnstileVerificationRetryDelayMs);
+        continue;
+      }
+      await tryRecordTurnstileFailure(recordFailure, {
+        reason: "invalid_response",
+        httpStatus: response.status,
+        durationMs: Date.now() - startedAt,
+        attemptCount: attempt,
+      });
+      throw new CommunityRequestError(
+        503,
+        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
+        "TURNSTILE_UNAVAILABLE",
+      );
+    }
+    if (
+      !result ||
+      typeof result !== "object" ||
+      Array.isArray(result) ||
+      typeof result.success !== "boolean"
+    ) {
+      if (attempt < turnstileVerificationMaximumAttempts) {
+        await wait(turnstileVerificationRetryDelayMs);
+        continue;
+      }
+      await tryRecordTurnstileFailure(recordFailure, {
+        reason: "invalid_response",
+        httpStatus: response.status,
+        durationMs: Date.now() - startedAt,
+        attemptCount: attempt,
+      });
+      throw new CommunityRequestError(
+        503,
+        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
+        "TURNSTILE_UNAVAILABLE",
+      );
+    }
+    const verifiedHostname = typeof result.hostname === "string"
+      ? result.hostname.toLowerCase().replace(/\.$/, "")
+      : "";
+    const successCheck = result.success === true;
+    const actionCheck = result.action === "community_submission";
+    const hostnameCheck = allowedHostnames.has(verifiedHostname);
+    if (successCheck && actionCheck && hostnameCheck) return;
+
+    const serviceErrorCodes = Array.isArray(result["error-codes"])
+      ? result["error-codes"]
+      : [];
+    const isInternalServiceError = !successCheck && serviceErrorCodes.includes("internal-error");
+    if (isInternalServiceError && attempt < turnstileVerificationMaximumAttempts) {
+      await wait(turnstileVerificationRetryDelayMs);
+      continue;
+    }
+    await tryRecordTurnstileFailure(recordFailure, {
+      reason: isInternalServiceError ? "service_error" : "rejected",
+      httpStatus: response.status,
+      durationMs: Date.now() - startedAt,
+      attemptCount: attempt,
+      serviceErrorCodes,
+      successCheck,
+      actionCheck,
+      hostnameCheck,
+    });
     throw new CommunityRequestError(
-      400,
-      "投稿前の確認に失敗しました。画面を再読み込みしてお試しください。",
-      "TURNSTILE_FAILED",
+      isInternalServiceError ? 503 : 400,
+      isInternalServiceError
+        ? "投稿前の確認に接続できませんでした。少し待ってからお試しください。"
+        : "投稿前の確認に失敗しました。画面を再読み込みしてお試しください。",
+      isInternalServiceError ? "TURNSTILE_UNAVAILABLE" : "TURNSTILE_FAILED",
     );
   }
+
+  throw new CommunityRequestError(
+    503,
+    "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
+    "TURNSTILE_UNAVAILABLE",
+  );
 }
 
 async function readSubmissionIndex(indexPath) {
@@ -826,6 +1119,7 @@ export async function acceptCommunitySubmission(form, context) {
       context.origin,
       context.config,
       context.fetchImplementation,
+      context.recordTurnstileFailure,
     );
   }
 
@@ -922,6 +1216,8 @@ export async function handleCommunityRequest(
       now: options.now?.() ?? new Date(),
       fetchImplementation: options.fetchImplementation ?? fetch,
       imageProcessor: options.imageProcessor ?? reencodeCommunityImage,
+      recordTurnstileFailure: options.recordTurnstileFailure ??
+        ((diagnostic) => appendTurnstileFailureDiagnostic(config, diagnostic)),
     });
     sendJson(response, 201, { submission }, origin);
   } catch (error) {
