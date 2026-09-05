@@ -212,6 +212,16 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     });
     await waitForReady(child);
 
+    const identityResponse = await fetch(`${baseUrl}/api/admin/identity`, {
+      cache: "no-store",
+    });
+    assert.equal(identityResponse.status, 200);
+    assert.equal(identityResponse.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await identityResponse.json(), {
+      application: "hasunosora-pilgrimage-admin",
+      schemaVersion: 1,
+    });
+
     const stateResponse = await fetch(`${baseUrl}/api/admin/state`, { cache: "no-store" });
     assert.equal(stateResponse.status, 200);
     const state = await stateResponse.json();

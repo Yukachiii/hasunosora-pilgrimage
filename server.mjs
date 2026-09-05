@@ -24,6 +24,7 @@ const communitySubmissionsDirectory = path.resolve(
     path.join(projectDirectory, "private", "community-submissions"),
 );
 const communitySubmissionIndexPath = path.join(communitySubmissionsDirectory, "index.json");
+const adminApplicationId = "hasunosora-pilgrimage-admin";
 const writeToken = randomBytes(32).toString("base64url");
 const maximumJsonBody = 8 * 1024 * 1024;
 const allowedCategories = new Set([
@@ -1039,6 +1040,10 @@ async function requestHandler(request, response, initialSpots) {
     if (pathname.startsWith("/api/admin/")) {
       if (request.method === "GET") {
         if (!requireLocal(request, response)) return;
+        if (pathname === "/api/admin/identity") {
+          sendJson(response, { application: adminApplicationId, schemaVersion: 1 });
+          return;
+        }
         const submissionImageMatch = pathname.match(
           /^\/api\/admin\/submissions\/([a-f0-9-]+)\/image$/i,
         );
@@ -1224,7 +1229,7 @@ async function requestHandler(request, response, initialSpots) {
 }
 
 function parseArguments() {
-  const values = { bind: "127.0.0.1", port: 8765 };
+  const values = { bind: "127.0.0.1", port: 8766 };
   for (let index = 2; index < process.argv.length; index += 1) {
     if (process.argv[index] === "--bind") values.bind = process.argv[++index] || values.bind;
     else if (process.argv[index] === "--port") values.port = Number(process.argv[++index]) || values.port;
