@@ -71,7 +71,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /写真・スポットを送る/);
   assert.match(html, /投稿機能は準備中/);
   assert.match(html, /href="#\/explore\/community-contribution"/);
-  assert.match(html, /Ver\.\s*(?:<!-- -->)?4\.2\.0/);
+  assert.match(html, /Ver\.\s*(?:<!-- -->)?4\.3\.0/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /金沢駅/);
@@ -220,7 +220,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "4.2.0");
+  assert.equal(JSON.parse(packageJson).version, "4.3.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -619,6 +619,12 @@ test("local admin writes publishable files before an explicit GitHub push", asyn
   assert.match(startScript, /Test-PortInUse/);
   assert.match(startScript, /\/api\/admin\/identity/);
   assert.match(startScript, /-EncodedCommand/);
+  assert.match(startScript, /\$SshTarget = "yuimarine@192\.168\.0\.4"/);
+  assert.match(startScript, /"-N"/);
+  assert.match(startScript, /"-L" "\$\{Port\}:127\.0\.0\.1:\$\{Port\}"/);
+  assert.match(startScript, /"ExitOnForwardFailure=yes"/);
+  assert.match(startScript, /Start-VerifiedAdminBrowser 120/);
+  assert.match(startScript, /ValidateSet\("admin", "no-open", "local", "local-no-open"\)/);
   assert.match(localMain, /localNetworkUrl/);
   assert.match(adminApp, /スマホから管理画面を開く/);
   assert.match(localServer, /writeJsonIfChanged/);
