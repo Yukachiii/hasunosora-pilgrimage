@@ -182,9 +182,6 @@ export function CommunityContributionPanel({
       }
 
       const creditName = textValue(formData, "creditName");
-      if (selectedFile && !creditName) {
-        throw new Error("写真に表示するクレジット名を入力してください。");
-      }
 
       const payload = kind === "photo"
         ? {
@@ -396,8 +393,8 @@ export function CommunityContributionPanel({
             )}
 
             <label>
-              <span>写真のクレジット名{selectedFile ? "（必須）" : "（写真添付時のみ）"}</span>
-              <input name="creditName" type="text" maxLength={60} required={Boolean(selectedFile)} placeholder="例：Yukachiii／匿名" />
+              <span>写真のクレジット名（任意・未入力は匿名）</span>
+              <input name="creditName" type="text" maxLength={60} placeholder="例：Yukachiii" />
             </label>
             <label>
               <span>補足（任意）</span>

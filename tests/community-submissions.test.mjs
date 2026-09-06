@@ -320,9 +320,54 @@ test("accepted entries are private pending records and enforce five per day", as
     assert.equal(index.length, 5);
     assert.equal(index[0].status, "pending");
     assert.equal(index[0].imageMime, "image/webp");
+    assert.equal(index[0].creditName, "投稿者");
     assert.match(index[0].imageKey, /^images\/[a-f0-9-]+\.webp$/);
     assert.equal(JSON.stringify(index).includes("203.0.113.20"), false);
     assert.equal(JSON.stringify(index).includes("secret-0.jpg"), false);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("photo submissions use an anonymous credit when the field is omitted or blank", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-anonymous-"));
+  const context = {
+    config: {
+      allowedOrigins: new Set(),
+      submissionsDirectory: temporaryDirectory,
+      turnstileSecret: "",
+      rateLimitSecret: "test-rate-secret",
+      consentVersion: "2026-09-04",
+      allowLocalTurnstileBypass: true,
+    },
+    origin: "http://127.0.0.1:3000",
+    ipAddress: "203.0.113.31",
+    now: new Date("2026-09-04T12:00:00.000Z"),
+    fetchImplementation: fetch,
+    imageProcessor: async () => Buffer.from("private webp derivative"),
+  };
+
+  try {
+    for (const [index, creditName] of [null, "   "].entries()) {
+      await acceptCommunitySubmission(
+        submissionForm({
+          kind: "photo",
+          payload: { spotId: "kanazawa-station" },
+          image: new File(
+            [Buffer.from([0xff, 0xd8, 0xff, 0xdb])],
+            `anonymous-${index}.jpg`,
+            { type: "image/jpeg" },
+          ),
+          creditName,
+        }),
+        context,
+      );
+    }
+
+    const saved = JSON.parse(
+      await readFile(path.join(temporaryDirectory, "index.json"), "utf8"),
+    );
+    assert.deepEqual(saved.map((submission) => submission.creditName), ["匿名", "匿名"]);
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }

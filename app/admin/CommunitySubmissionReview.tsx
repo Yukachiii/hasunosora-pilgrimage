@@ -330,7 +330,7 @@ export function CommunitySubmissionReview({
               <figure className="community-review__image">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/api/admin/submissions/${selected.id}/image`} alt="投稿された確認用写真" />
-                <figcaption>掲載名：{selected.creditName || "未入力"}</figcaption>
+                <figcaption>掲載名：{selected.creditName?.trim() || "匿名"}</figcaption>
               </figure>
             ) : null}
 

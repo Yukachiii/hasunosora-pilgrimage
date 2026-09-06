@@ -98,7 +98,7 @@ Get-Content .\private\community-submissions\diagnostics\turnstile-failures.jsonl
 - `© Yukachiii` の透かしを焼き込む
 - 透かし済みWebP/JPEGだけを `public/photos/` へ保存する
 
-利用者から投稿された写真は、受付時にEXIFを除去してWebPへ再生成し、承認時に投稿者が指定した掲載名を画像下部へ焼き込みます。運営者名の透かしは使用しません。
+利用者から投稿された写真は、受付時にEXIFを除去してWebPへ再生成し、承認時に投稿者が指定した掲載名を画像下部へ焼き込みます。掲載名が未入力の場合は「匿名」とし、運営者名の透かしは使用しません。
 
 ## GitHub Pages用ビルド
 

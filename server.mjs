@@ -864,6 +864,11 @@ function escapeSvgText(value) {
     .replaceAll("'", "&apos;");
 }
 
+function communityCreditName(value) {
+  const submittedName = typeof value === "string" ? value.trim() : "";
+  return requiredText(submittedName || "匿名", "写真の掲載名", 60);
+}
+
 async function createAttributedCommunityImage(imageBytes, creditName) {
   const { default: sharp } = await import("sharp");
   const input = sharp(imageBytes, { failOn: "error", animated: false });
@@ -874,7 +879,7 @@ async function createAttributedCommunityImage(imageBytes, creditName) {
   const fontSize = Math.max(18, Math.min(42, Math.round(width * 0.024)));
   const padding = Math.max(12, Math.round(fontSize * 0.72));
   const bandHeight = fontSize + padding * 2;
-  const label = escapeSvgText(`写真：${requiredText(creditName, "写真の掲載名", 60)}`);
+  const label = escapeSvgText(`写真：${communityCreditName(creditName)}`);
   const overlay = Buffer.from(
     `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">` +
       `<rect x="0" y="${height - bandHeight}" width="${width}" height="${bandHeight}" fill="#0f172a" fill-opacity="0.72"/>` +
@@ -889,7 +894,7 @@ async function createAttributedCommunityImage(imageBytes, creditName) {
 }
 
 function communityPhotoAsset(submission, spot, assetId, imageUrl, createdAt) {
-  const creditName = requiredText(submission.creditName, "写真の掲載名", 60);
+  const creditName = communityCreditName(submission.creditName);
   return {
     id: assetId,
     displayName: `${spot.name} 投稿写真（${creditName}）`,

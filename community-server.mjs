@@ -1068,9 +1068,10 @@ export async function acceptCommunitySubmission(form, context) {
   let creditName = null;
   if (file) {
     try {
-      creditName = parseCommunityCreditName(
-        requiredFormText(form, "creditName", "掲載名", 60),
-      );
+      const submittedCreditName = optionalFormText(form, "creditName", 60);
+      creditName = submittedCreditName
+        ? parseCommunityCreditName(submittedCreditName)
+        : "匿名";
     } catch (error) {
       if (error instanceof CommunitySubmissionValidationError) {
         throw new CommunityRequestError(400, error.message, "INVALID_PAYLOAD");

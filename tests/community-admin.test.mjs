@@ -119,6 +119,7 @@ test("local admin imports reviewed photos and spots, and rejects without publish
   const contentDirectory = path.join(testDirectory, "content");
   const adminDirectory = path.join(testDirectory, "admin-dist");
   const photoSubmissionId = "11111111-1111-4111-8111-111111111111";
+  const anonymousPhotoSubmissionId = "44444444-4444-4444-8444-444444444444";
   const spotSubmissionId = "22222222-2222-4222-8222-222222222222";
   const rejectedSubmissionId = "33333333-3333-4333-8333-333333333333";
   let child = null;
@@ -146,6 +147,10 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     }).webp().toBuffer();
     await writeFile(
       path.join(submissionsDirectory, "images", `${photoSubmissionId}.webp`),
+      submittedImage,
+    );
+    await writeFile(
+      path.join(submissionsDirectory, "images", `${anonymousPhotoSubmissionId}.webp`),
       submittedImage,
     );
 
@@ -179,6 +184,15 @@ test("local admin imports reviewed photos and spots, and rejects without publish
         payload: { spotId: "existing-spot", comment: "正面から撮影" },
         imageBytes: submittedImage,
       }),
+      {
+        ...pendingSubmission({
+          id: anonymousPhotoSubmissionId,
+          kind: "photo",
+          payload: { spotId: "existing-spot", comment: "掲載名なし" },
+          imageBytes: submittedImage,
+        }),
+        creditName: null,
+      },
       pendingSubmission({
         id: spotSubmissionId,
         kind: "spot",
@@ -227,7 +241,7 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     const state = await stateResponse.json();
     writeToken = state.writeToken;
     assert.equal(typeof writeToken, "string");
-    assert.equal(state.submissions.length, 3);
+    assert.equal(state.submissions.length, 4);
 
     const headers = {
       "content-type": "application/json",
@@ -249,6 +263,23 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     assert.equal(photoResult.submission.status, "imported");
     assert.equal(photoResult.asset.submissionId, photoSubmissionId);
     assert.equal(photoResult.asset.creditName, "テスト投稿者");
+
+    const anonymousPhotoResponse = await fetch(
+      `${baseUrl}/api/admin/submissions/${anonymousPhotoSubmissionId}/import`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          spotId: "existing-spot",
+          reviewNote: "匿名写真を確認済み",
+        }),
+      },
+    );
+    assert.equal(anonymousPhotoResponse.status, 200);
+    const anonymousPhotoResult = await anonymousPhotoResponse.json();
+    assert.equal(anonymousPhotoResult.submission.status, "imported");
+    assert.equal(anonymousPhotoResult.asset.submissionId, anonymousPhotoSubmissionId);
+    assert.equal(anonymousPhotoResult.asset.creditName, "匿名");
 
     const spotResponse = await fetch(
       `${baseUrl}/api/admin/submissions/${spotSubmissionId}/import`,
@@ -300,17 +331,22 @@ test("local admin imports reviewed photos and spots, and rejects without publish
       await readFile(path.join(submissionsDirectory, "index.json"), "utf8"),
     );
     assert.deepEqual(spots.map((spot) => spot.id), ["existing-spot", "new-community-spot"]);
-    assert.equal(media.length, 1);
-    assert.equal(media[0].submissionId, photoSubmissionId);
-    assert.equal(spots[0].imageUrl, media[0].imageUrl);
+    assert.equal(media.length, 2);
+    const attributedAsset = media.find((asset) => asset.submissionId === photoSubmissionId);
+    const anonymousAsset = media.find((asset) => asset.submissionId === anonymousPhotoSubmissionId);
+    assert.ok(attributedAsset);
+    assert.ok(anonymousAsset);
+    assert.equal(attributedAsset.creditName, "テスト投稿者");
+    assert.equal(anonymousAsset.creditName, "匿名");
+    assert.equal(spots[0].imageUrl, attributedAsset.imageUrl);
     assert.equal(transitNames["new-community-spot"], "新規候補地 石川県金沢市広坂");
     assert.deepEqual(
       queue.map((submission) => submission.status),
-      ["imported", "imported", "rejected"],
+      ["imported", "imported", "imported", "rejected"],
     );
     assert.equal(
       await readFile(
-        path.join(testDirectory, "public", ...media[0].imageUrl.split("/").filter(Boolean)),
+        path.join(testDirectory, "public", ...anonymousAsset.imageUrl.split("/").filter(Boolean)),
       ).then((bytes) => bytes.length > 0),
       true,
     );
