@@ -175,7 +175,7 @@ function normalizeRequest(value: unknown): NormalizedPlan {
     : stopIds.map((id) => spots.find((spot) => spot.id === id));
   if (registeredStops?.some((spot) => !spot)) {
     throw new RoutePlanError(
-      "公開ページとルートAPIのスポットデータに更新差があります。",
+      "スポット情報が更新されました。ページを再読み込みしてお試しください。",
       409,
       "SPOT_DATA_OUT_OF_DATE",
     );

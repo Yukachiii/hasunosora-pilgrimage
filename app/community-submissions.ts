@@ -161,35 +161,35 @@ function normalizeText(
     forbiddenControlCharacterPattern.test(text)
   ) {
     throw new CommunitySubmissionValidationError(
-      `${label}にHTMLや制御文字は使用できません。`,
+      `${label}に入力できない文字が含まれています。`,
     );
   }
   return text;
 }
 
 function requiredUrl(value: unknown) {
-  const text = normalizeText(value, "根拠URL", 500, { required: true })!;
+  const text = normalizeText(value, "参考URL", 500, { required: true })!;
   let url: URL;
   try {
     url = new URL(text);
   } catch {
     throw new CommunitySubmissionValidationError(
-      "根拠URLが正しくありません。",
+      "参考URLが正しくありません。",
     );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new CommunitySubmissionValidationError(
-      "根拠URLはhttpまたはhttpsで入力してください。",
+      "「https://」または「http://」で始まる参考URLを入力してください。",
     );
   }
   if (url.username || url.password) {
     throw new CommunitySubmissionValidationError(
-      "根拠URLにユーザー名やパスワードは使用できません。",
+      "ログイン情報を含まない公開URLを入力してください。",
     );
   }
   if (isBlockedSourceHostname(url.hostname)) {
     throw new CommunitySubmissionValidationError(
-      "根拠URLに端末内やローカルネットワークのアドレスは使用できません。",
+      "公開されているWebページのURLを入力してください。",
     );
   }
   return url.toString();

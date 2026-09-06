@@ -2893,184 +2893,6 @@ button {
   background: rgba(125, 185, 196, 0.08);
 }
 
-.visitor-notice {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  overflow-y: auto;
-  background:
-    radial-gradient(circle at 18% 14%, rgba(134, 205, 217, 0.2), transparent 30%),
-    rgba(18, 29, 43, 0.88);
-  backdrop-filter: blur(12px);
-}
-
-.visitor-notice__dialog {
-  position: relative;
-  width: min(720px, 100%);
-  max-height: calc(100dvh - 48px);
-  padding: 42px 48px 36px;
-  overflow-y: auto;
-  border: 1px solid rgba(125, 185, 196, 0.42);
-  border-radius: 4px;
-  background: #f7fbfc;
-  box-shadow: 0 28px 90px rgba(4, 12, 24, 0.42);
-  color: var(--ink);
-  overscroll-behavior: contain;
-}
-
-.visitor-notice__mark {
-  position: absolute;
-  top: 28px;
-  right: 34px;
-  color: rgba(75, 151, 166, 0.12);
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-  font-size: 72px;
-  line-height: 1;
-}
-
-.visitor-notice__eyebrow {
-  margin: 0 0 10px;
-  color: var(--ice-deep);
-  font-family: Georgia, serif;
-  font-size: 10px;
-  letter-spacing: 0.2em;
-}
-
-.visitor-notice__dialog h2 {
-  position: relative;
-  margin: 0;
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-  font-size: clamp(28px, 5vw, 42px);
-  font-weight: 500;
-}
-
-.visitor-notice__lead {
-  margin: 12px 0 26px;
-  color: var(--ink-muted);
-  font-size: 12px;
-}
-
-.visitor-notice__items {
-  display: grid;
-  border-top: 1px solid rgba(31, 43, 59, 0.14);
-}
-
-.visitor-notice__items label {
-  display: grid;
-  grid-template-columns: 22px 38px 1fr;
-  gap: 14px;
-  align-items: start;
-  margin: 0 -12px;
-  padding: 18px 12px;
-  border-bottom: 1px solid rgba(31, 43, 59, 0.14);
-  cursor: pointer;
-  transition: background 160ms ease;
-}
-
-.visitor-notice__items label:hover,
-.visitor-notice__items label:has(input:checked) {
-  background: rgba(125, 185, 196, 0.1);
-}
-
-.visitor-notice__items label:has(input:focus-visible) {
-  outline: 3px solid rgba(75, 151, 166, 0.28);
-  outline-offset: -3px;
-}
-
-.visitor-notice__items input {
-  width: 18px;
-  height: 18px;
-  margin: 2px 0 0;
-  accent-color: var(--ice-deep);
-  cursor: pointer;
-}
-
-.visitor-notice__number {
-  padding-top: 3px;
-  color: var(--ice-deep);
-  font-family: Georgia, serif;
-  font-size: 11px;
-}
-
-.visitor-notice__items h3 {
-  margin: 0 0 6px;
-  font-size: 14px;
-}
-
-.visitor-notice__items p {
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: 11px;
-  line-height: 1.8;
-}
-
-.visitor-notice__progress {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 20px 0 0;
-  color: var(--ink-muted);
-  font-size: 10px;
-}
-
-.visitor-notice__progress span {
-  font-family: Georgia, serif;
-  letter-spacing: 0.08em;
-}
-
-.visitor-notice__progress strong {
-  color: var(--ink);
-  font-size: 10px;
-}
-
-.visitor-notice__accept {
-  display: flex;
-  width: 100%;
-  min-height: 54px;
-  margin-top: 26px;
-  padding: 0 22px;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: white;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  transition: background 160ms ease, border-color 160ms ease;
-}
-
-.visitor-notice__accept:hover:not(:disabled) {
-  border-color: var(--ice-deep);
-  background: var(--ice-deep);
-}
-
-.visitor-notice__accept:disabled {
-  border-color: rgba(31, 43, 59, 0.18);
-  background: rgba(31, 43, 59, 0.12);
-  color: rgba(31, 43, 59, 0.42);
-  cursor: not-allowed;
-}
-
-.visitor-notice__accept:focus-visible {
-  outline: 3px solid rgba(75, 151, 166, 0.36);
-  outline-offset: 3px;
-}
-
-.visitor-notice__dialog > small {
-  display: block;
-  margin-top: 12px;
-  color: var(--ink-muted);
-  font-size: 9px;
-  text-align: center;
-}
-
 .today-mode {
   position: fixed;
   z-index: 220;
@@ -4153,42 +3975,6 @@ footer > span {
     max-height: calc(100dvh - 68px);
   }
 
-  .visitor-notice {
-    place-items: start center;
-    padding: 12px;
-  }
-
-  .visitor-notice__dialog {
-    max-height: calc(100dvh - 24px);
-    padding: 30px 22px 24px;
-  }
-
-  .visitor-notice__mark {
-    top: 20px;
-    right: 20px;
-    font-size: 54px;
-  }
-
-  .visitor-notice__lead {
-    margin-bottom: 18px;
-  }
-
-  .visitor-notice__items label {
-    grid-template-columns: 20px 28px 1fr;
-    gap: 9px;
-    padding: 14px 10px;
-  }
-
-  .visitor-notice__progress {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .visitor-notice__accept {
-    margin-top: 20px;
-  }
-
   .today-mode {
     place-items: start center;
     padding: 0;
@@ -4375,8 +4161,6 @@ footer > span {
     letter-spacing: 0.12em;
   }
 
-  body:has(.visitor-notice) .mobile-nav,
-  body:has(.visitor-notice) .mobile-explore-picker,
   body:has(.today-mode) .mobile-nav {
     display: none;
   }
@@ -6798,7 +6582,7 @@ footer > span {
   gap: 12px;
 }
 
-.explore-menu__grid button {
+.explore-menu__grid :is(button, a) {
   display: grid;
   min-height: 124px;
   align-content: center;
@@ -6808,12 +6592,13 @@ footer > span {
   border-radius: 8px;
   background: white;
   color: var(--ink);
+  text-decoration: none;
   text-align: left;
   cursor: pointer;
   transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
-.explore-menu__grid button:hover {
+.explore-menu__grid :is(button, a):hover {
   border-color: var(--ice-deep);
   box-shadow: 0 12px 32px rgba(38, 52, 70, 0.08);
   transform: translateY(-2px);
@@ -6828,6 +6613,13 @@ footer > span {
 .explore-menu__grid span {
   color: var(--ink-soft);
   font-size: 10px;
+}
+
+.explore-menu__grid .explore-menu__contribute {
+  grid-column: 1 / -1;
+  min-height: 92px;
+  border-color: rgba(75, 151, 166, 0.38);
+  background: rgba(217, 239, 242, 0.22);
 }
 
 .explore-sheet {
@@ -8147,7 +7939,7 @@ footer > span {
     gap: 8px;
   }
 
-  .explore-menu__grid button {
+  .explore-menu__grid :is(button, a) {
     min-height: 104px;
     padding: 16px;
   }
@@ -9194,6 +8986,12 @@ footer > span {
   background:
     radial-gradient(circle at 8% 10%, rgba(217, 239, 242, 0.62), transparent 28%),
     #fbfbf7;
+  scroll-margin-top: 88px;
+}
+
+.community-contribution:focus-visible {
+  outline: 3px solid rgba(75, 151, 166, 0.56);
+  outline-offset: 5px;
 }
 
 .community-contribution__heading > div > span {

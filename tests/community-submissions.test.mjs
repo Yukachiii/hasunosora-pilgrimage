@@ -68,7 +68,7 @@ test("community spot payload requires only name, address and evidence URL", () =
       address: "石川県金沢市",
       sourceUrl: "javascript:alert(1)",
     }),
-    /httpまたはhttps/,
+    /始まる参考URL/,
   );
   assert.throws(
     () => parseCommunitySubmissionPayload("spot", {
@@ -92,7 +92,7 @@ test("community spot payload requires only name, address and evidence URL", () =
         address: "石川県金沢市",
         sourceUrl,
       }),
-      /ローカルネットワーク/,
+      /公開されているWebページ/,
     );
   }
   assert.equal(

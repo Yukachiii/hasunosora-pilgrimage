@@ -578,7 +578,7 @@ export function MapboxPilgrimageMap({
         if (!token) {
           onRouteResult({
             state: "fallback",
-            message: "地図の接続設定を確認しています。しばらくしてからもう一度お試しください。",
+            message: "地図を準備しています。少し待ってから、もう一度お試しください。",
           });
           return;
         }
@@ -613,7 +613,7 @@ export function MapboxPilgrimageMap({
           throw new Error(payload.message || "この組み合わせのルートを作成できませんでした。");
         }
         const route = shouldOptimize ? payload.trips?.[0] : payload.routes?.[0];
-        if (!route) throw new Error("Mapboxからルートが返されませんでした。");
+        if (!route) throw new Error("ルートを見つけられませんでした。条件を変えてお試しください。");
         const orderedStopIds = shouldOptimize && payload.waypoints?.length === requestedRoute.stops.length
           ? payload.waypoints
               .map((waypoint, inputIndex) => ({
@@ -688,7 +688,7 @@ export function MapboxPilgrimageMap({
           })}
           <div className="map-fallback__note">
             <span className="status-dot" />
-            {mapState === "error" ? "地図を読み込めませんでした" : "地図の接続設定を確認中"}
+            {mapState === "error" ? "地図を読み込めませんでした" : "地図を準備中"}
           </div>
         </div>
       )}

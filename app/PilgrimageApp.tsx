@@ -58,12 +58,25 @@ import {
 } from "./planner-share";
 import { CommunityContributionPanel } from "./CommunityContributionPanel";
 
-const VISITOR_NOTICE_STORAGE_KEY = "hasunosora-pilgrimage.visitor-notice.v2";
 const LEGACY_PLANNER_DRAFT_STORAGE_KEY = "hasunosora-pilgrimage.planner-draft.v1";
 const PLANNER_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const CARD_MODEL_SPOT_IDS = Array.from(new Set(
   cardModels.flatMap((card) => card.spotId ? [card.spotId] : []),
 ));
+const GENERIC_SPOT_DESCRIPTION = "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。";
+const GENERIC_ACCESS_NOTE = "訪問前に営業時間・利用案内を確認";
+
+function publicSpotDescription(description: string) {
+  return description === GENERIC_SPOT_DESCRIPTION
+    ? ""
+    : description;
+}
+
+function publicAccessNote(accessNote: string) {
+  if (accessNote === GENERIC_ACCESS_NOTE) return "営業時間などは公式情報へ";
+  if (accessNote === "通行や周辺の生活に配慮して訪問") return "周辺への配慮を忘れずに";
+  return accessNote;
+}
 
 type NavigableAppPage = "explore" | "planner" | "today" | "guide";
 type AppPage = NavigableAppPage | "shared";
@@ -215,8 +228,6 @@ export function PilgrimageApp({
   communitySubmissionsEnabled = false,
 }: Props) {
   const heroImage = heroImages[initialHeroIndex] ?? heroImages[0] ?? null;
-  const [hasAcceptedVisitorNotice, setHasAcceptedVisitorNotice] = useState(false);
-  const [visitorNoticeChecks, setVisitorNoticeChecks] = useState([false, false, false]);
   const [selectedId, setSelectedId] = useState(spots[0].id);
   const [plannerDays, setPlannerDays] = useState<PlannerDaySnapshot[]>(() => [
     createPlannerDay(0, japanDate()),
@@ -533,7 +544,9 @@ export function PilgrimageApp({
         if (nextPage === "shared") {
           window.scrollTo({ top: 0 });
         } else if (sectionId && sectionId !== "spots" && sectionId !== "card-models") {
-          document.getElementById(sectionId)?.scrollIntoView({ block: "start" });
+          const section = document.getElementById(sectionId);
+          if (sectionId === "community-contribution") section?.focus({ preventScroll: true });
+          section?.scrollIntoView({ block: "start" });
         } else if (!sectionId) {
           window.scrollTo({ top: 0 });
         }
@@ -544,29 +557,6 @@ export function PilgrimageApp({
     window.addEventListener("hashchange", syncPage);
     return () => window.removeEventListener("hashchange", syncPage);
   }, [spots]);
-
-  useEffect(() => {
-    let wasAccepted = false;
-    try {
-      wasAccepted = window.localStorage.getItem(VISITOR_NOTICE_STORAGE_KEY) === "accepted";
-    } catch {
-      return undefined;
-    }
-    if (!wasAccepted) return undefined;
-    const restoreAcceptance = window.setTimeout(() => {
-      setHasAcceptedVisitorNotice(true);
-    }, 0);
-    return () => window.clearTimeout(restoreAcceptance);
-  }, []);
-
-  useEffect(() => {
-    if (hasAcceptedVisitorNotice) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [hasAcceptedVisitorNotice]);
 
   useEffect(() => {
     if (!activeExplorePanel) return undefined;
@@ -712,25 +702,6 @@ export function PilgrimageApp({
       window.clearInterval(timer);
     };
   }, [activePage]);
-
-  const confirmedVisitorNoticeCount = visitorNoticeChecks.filter(Boolean).length;
-  const hasConfirmedAllVisitorNotices = confirmedVisitorNoticeCount === visitorNoticeChecks.length;
-
-  function changeVisitorNoticeCheck(index: number, checked: boolean) {
-    setVisitorNoticeChecks((current) =>
-      current.map((value, currentIndex) => currentIndex === index ? checked : value),
-    );
-  }
-
-  function acceptVisitorNotice() {
-    if (!hasConfirmedAllVisitorNotices) return;
-    try {
-      window.localStorage.setItem(VISITOR_NOTICE_STORAGE_KEY, "accepted");
-    } catch {
-      // 保存できない環境でも、この閲覧中はサイトを利用できるようにします。
-    }
-    setHasAcceptedVisitorNotice(true);
-  }
 
   const areas = useMemo(
     () => Array.from(new Set(spots.map((spot) => spot.area))),
@@ -1233,7 +1204,7 @@ export function PilgrimageApp({
     if (collaborationSpotIds.length < 2) {
       setRouteResult({
         state: "error",
-        message: "このコラボはルート検索できる登録地点が不足しています。",
+        message: "このコラボは、予定を作れるスポットがまだ足りません。",
       });
       return;
     }
@@ -1463,88 +1434,6 @@ export function PilgrimageApp({
 
   return (
     <>
-      {!hasAcceptedVisitorNotice ? (
-        <div className="visitor-notice" role="presentation">
-          <section
-            className="visitor-notice__dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="visitor-notice-title"
-            aria-describedby="visitor-notice-description"
-          >
-            <div className="visitor-notice__mark" aria-hidden="true">蓮</div>
-            <h2 id="visitor-notice-title">利用前の確認</h2>
-            <p id="visitor-notice-description" className="visitor-notice__lead">
-              このサイトをご利用になる前に、以下の注意事項をご確認ください。
-            </p>
-            <div className="visitor-notice__items">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={visitorNoticeChecks[0]}
-                  onChange={(event) => changeVisitorNoticeCheck(0, event.target.checked)}
-                  autoFocus
-                />
-                <span className="visitor-notice__number">01</span>
-                <div>
-                  <h3>地域とスポットへの配慮</h3>
-                  <p>
-                    通行や営業、地域で暮らす方を優先してください。私有地への立入りや無断撮影、
-                    長時間の占有などはせず、各施設のルールと係員の案内を守りましょう。
-                  </p>
-                </div>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={visitorNoticeChecks[1]}
-                  onChange={(event) => changeVisitorNoticeCheck(1, event.target.checked)}
-                />
-                <span className="visitor-notice__number">02</span>
-                <div>
-                  <h3>最新情報と安全の確認</h3>
-                  <p>
-                    営業時間、休業日、交通機関、道路状況、天候は変わることがあります。
-                    出発前と移動中に公式情報を確認し、無理のない行動をしてください。
-                  </p>
-                </div>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={visitorNoticeChecks[2]}
-                  onChange={(event) => changeVisitorNoticeCheck(2, event.target.checked)}
-                />
-                <span className="visitor-notice__number">03</span>
-                <div>
-                  <h3>旅程とルートについて</h3>
-                  <p>
-                    本サイトの旅程、所要時間、ルートは参考情報であり、予定どおりの移動や到着を保証するものではありません。
-                    遅延、予定変更、費用その他の損害についてサイト運営者は責任を負いません。
-                    安全確認と最終的な判断は、ご自身でお願いいたします。
-                  </p>
-                </div>
-              </label>
-            </div>
-            <p className="visitor-notice__progress" id="visitor-notice-progress" aria-live="polite">
-              <span>確認済み {confirmedVisitorNoticeCount} / {visitorNoticeChecks.length}</span>
-              <strong>{hasConfirmedAllVisitorNotices ? "すべて確認済みです" : "各項目にチェックしてください"}</strong>
-            </p>
-            <button
-              type="button"
-              className="visitor-notice__accept"
-              onClick={acceptVisitorNotice}
-              disabled={!hasConfirmedAllVisitorNotices}
-              aria-describedby="visitor-notice-progress"
-            >
-              内容に同意してサイトを見る
-              <span aria-hidden="true">→</span>
-            </button>
-            <small>同意しない場合は、このページを閉じてください。</small>
-          </section>
-        </div>
-      ) : null}
-
       <main className={`app-shell app-page--${activePage}${heroImage ? " has-managed-hero" : ""}`} data-page={activePage}>
       <header className="site-header">
         <a className="brand" href="#/explore" aria-label="蓮ノ旅 探すページ" onClick={(event) => { event.preventDefault(); navigateToPage("explore"); }}>
@@ -1718,6 +1607,13 @@ export function PilgrimageApp({
             <strong>カード</strong>
             <span>キャラクターからモデル地を探す</span>
           </button>
+          <a
+            href="#/explore/community-contribution"
+            className="explore-menu__contribute"
+          >
+            <strong>投稿</strong>
+            <span>{communitySubmissionsEnabled ? "写真や新しいスポットを送る" : "投稿機能は準備中"}</span>
+          </a>
         </div>
       </section>
 
@@ -1834,7 +1730,7 @@ export function PilgrimageApp({
           </div>
           <section className="planner-share-launch" aria-label="予定の共有">
             <div>
-              <small>READ ONLY LINK</small>
+              <small>SHARE PLAN</small>
               <strong>この予定を共有</strong>
               <span>宿泊地・自由予定・進捗・出発駅は共有されません。</span>
             </div>
@@ -1946,8 +1842,8 @@ export function PilgrimageApp({
                   <span aria-hidden="true">→</span>
                 </button>
               </div>
-              {selectedSpot.description ? (
-                <p className="selected-map-detail__description">{selectedSpot.description}</p>
+              {publicSpotDescription(selectedSpot.description) ? (
+                <p className="selected-map-detail__description">{publicSpotDescription(selectedSpot.description)}</p>
               ) : null}
               {selectedSpotPhotos.length ? (
                 <div className="selected-map-detail__photos">
@@ -2240,8 +2136,8 @@ export function PilgrimageApp({
                   }}
                 />
                 <span>
-                  <strong>訪問順を自動で最適化</strong>
-                  <small>{travelMode === "TRANSIT" ? "公共交通は指定順で、各スポットの滞在終了時刻に合わせて区間検索します。" : "最初と最後を固定して、中間地点を並べ替えます。"}</small>
+                  <strong>おすすめの順番に並べる</strong>
+                  <small>{travelMode === "TRANSIT" ? "公共交通では、選んだ順番で区間ごとに調べます。" : "最初と最後はそのままに、中間の順番を調整します。"}</small>
                 </span>
               </label>
               </div>
@@ -2532,7 +2428,7 @@ export function PilgrimageApp({
                 ) : null}
                 <p>
                   滞在込み <strong>{formatDuration(schedule.finish - schedule.start)}</strong>
-                  {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · 最適化した順で表示" : ""}
+                  {routeResult.orderedStopIds?.join("|") !== routeRequest?.stops.map((spot) => spot.id).join("|") ? " · おすすめの順番で表示" : ""}
                 </p>
               </section>
             )}
@@ -2545,8 +2441,8 @@ export function PilgrimageApp({
             <h2>コラボ</h2>
           </div>
           <p>
-            コラボ企画の開催情報と対象スポットを掲載しています。
-            開催期間や各施設の休業日は、出発前に公式案内も確認してください。
+            コラボ企画と対象スポットをまとめています。
+            お出かけ前に、開催期間やお休みを公式案内でもご確認ください。
           </p>
         </div>
         <div className="collaboration-grid">
@@ -2612,6 +2508,14 @@ export function PilgrimageApp({
         </div>
       </section>
 
+      <CommunityContributionPanel
+        spots={spots}
+        apiBaseUrl={communityApiUrl}
+        turnstileSiteKey={turnstileSiteKey}
+        enabled={communitySubmissionsEnabled}
+        hidden={activePage !== "explore"}
+      />
+
         <div
           className={`explore-sheet${isExploreSheetClosing ? " is-closing" : ""}`}
           hidden={!activeExplorePanel}
@@ -2675,8 +2579,8 @@ export function PilgrimageApp({
             <h2>スポット一覧（{spots.length}件）</h2>
           </div>
           <p>
-            活動記録・せーはす！・関連映像等から整理した一覧です。
-            名称や営業情報は、訪問前に各施設の最新案内も確認してください。
+            活動記録や関連映像、コラボなどにまつわる場所をまとめています。
+            お出かけ前に、施設の最新情報もご確認ください。
           </p>
         </div>
 
@@ -2780,7 +2684,7 @@ export function PilgrimageApp({
                 </div>
                 <h3>{spot.name}</h3>
                 {imageCredit ? <small className="spot-card__photo-credit">写真：{imageCredit}</small> : null}
-                <p>{spot.description}</p>
+                {publicSpotDescription(spot.description) ? <p>{publicSpotDescription(spot.description)}</p> : null}
                 <div className={`spot-card__hours${spot.openingTime && spot.closingTime ? " is-known" : ""}`}>
                   <strong>{formatOpeningHours(spot)}</strong>
                   {spot.openingHoursNote ? <span>{spot.openingHoursNote}</span> : null}
@@ -2834,7 +2738,7 @@ export function PilgrimageApp({
                   </div>
                 ) : null}
                 <div className="spot-card__meta">
-                  <span>{spot.accessNote}</span>
+                  <span>{publicAccessNote(spot.accessNote)}</span>
                   <strong>
                     地図で表示 <span aria-hidden="true">→</span>
                   </strong>
@@ -2866,7 +2770,7 @@ export function PilgrimageApp({
             <h2>カードモデル地（{cardModels.length}件）</h2>
           </div>
           <p>
-            現実の地点まで特定できたカードイラストを整理しています。
+            カードイラストのモデルと思われる場所を紹介しています。
           </p>
         </div>
         <div className="card-model-filter" aria-label="カードイラストのキャラクター絞り込み">
@@ -3077,56 +2981,41 @@ export function PilgrimageApp({
         </p>
       </section>
 
-      {activePage === "guide" ? (
-        <CommunityContributionPanel
-          spots={spots}
-          apiBaseUrl={communityApiUrl}
-          turnstileSiteKey={turnstileSiteKey}
-          enabled={communitySubmissionsEnabled}
-        />
-      ) : null}
-
       <section className="site-disclaimer" id="site-notice" aria-labelledby="site-notice-title" hidden={activePage !== "guide"}>
         <div className="site-disclaimer__heading">
-          <h2 id="site-notice-title">ご利用上の注意</h2>
+          <h2 id="site-notice-title">訪れるときのお願い</h2>
           <p>
-            本サイトを使って巡礼計画を立てる際は、次の内容をご確認ください。
+            みんなが気持ちよく楽しめるよう、次の点だけご協力ください。
           </p>
         </div>
         <div className="site-disclaimer__content">
           <ul>
             <li>
-              通行・営業・地域の日常を優先し、私有地への立入りや無断撮影をせず、各施設のルールを守ってください。
+              お店や地域の方、通行する方への配慮を忘れず、立入りや撮影は各施設の案内に従いましょう。
             </li>
             <li>
-              営業時間、休業日、交通機関、道路状況、天候などは、出発前と移動中に公式情報をご確認ください。
+              営業時間や交通、天候は変わることがあります。お出かけ前に公式情報も確認しておくと安心です。
             </li>
             <li>
-              掲載する旅程、所要時間、ルートは参考情報です。予定どおりの移動や到着を保証するものではありません。
-            </li>
-            <li>
-              本サイトの利用に伴う遅延、予定変更、費用その他の損害について、サイト運営者は責任を負いません。
-              安全確認と最終的な判断は利用者ご自身でお願いいたします。
+              旅程や所要時間は目安です。当日は現地の状況に合わせて、無理のない予定でお楽しみください。
             </li>
           </ul>
           <div className="site-data-note" aria-labelledby="site-data-note-title">
-            <h3 id="site-data-note-title">端末内の保存と外部サービス</h3>
+            <h3 id="site-data-note-title">このサイトで扱うデータ</h3>
             <p>
-              利用前確認と作成した予定は、この端末のブラウザ（Cookie・localStorage）に保存されます。
-              運営者のサーバーには保存されず、ブラウザのデータを削除すると消去されます。
+              作成した予定はこの端末のブラウザに保存され、サイト側で予定を保管することはありません。
+              ブラウザのデータを消すと予定も消えます。
             </p>
             <p>
-              地図の表示・ルート作成では、表示範囲や選択した地点などがMapboxへ送信されます。
-              サーバー経由のルート検索を利用できる環境では、出発地・目的地・移動条件がGoogle Routesへ送信されます。
+              地図や経路を表示するときは、表示範囲や選んだ地点、移動条件をMapboxやGoogle Routesへ送ります。
             </p>
             {communitySubmissionsEnabled ? (
               <p>
-                写真・スポットを投稿すると、入力内容と再生成した画像が運営者の投稿受付サーバーへ送信されます。
-                不正送信対策の確認にはCloudflare Turnstileを使用し、確認トークンと接続元IPがCloudflareへ送信されます。
-                投稿は運営者が確認するまで公開されません。
+                投稿すると、入力内容と写真は運営者のサーバーへ送られ、確認後に掲載します。
+                迷惑投稿を防ぐため、Cloudflare Turnstileへ接続元IPなどが送られます。
               </p>
             ) : null}
-            <p>本サイトはアクセス解析および広告トラッキングを導入していません。</p>
+            <p>アクセス解析や広告用の追跡は行っていません。</p>
           </div>
         </div>
       </section>
@@ -3139,7 +3028,7 @@ export function PilgrimageApp({
         <header className="shared-plan-page__header">
           <small>SHARED PLAN</small>
           <h1 id="shared-plan-title">共有された予定</h1>
-          <p>共有時点の訪問先と滞在時間を、閲覧専用で表示しています。</p>
+          <p>共有された訪問先と滞在時間を表示しています。</p>
         </header>
 
         {!sharedPlanLoaded ? (
@@ -3213,14 +3102,14 @@ export function PilgrimageApp({
                   ))}
                 </ol>
                 <p>
-                  {sharedPlan.optimizeOrder ? "訪問順最適化を使用する設定" : "表示順に訪問する設定"}
-                  <span>経路と移動時間は共有画面では再計算しません。</span>
+                  {sharedPlan.optimizeOrder ? "おすすめの訪問順" : "共有された順番"}
+                  <span>経路と移動時間はこの画面では表示しません。</span>
                 </p>
               </article>
             ) : null}
 
             <aside className="shared-plan-privacy">
-              <strong>このリンクに含まれない情報</strong>
+              <strong>共有されない情報</strong>
               <p>宿泊地、予約・待ち合わせなどの自由予定、訪問済みの進捗、出発駅は共有されません。</p>
             </aside>
             <a className="shared-plan-home" href="#/explore" onClick={(event) => { event.preventDefault(); navigateToPage("explore"); }}>
@@ -3241,9 +3130,9 @@ export function PilgrimageApp({
           </span>
         </div>
         <p>
-          本サイトはファンによる非公式ファンサイトです。作品・施設・地域の公式運営とは関係ありません。
+          ファンが個人で運営する非公式サイトです。作品・施設・地域の各公式とは関係ありません。
         </p>
-        <span>Ver. {siteVersion} · © 2026 Yukachiii・写真の権利は各画像の表記に準拠</span>
+        <span>Ver. {siteVersion} · © 2026 Yukachiii · 写真のクレジットは各画像に記載</span>
       </footer>
       </main>
 
@@ -3264,7 +3153,7 @@ export function PilgrimageApp({
           >
             <header>
               <div>
-                <small>READ ONLY LINK</small>
+                <small>SHARE PLAN</small>
                 <h2 id="planner-share-title">予定を共有</h2>
               </div>
               <button
@@ -3277,8 +3166,7 @@ export function PilgrimageApp({
               </button>
             </header>
             <p>
-              訪問先、表示順、滞在時間、開始・終了時刻、移動手段だけを閲覧専用URLにします。
-              この端末の予定そのものは送信されません。
+              訪問先や時間を、見るだけのリンクで共有します。
             </p>
             <label className="planner-share-modal__date-option">
               <input
@@ -3288,7 +3176,7 @@ export function PilgrimageApp({
               />
               <span>
                 <strong>訪問日も共有する</strong>
-                <small>訪問予定日がリンクを知っている相手に伝わります。既定では共有しません。</small>
+                <small>訪問日は、ここを選んだときだけ共有されます。</small>
               </span>
             </label>
             <div className="planner-share-modal__privacy">
@@ -3470,7 +3358,7 @@ export function PilgrimageApp({
             <details className="today-mode__tools">
               <summary>
                 <span>当日の調整</span>
-                <small>{todayOffsetMinutes ? `時刻補正 ${todayOffsetMinutes >= 0 ? "+" : ""}${todayOffsetMinutes}分` : "必要な場合のみ"}</small>
+                <small>{todayOffsetMinutes ? `予定時刻を${todayOffsetMinutes >= 0 ? "+" : ""}${todayOffsetMinutes}分調整中` : "必要な場合のみ"}</small>
               </summary>
               <div>
                 <button
@@ -3481,15 +3369,15 @@ export function PilgrimageApp({
                   残りを現在時刻に合わせる
                 </button>
                 <button type="button" onClick={() => setTodayOffsetMinutes(0)} disabled={!todayOffsetMinutes}>
-                  時刻補正を戻す
+                  調整を元に戻す
                 </button>
                 <button type="button" onClick={() => setCompletedSpotIds([])} disabled={!completedScheduledSpotIds.length}>
                   訪問済みをリセット
                 </button>
                 <p>
                   {visitDate === japanDate()
-                    ? `時刻補正 ${todayOffsetMinutes >= 0 ? "+" : ""}${todayOffsetMinutes}分。表示時刻だけを調整します。`
-                    : "現在時刻への補正は、訪問日当日に利用できます。"}
+                    ? `表示時刻を${todayOffsetMinutes >= 0 ? "+" : ""}${todayOffsetMinutes}分調整しています。`
+                    : "訪問日当日は、残りの予定を現在時刻に合わせられます。"}
                 </p>
               </div>
             </details>
@@ -3517,8 +3405,8 @@ export function PilgrimageApp({
             </ol>
 
             <p className="today-mode__notice">
-              営業時間・交通状況は変わる場合があります。現地と公式案内を優先してください。
-              進捗と時刻補正はこの端末へ自動保存されます。
+              営業時間や交通状況は変わる場合があります。現地と公式案内もご確認ください。
+              訪問済みと時刻の変更は、この端末に自動保存されます。
             </p>
             {activePlannerDay.hotelName ? (
               <p className="today-mode__hotel">

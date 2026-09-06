@@ -52,6 +52,7 @@ type Props = {
   apiBaseUrl?: string;
   turnstileSiteKey?: string;
   enabled?: boolean;
+  hidden?: boolean;
 };
 
 function submissionEndpoint(apiBaseUrl: string) {
@@ -77,6 +78,7 @@ export function CommunityContributionPanel({
   apiBaseUrl = "",
   turnstileSiteKey = "",
   enabled = true,
+  hidden = false,
 }: Props) {
   const panelId = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -93,7 +95,7 @@ export function CommunityContributionPanel({
   useEffect(() => {
     const siteKey = turnstileSiteKey.trim();
     const container = turnstileContainerRef.current;
-    if (!enabled || !siteKey || !container) return;
+    if (!enabled || hidden || !siteKey || !container) return;
 
     function renderWidget() {
       if (!window.turnstile || !turnstileContainerRef.current || turnstileWidgetIdRef.current) return;
@@ -106,7 +108,7 @@ export function CommunityContributionPanel({
         "expired-callback": () => setTurnstileToken(""),
         "error-callback": () => {
           setTurnstileToken("");
-          setError("確認機能を読み込めませんでした。通信状態を確認してください。");
+          setError("ただいま投稿前の確認ができません。少し待ってから、もう一度お試しください。");
         },
       });
     }
@@ -134,7 +136,7 @@ export function CommunityContributionPanel({
         turnstileWidgetIdRef.current = null;
       }
     };
-  }, [enabled, turnstileSiteKey]);
+  }, [enabled, hidden, turnstileSiteKey]);
 
   function selectKind(nextKind: ContributionKind) {
     if (submitting || nextKind === kind) return;
@@ -242,7 +244,7 @@ export function CommunityContributionPanel({
         window.turnstile?.reset(turnstileWidgetIdRef.current);
         setTurnstileToken("");
       }
-      setError(submissionError instanceof Error ? submissionError.message : "投稿できませんでした。");
+      setError(submissionError instanceof Error ? submissionError.message : "うまく送信できませんでした。もう一度お試しください。");
     } finally {
       setSubmitting(false);
     }
@@ -252,21 +254,27 @@ export function CommunityContributionPanel({
   const areas = Array.from(new Set(spots.map((spot) => spot.area)));
 
   return (
-    <section className="community-contribution" aria-labelledby={`${panelId}-title`}>
+    <section
+      id="community-contribution"
+      className="community-contribution"
+      aria-labelledby={`${panelId}-title`}
+      hidden={hidden}
+      tabIndex={-1}
+    >
       <header className="community-contribution__heading">
         <div>
           <span>CONTRIBUTE</span>
-          <h2 id={`${panelId}-title`}>写真・スポットの情報提供</h2>
+          <h2 id={`${panelId}-title`}>写真・スポットを送る</h2>
         </div>
         <p>
-          送信した内容はすぐには公開されません。運営者が内容、位置、写真の権利を確認し、承認したものだけを掲載します。
+          いただいた内容は、運営者が確認してから掲載します。
         </p>
       </header>
 
       {!enabled ? (
         <div className="community-contribution__unavailable" role="status">
-          <strong>投稿受付は準備中です</strong>
-          <p>受付サーバーの準備が整い次第、この画面から送信できるようになります。</p>
+          <strong>投稿機能は準備中です</strong>
+          <p>もう少しお待ちください。</p>
         </div>
       ) : (
         <div className="community-contribution__body">
@@ -322,7 +330,7 @@ export function CommunityContributionPanel({
                     required
                     onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
                   />
-                  <small>JPEG・PNG・WebP、15MBまで。位置情報などのEXIFは受付時に削除します。</small>
+                  <small>JPEG・PNG・WebP、15MBまで。写真は受付時に位置情報を取り除き、公開用に変換します。</small>
                 </label>
               </>
             ) : (
@@ -368,8 +376,8 @@ export function CommunityContributionPanel({
                   </label>
                 </div>
                 <label>
-                  <span>確認できるURL</span>
-                  <input name="sourceUrl" type="url" maxLength={500} placeholder="施設公式サイトや作品との関連が確認できるページ" required />
+                  <span>参考URL</span>
+                  <input name="sourceUrl" type="url" maxLength={500} placeholder="施設の公式サイトや、作品との関係が分かるページ" required />
                 </label>
                 <label>
                   <span>スポットの説明（任意）</span>
@@ -387,7 +395,7 @@ export function CommunityContributionPanel({
                     accept="image/jpeg,image/png,image/webp"
                     onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
                   />
-                  <small>位置が分かる写真を添付できます。画像は承認されるまで公開されません。</small>
+                  <small>場所が分かる写真を添付できます。確認が終わるまでは公開されません。</small>
                 </label>
               </>
             )}
@@ -405,8 +413,8 @@ export function CommunityContributionPanel({
               <input name="consent" type="checkbox" value="accepted" required />
               <span>
                 {selectedFile || kind === "photo"
-                  ? "自分が撮影した、または掲載許可を得た写真です。人物・車両番号・私有地・撮影禁止物が写っていないことを確認し、運営者による編集と本サイトへの掲載を許可します。"
-                  : "入力内容が正確で、公開して差し支えない情報であることを確認し、運営者による編集と本サイトへの掲載を許可します。"}
+                  ? "自分で撮影した写真、または掲載許可を得た写真です。人物・ナンバープレート・私有地・撮影禁止のものが写っていないことを確認し、本サイトへの掲載と、掲載に必要な編集に同意します。"
+                  : "内容に間違いがなく、公開して問題のない情報です。本サイトへの掲載と、掲載に必要な編集に同意します。"}
               </span>
             </label>
 
@@ -417,11 +425,11 @@ export function CommunityContributionPanel({
             {message ? <p className="community-contribution__message is-success" role="status">{message}</p> : null}
 
             <button className="community-contribution__submit" type="submit" disabled={submitting}>
-              {submitting ? "送信中…" : "審査へ送る"}
+              {submitting ? "送信中…" : "送信する"}
               <span aria-hidden="true">→</span>
             </button>
             <p className="community-contribution__privacy">
-              メールアドレスなどの連絡先は収集しません。却下した投稿と画像は一定期間後に削除します。
+              連絡先は入力・収集しません。掲載しなかった内容は一定期間後に削除します。
             </p>
           </form>
         </div>
