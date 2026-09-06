@@ -65,6 +65,7 @@ const CARD_MODEL_SPOT_IDS = Array.from(new Set(
 ));
 const GENERIC_SPOT_DESCRIPTION = "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。";
 const GENERIC_ACCESS_NOTE = "訪問前に営業時間・利用案内を確認";
+const CARD_ILLUSTRATION_COPYRIGHT = "©︎PL!HS ©︎S ©︎2023 BNML ©︎ODD No.";
 
 function publicSpotDescription(description: string) {
   return description === GENERIC_SPOT_DESCRIPTION
@@ -2819,14 +2820,14 @@ export function PilgrimageApp({
                     />
                   </button>
                   <figcaption>
-                    画像：<a
+                    <a
                       href="https://www.lovelive-anime.jp/hasunosora/"
                       target="_blank"
                       rel="noreferrer"
-                      aria-label="©プロジェクトラブライブ！蓮ノ空女学院スクールアイドルクラブ"
-                      title="©プロジェクトラブライブ！蓮ノ空女学院スクールアイドルクラブ"
+                      aria-label={CARD_ILLUSTRATION_COPYRIGHT}
+                      title={CARD_ILLUSTRATION_COPYRIGHT}
                     >
-                      ©PL!HS
+                      {CARD_ILLUSTRATION_COPYRIGHT}
                     </a>
                   </figcaption>
                 </figure>
@@ -3254,9 +3255,10 @@ export function PilgrimageApp({
                       href="https://www.lovelive-anime.jp/hasunosora/"
                       target="_blank"
                       rel="noreferrer"
-                      aria-label="©プロジェクトラブライブ！蓮ノ空女学院スクールアイドルクラブ"
+                      aria-label={CARD_ILLUSTRATION_COPYRIGHT}
+                      title={CARD_ILLUSTRATION_COPYRIGHT}
                     >
-                      ©PL!HS
+                      {CARD_ILLUSTRATION_COPYRIGHT}
                     </a>
                   </span>
                 ) : null}

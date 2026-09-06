@@ -71,7 +71,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /写真・スポットを送る/);
   assert.match(html, /投稿機能は準備中/);
   assert.match(html, /href="#\/explore\/community-contribution"/);
-  assert.match(html, /Ver\.\s*(?:<!-- -->)?2\.0\.0/);
+  assert.match(html, /Ver\.\s*(?:<!-- -->)?2\.0\.1/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /金沢駅/);
@@ -116,6 +116,8 @@ test("illustrated user guide ships every referenced screenshot", async () => {
   assert.match(app, /card-model__image-button/);
   assert.match(app, /guide-image-modal__copyright/);
   assert.match(app, /activeGuideImage\.variant === "card"/);
+  assert.match(app, /©︎PL!HS ©︎S ©︎2023 BNML ©︎ODD No\./);
+  assert.equal((app.match(/\{CARD_ILLUSTRATION_COPYRIGHT\}/g) ?? []).length, 6);
   assert.doesNotMatch(app, /href="\.\/guide\/[^\"]+" target="_blank"/);
   assert.match(css, /\.guide-image-modal\s*\{/);
   assert.match(css, /\.guide-image-modal--card \.guide-image-modal__dialog\s*\{/);
@@ -220,7 +222,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "2.0.0");
+  assert.equal(JSON.parse(packageJson).version, "2.0.1");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
