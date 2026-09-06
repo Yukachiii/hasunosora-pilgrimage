@@ -2806,7 +2806,7 @@ export function PilgrimageApp({
                     aria-label={`${card.card}のカードイラストを拡大表示`}
                     onClick={() => setActiveGuideImage({
                       src: card.imageUrl!,
-                      alt: `${card.card}のカードイラスト`,
+                      alt: card.card,
                       variant: "card",
                     })}
                   >
@@ -2820,15 +2820,7 @@ export function PilgrimageApp({
                     />
                   </button>
                   <figcaption>
-                    <a
-                      href="https://www.lovelive-anime.jp/hasunosora/"
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={CARD_ILLUSTRATION_COPYRIGHT}
-                      title={CARD_ILLUSTRATION_COPYRIGHT}
-                    >
-                      {CARD_ILLUSTRATION_COPYRIGHT}
-                    </a>
+                    {CARD_ILLUSTRATION_COPYRIGHT}
                   </figcaption>
                 </figure>
               ) : null}
@@ -3251,15 +3243,7 @@ export function PilgrimageApp({
                 <img src={activeGuideImage.src} alt={activeGuideImage.alt} />
                 {activeGuideImage.variant === "card" ? (
                   <span className="guide-image-modal__copyright">
-                    <a
-                      href="https://www.lovelive-anime.jp/hasunosora/"
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={CARD_ILLUSTRATION_COPYRIGHT}
-                      title={CARD_ILLUSTRATION_COPYRIGHT}
-                    >
-                      {CARD_ILLUSTRATION_COPYRIGHT}
-                    </a>
+                    {CARD_ILLUSTRATION_COPYRIGHT}
                   </span>
                 ) : null}
                 {activeGuideImage.credit ? (
