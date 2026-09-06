@@ -974,6 +974,11 @@ test("submission HTTP endpoint applies exact CORS and returns no private fields"
     const health = await fetch(`${baseUrl}/health`);
     assert.equal(health.status, 200);
     assert.equal(health.headers.get("x-content-type-options"), "nosniff");
+    assert.deepEqual(await health.json(), {
+      status: "ok",
+      application: "hasunosora-community-receiver",
+      schemaVersion: 1,
+    });
 
     const rejected = await fetch(`${baseUrl}/api/submissions`, {
       method: "OPTIONS",

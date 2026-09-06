@@ -69,6 +69,24 @@ tailscale funnel --bg 8790
 tailscale funnel status
 ```
 
+### GitHubへのプッシュ後に受付サーバーを自動更新する
+
+自宅サーバーで最初の1回だけ最新版を取得し、管理者権限で自動更新タスクを登録します。`install-community-auto-update.bat` をダブルクリックしてUACを許可するか、管理者PowerShellで次を実行してください。
+
+```powershell
+Set-Location -LiteralPath 'C:\Users\Yuimarine\pilgrimage-system'
+git pull --ff-only
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\install-community-auto-update.ps1'
+```
+
+`Hasunosora Community Auto Update` がGitHubの `main` を1分ごとに確認します。新しいコミットがあればfast-forwardだけで取り込み、依存関係が変わった場合だけ `npm ci` を実行した後、`Hasunosora Community Receiver` を再起動して `/health` の成功まで確認します。追跡対象ファイルに未保存の変更がある場合や履歴が分岐している場合は更新しません。
+
+初回登録後は、GitHubへプッシュしてから通常1分以内に自宅サーバーへ反映されます。更新履歴と失敗理由は次の非公開ログで確認できます。
+
+```powershell
+Get-Content -LiteralPath '.\private\community-update\update.log' -Tail 20
+```
+
 受付サーバーはループバックから接続したリバースプロキシが設定する `X-Forwarded-For` だけを送信元判定へ利用します。外部から直接送られた転送ヘッダーや `CF-Connecting-IP` は信用しません。
 
 Cloudflare Tunnelで固定ホスト名を使う場合の接続先は `http://127.0.0.1:8790` です。公開後、GitHubリポジトリのActions用Variablesへ次を設定すると、Pagesの投稿フォームが有効になります。

@@ -70,7 +70,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /visitor-notice__progress[\s\S]{0,200}確認済み[\s\S]{0,100}0[\s\S]{0,100}\/[\s\S]{0,100}3/);
   assert.match(html, /visitor-notice__accept" disabled=/);
   assert.match(html, /ご利用上の注意/);
-  assert.match(html, /Ver\.\s*(?:<!-- -->)?4\.0\.4/);
+  assert.match(html, /Ver\.\s*(?:<!-- -->)?4\.0\.5/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /予定どおりの移動や到着を保証するものではありません/);
@@ -220,7 +220,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "4.0.4");
+  assert.equal(JSON.parse(packageJson).version, "4.0.5");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -257,6 +257,34 @@ test("GitHub Pages ships public release metadata", async () => {
     ),
   );
   await access(new URL("../public/favicon.svg", import.meta.url));
+});
+
+test("Windows auto updater fast-forwards trusted pushes and health-checks the receiver", async () => {
+  const [updater, installer, wrapper, gitignore] = await Promise.all([
+    readFile(new URL("../update-community.ps1", import.meta.url), "utf8"),
+    readFile(new URL("../install-community-auto-update.ps1", import.meta.url), "utf8"),
+    readFile(new URL("../install-community-auto-update.bat", import.meta.url), "utf8"),
+    readFile(new URL("../.gitignore", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(updater, /ExpectedOrigin = "https:\/\/github\.com\/Yukachiii\/hasunosora-pilgrimage\.git"/);
+  assert.match(updater, /"fetch", "--quiet", "origin", "main"/);
+  assert.match(updater, /"merge", "--ff-only", \$remoteCommit/);
+  assert.match(updater, /core\.hooksPath=NUL/);
+  assert.match(updater, /\$ErrorActionPreference = "Continue"[\s\S]+\$exitCode = \$LASTEXITCODE/);
+  assert.match(updater, /Tracked local changes exist/);
+  assert.match(updater, /Stop-ScheduledTask/);
+  assert.match(updater, /Start-ScheduledTask/);
+  assert.match(updater, /127\.0\.0\.1:\$\{HealthPort\}\/health/);
+  assert.match(updater, /npmOutput = @\(& \$ResolvedNpmExe ci --no-audit --no-fund/);
+  assert.match(updater, /\$npmExitCode = \$LASTEXITCODE/);
+  assert.match(updater, /\$currentDependencyHash -and[\s\S]+\$storedDependencyHash -and/);
+  assert.doesNotMatch(updater, /reset\s+--hard|clean\s+-[a-z]*f/i);
+  assert.match(installer, /Hasunosora Community Auto Update/);
+  assert.match(installer, /-UserId "SYSTEM"/);
+  assert.match(installer, /-RepetitionInterval \(New-TimeSpan -Minutes \$IntervalMinutes\)/);
+  assert.match(wrapper, /install-community-auto-update\.ps1/);
+  assert.match(gitignore, /\/private\/community-update\//);
 });
 
 test("Mapbox map and route integration stays guarded", async () => {

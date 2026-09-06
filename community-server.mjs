@@ -1176,7 +1176,11 @@ export async function handleCommunityRequest(
       sendJson(response, 405, { error: "Method not allowed" });
       return;
     }
-    sendJson(response, 200, { status: "ok" });
+    sendJson(response, 200, {
+      status: "ok",
+      application: "hasunosora-community-receiver",
+      schemaVersion: 1,
+    });
     return;
   }
 
