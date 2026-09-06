@@ -71,7 +71,7 @@ test("server-renders the pilgrimage MVP", async () => {
   assert.match(html, /写真・スポットを送る/);
   assert.match(html, /投稿機能は準備中/);
   assert.match(html, /href="#\/explore\/community-contribution"/);
-  assert.match(html, /Ver\.\s*(?:<!-- -->)?4\.1\.0/);
+  assert.match(html, /Ver\.\s*(?:<!-- -->)?4\.2\.0/);
   assert.match(html, /目的に合う方法でスポットやカードを探せます/);
   assert.doesNotMatch(html, /開催中のコラボ/);
   assert.match(html, /金沢駅/);
@@ -220,7 +220,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(page, /PilgrimageApp/);
   assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "4.1.0");
+  assert.equal(JSON.parse(packageJson).version, "4.2.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -651,7 +651,7 @@ test("local admin writes publishable files before an explicit GitHub push", asyn
 });
 
 test("planner persistence, opening hours, and today mode avoid extra route requests", async () => {
-  const [app, storage, routePlanner, adminApp, schema, migration, css] = await Promise.all([
+  const [app, storage, routePlanner, adminApp, schema, migration, css, contributionPanel] = await Promise.all([
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/planner-storage.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
@@ -659,6 +659,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0002_lucky_the_hood.sql", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/CommunityContributionPanel.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(storage, /PLANNER_DRAFT_COOKIE_KEY/);
@@ -740,6 +741,12 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /communitySubmissionsEnabled \? "写真や新しいスポットを送る" : "投稿機能は準備中"/);
   assert.match(app, /hidden=\{activePage !== "explore"\}/);
   assert.match(app, /sectionId === "community-contribution"[\s\S]{0,100}focus\(\{ preventScroll: true \}\)/);
+  assert.match(contributionPanel, /gps as readGps/);
+  assert.match(contributionPanel, /AUTOMATIC_SPOT_DISTANCE_LIMIT_M/);
+  assert.match(contributionPanel, /位置情報から「\{photoLocation\.spotName\}」を選びました/);
+  assert.match(contributionPanel, /写真を選ぶ/);
+  assert.match(css, /\.community-contribution__file-picker:focus-within/);
+  assert.doesNotMatch(contributionPanel, /payload[\s\S]{0,180}(?:gps|latitude|longitude)/i);
   assert.doesNotMatch(app, /scrollIntoView\(\{ behavior: "smooth" \}\)/);
   assert.doesNotMatch(app, /非公式の試作サイト/);
   assert.match(app, /mapReturnSection/);

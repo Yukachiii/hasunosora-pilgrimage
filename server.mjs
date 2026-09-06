@@ -24,6 +24,12 @@ const communitySubmissionsDirectory = path.resolve(
     path.join(projectDirectory, "private", "community-submissions"),
 );
 const communitySubmissionIndexPath = path.join(communitySubmissionsDirectory, "index.json");
+const communityApiUsagePath = path.join(
+  communitySubmissionsDirectory,
+  "diagnostics",
+  "api-usage.json",
+);
+const communityApiUsageTimeZone = "Asia/Tokyo";
 const adminApplicationId = "hasunosora-pilgrimage-admin";
 const writeToken = randomBytes(32).toString("base64url");
 const maximumJsonBody = 8 * 1024 * 1024;
@@ -817,6 +823,143 @@ async function proxyRouteUsage(response) {
   }
 }
 
+const emptyCommunityUsageTotals = Object.freeze({
+  submissionAttempts: 0,
+  submissionsAccepted: 0,
+  submissionsFailed: 0,
+  turnstileRequests: 0,
+  turnstileSuccessful: 0,
+  turnstileFailed: 0,
+  turnstileRetries: 0,
+});
+
+function nonNegativeInteger(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : 0;
+}
+
+function summarizeCommunityUsageCounters(value) {
+  const counters = value && typeof value === "object" ? value : {};
+  const rejected = counters.submissionRejected && typeof counters.submissionRejected === "object"
+    ? counters.submissionRejected
+    : {};
+  return {
+    submissionAttempts: nonNegativeInteger(counters.submissionRequests),
+    submissionsAccepted: nonNegativeInteger(counters.submissionAccepted),
+    submissionsFailed:
+      nonNegativeInteger(rejected.turnstile) +
+      nonNegativeInteger(rejected.validation) +
+      nonNegativeInteger(rejected.system),
+    turnstileRequests: nonNegativeInteger(counters.turnstileApiRequests),
+    turnstileSuccessful: nonNegativeInteger(counters.turnstileVerified),
+    turnstileFailed: nonNegativeInteger(counters.turnstileFailed),
+    turnstileRetries: nonNegativeInteger(counters.turnstileRetries),
+  };
+}
+
+function addCommunityUsageTotals(left, right) {
+  return Object.fromEntries(
+    Object.keys(emptyCommunityUsageTotals).map((key) => [
+      key,
+      nonNegativeInteger(left?.[key]) + nonNegativeInteger(right?.[key]),
+    ]),
+  );
+}
+
+function communityUsageDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: communityApiUsageTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function communityUsageDailyRows(value) {
+  if (Array.isArray(value?.daily)) return value.daily;
+  if (!value?.daily || typeof value.daily !== "object") return [];
+  return Object.entries(value.daily).map(([date, counters]) => ({
+    ...(counters && typeof counters === "object" ? counters : {}),
+    date,
+  }));
+}
+
+function summarizeCommunityApiUsage(value, now = new Date()) {
+  const todayDate = communityUsageDate(now);
+  const monthPrefix = todayDate.slice(0, 7);
+  const daily = communityUsageDailyRows(value);
+  const todayRow = daily.find((row) => row?.date === todayDate);
+  const currentMonth = daily
+    .filter((row) => typeof row?.date === "string" && row.date.startsWith(monthPrefix))
+    .reduce(
+      (total, row) => addCommunityUsageTotals(total, summarizeCommunityUsageCounters(row)),
+      { ...emptyCommunityUsageTotals },
+    );
+  return {
+    trackingStartedAt:
+      typeof value?.trackingStartedAt === "string" ? value.trackingStartedAt : null,
+    today: summarizeCommunityUsageCounters(todayRow),
+    currentMonth,
+    allTime: summarizeCommunityUsageCounters(value?.allTime),
+  };
+}
+
+function summarizeRetainedCommunitySubmissions(submissions) {
+  return submissions.reduce(
+    (counts, submission) => {
+      if (submission?.status === "pending") counts.pending += 1;
+      else if (submission?.status === "rejected") counts.rejected += 1;
+      else if (submission?.status === "approved" || submission?.status === "imported") {
+        counts.accepted += 1;
+      }
+      return counts;
+    },
+    { pending: 0, accepted: 0, rejected: 0 },
+  );
+}
+
+function configuredCommunityServerPort() {
+  const port = Number(process.env.COMMUNITY_SERVER_PORT || 8790);
+  return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : 8790;
+}
+
+async function communityReceiverStatus() {
+  const checkedAt = new Date().toISOString();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1_500);
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${configuredCommunityServerPort()}/health`,
+      { cache: "no-store", signal: controller.signal },
+    );
+    const result = await response.json().catch(() => ({}));
+    if (response.ok && result?.status === "ok") return { status: "ok", checkedAt };
+    return { status: "unreachable", checkedAt, message: "投稿受付サーバーが正常応答しません。" };
+  } catch {
+    return { status: "unreachable", checkedAt, message: "投稿受付サーバーへ接続できません。" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function readCommunityUsageSummary() {
+  const [usage, submissions, receiver] = await Promise.all([
+    readJson(communityApiUsagePath, null),
+    readCommunitySubmissions(),
+    communityReceiverStatus(),
+  ]);
+  return {
+    available: true,
+    generatedAt: new Date().toISOString(),
+    timeZone: communityApiUsageTimeZone,
+    ...summarizeCommunityApiUsage(usage),
+    retained: summarizeRetainedCommunitySubmissions(submissions),
+    receiver,
+  };
+}
+
 function communityReviewNote(value) {
   if (value === undefined || value === null || value === "") return null;
   return requiredText(value, "審査メモ", 500);
@@ -1096,6 +1239,10 @@ async function requestHandler(request, response, initialSpots) {
         }
         if (pathname === "/api/admin/route-usage") {
           await proxyRouteUsage(response);
+          return;
+        }
+        if (pathname === "/api/admin/community-usage") {
+          sendJson(response, await readCommunityUsageSummary());
           return;
         }
       }

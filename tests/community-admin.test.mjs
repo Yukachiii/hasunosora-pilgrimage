@@ -109,6 +109,17 @@ function pendingSubmission({ id, kind, payload, imageBytes = null }) {
   };
 }
 
+function tokyoDateKey(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
 test("local admin imports reviewed photos and spots, and rejects without publishing", {
   timeout: 30_000,
 }, async () => {
@@ -212,14 +223,41 @@ test("local admin imports reviewed photos and spots, and rejects without publish
         },
       }),
     ]);
+    await writeJson(path.join(submissionsDirectory, "diagnostics", "api-usage.json"), {
+      schemaVersion: 1,
+      trackingStartedAt: "2026-09-06T00:00:00.000Z",
+      updatedAt: "2026-09-06T00:05:00.000Z",
+      timeZone: "Asia/Tokyo",
+      allTime: {
+        submissionRequests: 12,
+        submissionAccepted: 8,
+        submissionRejected: { turnstile: 2, validation: 1, system: 1 },
+        turnstileApiRequests: 11,
+        turnstileVerified: 8,
+        turnstileFailed: 3,
+        turnstileRetries: 1,
+      },
+      daily: [{
+        date: tokyoDateKey(),
+        submissionRequests: 3,
+        submissionAccepted: 2,
+        submissionRejected: { turnstile: 1, validation: 0, system: 0 },
+        turnstileApiRequests: 4,
+        turnstileVerified: 2,
+        turnstileFailed: 2,
+        turnstileRetries: 1,
+      }],
+    });
 
     const port = await freeLoopbackPort();
+    const unusedCommunityPort = await freeLoopbackPort();
     baseUrl = `http://127.0.0.1:${port}`;
     child = spawn(process.execPath, [path.join(testDirectory, "server.mjs"), "--port", String(port)], {
       cwd: testDirectory,
       env: {
         ...process.env,
         COMMUNITY_SUBMISSIONS_DIRECTORY: submissionsDirectory,
+        COMMUNITY_SERVER_PORT: String(unusedCommunityPort),
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -242,6 +280,37 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     writeToken = state.writeToken;
     assert.equal(typeof writeToken, "string");
     assert.equal(state.submissions.length, 4);
+
+    const usageResponse = await fetch(`${baseUrl}/api/admin/community-usage`, {
+      cache: "no-store",
+    });
+    assert.equal(usageResponse.status, 200);
+    assert.equal(usageResponse.headers.get("cache-control"), "no-store");
+    const usage = await usageResponse.json();
+    assert.equal(usage.available, true);
+    assert.equal(usage.timeZone, "Asia/Tokyo");
+    assert.equal(usage.trackingStartedAt, "2026-09-06T00:00:00.000Z");
+    assert.deepEqual(usage.today, {
+      submissionAttempts: 3,
+      submissionsAccepted: 2,
+      submissionsFailed: 1,
+      turnstileRequests: 4,
+      turnstileSuccessful: 2,
+      turnstileFailed: 2,
+      turnstileRetries: 1,
+    });
+    assert.deepEqual(usage.currentMonth, usage.today);
+    assert.deepEqual(usage.allTime, {
+      submissionAttempts: 12,
+      submissionsAccepted: 8,
+      submissionsFailed: 4,
+      turnstileRequests: 11,
+      turnstileSuccessful: 8,
+      turnstileFailed: 3,
+      turnstileRetries: 1,
+    });
+    assert.deepEqual(usage.retained, { pending: 4, accepted: 0, rejected: 0 });
+    assert.equal(usage.receiver.status, "unreachable");
 
     const headers = {
       "content-type": "application/json",

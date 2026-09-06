@@ -41,6 +41,8 @@ const turnstileVerificationMaximumAttempts = 2;
 const turnstileVerificationRetryDelayMs = 1_000;
 const turnstileDiagnosticMaximumBytes = 512 * 1024;
 const turnstileDiagnosticMaximumBackups = 3;
+const communityApiUsageDailyRetentionDays = 90;
+const communityApiUsageTimeZone = "Asia/Tokyo";
 const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const allowedTurnstileDiagnosticReasons = new Set([
   "network_error",
@@ -92,6 +94,7 @@ export class CommunityRequestError extends Error {
 
 let fileWriteQueue = Promise.resolve();
 let turnstileDiagnosticWriteQueue = Promise.resolve();
+let communityApiUsageWriteQueue = Promise.resolve();
 let activeSubmissionRequests = 0;
 
 function withFileWriteLock(task) {
@@ -315,6 +318,282 @@ export function appendTurnstileFailureDiagnostic(config, diagnostic, options = {
   const result = turnstileDiagnosticWriteQueue.then(task, task);
   turnstileDiagnosticWriteQueue = result.catch(() => undefined);
   return result;
+}
+
+const communityApiUsageDayFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: communityApiUsageTimeZone,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function normalizedUsageDate(value = new Date()) {
+  const date = typeof value === "function" ? value() : value;
+  const normalized = date instanceof Date ? date : new Date(date);
+  return Number.isFinite(normalized.getTime()) ? normalized : new Date();
+}
+
+function communityApiUsageDayKey(value = new Date()) {
+  const parts = Object.fromEntries(
+    communityApiUsageDayFormatter
+      .formatToParts(normalizedUsageDate(value))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function validCommunityUsageDayKey(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
+    ? value
+    : "";
+}
+
+function normalizedUsageCount(value) {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number) || number <= 0) return 0;
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.trunc(number));
+}
+
+function emptyCommunityUsageCounters() {
+  return {
+    submissionRequests: 0,
+    submissionAccepted: 0,
+    submissionRejected: {
+      turnstile: 0,
+      validation: 0,
+      system: 0,
+    },
+    turnstileApiRequests: 0,
+    turnstileVerified: 0,
+    turnstileFailed: 0,
+    turnstileRetries: 0,
+  };
+}
+
+function normalizedCommunityUsageCounters(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const rejected = source.submissionRejected &&
+      typeof source.submissionRejected === "object" &&
+      !Array.isArray(source.submissionRejected)
+    ? source.submissionRejected
+    : {};
+  return {
+    submissionRequests: normalizedUsageCount(source.submissionRequests),
+    submissionAccepted: normalizedUsageCount(source.submissionAccepted),
+    submissionRejected: {
+      turnstile: normalizedUsageCount(rejected.turnstile),
+      validation: normalizedUsageCount(rejected.validation),
+      system: normalizedUsageCount(rejected.system),
+    },
+    turnstileApiRequests: normalizedUsageCount(source.turnstileApiRequests),
+    turnstileVerified: normalizedUsageCount(source.turnstileVerified),
+    turnstileFailed: normalizedUsageCount(source.turnstileFailed),
+    turnstileRetries: normalizedUsageCount(source.turnstileRetries),
+  };
+}
+
+function addedUsageCount(left, right) {
+  return Math.min(
+    Number.MAX_SAFE_INTEGER,
+    normalizedUsageCount(left) + normalizedUsageCount(right),
+  );
+}
+
+function addCommunityUsageCounters(target, delta) {
+  const normalizedDelta = normalizedCommunityUsageCounters(delta);
+  target.submissionRequests = addedUsageCount(
+    target.submissionRequests,
+    normalizedDelta.submissionRequests,
+  );
+  target.submissionAccepted = addedUsageCount(
+    target.submissionAccepted,
+    normalizedDelta.submissionAccepted,
+  );
+  for (const category of ["turnstile", "validation", "system"]) {
+    target.submissionRejected[category] = addedUsageCount(
+      target.submissionRejected[category],
+      normalizedDelta.submissionRejected[category],
+    );
+  }
+  target.turnstileApiRequests = addedUsageCount(
+    target.turnstileApiRequests,
+    normalizedDelta.turnstileApiRequests,
+  );
+  target.turnstileVerified = addedUsageCount(
+    target.turnstileVerified,
+    normalizedDelta.turnstileVerified,
+  );
+  target.turnstileFailed = addedUsageCount(
+    target.turnstileFailed,
+    normalizedDelta.turnstileFailed,
+  );
+  target.turnstileRetries = addedUsageCount(
+    target.turnstileRetries,
+    normalizedDelta.turnstileRetries,
+  );
+  return target;
+}
+
+function normalizedUsageTimestamp(value) {
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function trimCommunityUsageDays(days, anchorDay) {
+  const normalizedAnchor = validCommunityUsageDayKey(anchorDay);
+  if (!normalizedAnchor) return days.slice(-communityApiUsageDailyRetentionDays);
+  const anchorTime = Date.parse(`${normalizedAnchor}T00:00:00.000Z`);
+  const firstDayTime = anchorTime -
+    (communityApiUsageDailyRetentionDays - 1) * 86_400_000;
+  return days.filter((day) => {
+    const dayTime = Date.parse(`${day.date}T00:00:00.000Z`);
+    return dayTime >= firstDayTime && dayTime <= anchorTime;
+  });
+}
+
+function normalizedCommunityApiUsage(value) {
+  if (value === null || value === undefined) {
+    return {
+      schemaVersion: 1,
+      trackingStartedAt: null,
+      updatedAt: null,
+      timeZone: communityApiUsageTimeZone,
+      allTime: emptyCommunityUsageCounters(),
+      daily: [],
+    };
+  }
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    value.schemaVersion !== 1
+  ) {
+    throw new Error("Community API usage data is invalid.");
+  }
+
+  const daysByDate = new Map();
+  if (Array.isArray(value.daily)) {
+    for (const candidate of value.daily) {
+      const date = validCommunityUsageDayKey(candidate?.date);
+      if (!date) continue;
+      const counters = daysByDate.get(date) ?? emptyCommunityUsageCounters();
+      addCommunityUsageCounters(counters, candidate);
+      daysByDate.set(date, counters);
+    }
+  }
+  const daily = [...daysByDate]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, counters]) => ({ date, ...counters }));
+  const latestDay = daily.at(-1)?.date ?? "";
+
+  return {
+    schemaVersion: 1,
+    trackingStartedAt: normalizedUsageTimestamp(value.trackingStartedAt),
+    updatedAt: normalizedUsageTimestamp(value.updatedAt),
+    timeZone: communityApiUsageTimeZone,
+    allTime: normalizedCommunityUsageCounters(value.allTime),
+    daily: trimCommunityUsageDays(daily, latestDay),
+  };
+}
+
+export function communityApiUsagePath(config) {
+  return path.join(
+    path.resolve(config.submissionsDirectory),
+    "diagnostics",
+    "api-usage.json",
+  );
+}
+
+export async function readCommunityApiUsage(config) {
+  try {
+    const contents = await readFile(communityApiUsagePath(config), "utf8");
+    return normalizedCommunityApiUsage(JSON.parse(contents));
+  } catch (error) {
+    if (error?.code === "ENOENT") return normalizedCommunityApiUsage(null);
+    throw error;
+  }
+}
+
+export function recordCommunityApiUsage(config, delta, options = {}) {
+  const now = normalizedUsageDate(options.now ?? new Date());
+  const occurredAt = now.toISOString();
+  const dayKey = communityApiUsageDayKey(now);
+  const normalizedDelta = normalizedCommunityUsageCounters(delta);
+  const usagePath = communityApiUsagePath(config);
+  const task = async () => {
+    await mkdir(path.dirname(usagePath), { recursive: true, mode: 0o700 });
+    const usage = await readCommunityApiUsage(config);
+    if (!usage.trackingStartedAt) usage.trackingStartedAt = occurredAt;
+    usage.updatedAt = occurredAt;
+    addCommunityUsageCounters(usage.allTime, normalizedDelta);
+    let day = usage.daily.find((candidate) => candidate.date === dayKey);
+    if (!day) {
+      day = { date: dayKey, ...emptyCommunityUsageCounters() };
+      usage.daily.push(day);
+    }
+    addCommunityUsageCounters(day, normalizedDelta);
+    usage.daily.sort((left, right) => left.date.localeCompare(right.date));
+    const latestDay = usage.daily.at(-1)?.date ?? dayKey;
+    usage.daily = trimCommunityUsageDays(usage.daily, latestDay);
+    await atomicWrite(usagePath, `${JSON.stringify(usage, null, 2)}\n`);
+    return usage;
+  };
+  const result = communityApiUsageWriteQueue.then(task, task);
+  communityApiUsageWriteQueue = result.catch(() => undefined);
+  return result;
+}
+
+function dashboardUsageTotals(counters) {
+  const normalized = normalizedCommunityUsageCounters(counters);
+  return {
+    submissionAttempts: normalized.submissionRequests,
+    submissionsAccepted: normalized.submissionAccepted,
+    submissionsFailed:
+      normalized.submissionRejected.turnstile +
+      normalized.submissionRejected.validation +
+      normalized.submissionRejected.system,
+    turnstileRequests: normalized.turnstileApiRequests,
+    turnstileSuccessful: normalized.turnstileVerified,
+    turnstileFailed: normalized.turnstileFailed,
+    turnstileRetries: normalized.turnstileRetries,
+  };
+}
+
+export function summarizeCommunityApiUsage(value, now = new Date()) {
+  const normalizedNow = normalizedUsageDate(now);
+  const usage = normalizedCommunityApiUsage(value);
+  const todayKey = communityApiUsageDayKey(normalizedNow);
+  const monthKey = todayKey.slice(0, 7);
+  const today = usage.daily.find((day) => day.date === todayKey) ??
+    emptyCommunityUsageCounters();
+  const currentMonth = usage.daily
+    .filter((day) => day.date.startsWith(monthKey))
+    .reduce(
+      (totals, day) => addCommunityUsageCounters(totals, day),
+      emptyCommunityUsageCounters(),
+    );
+  return {
+    available: true,
+    generatedAt: normalizedNow.toISOString(),
+    timeZone: communityApiUsageTimeZone,
+    trackingStartedAt: usage.trackingStartedAt,
+    today: dashboardUsageTotals(today),
+    currentMonth: dashboardUsageTotals(currentMonth),
+    allTime: dashboardUsageTotals(usage.allTime),
+  };
+}
+
+async function tryRecordCommunityApiUsage(recordUsage, delta) {
+  if (typeof recordUsage !== "function") return;
+  try {
+    await recordUsage(delta);
+  } catch {
+    console.error("Community API usage log write failed");
+  }
 }
 
 async function tryRecordTurnstileFailure(recordFailure, diagnostic) {
@@ -638,6 +917,7 @@ async function verifyTurnstile(
   config,
   fetchImplementation,
   recordFailure,
+  recordUsage,
 ) {
   if (!config.turnstileSecret) {
     throw new CommunityRequestError(
@@ -672,6 +952,10 @@ async function verifyTurnstile(
   );
   const startedAt = Date.now();
   for (let attempt = 1; attempt <= turnstileVerificationMaximumAttempts; attempt += 1) {
+    await tryRecordCommunityApiUsage(recordUsage, {
+      turnstileApiRequests: 1,
+      turnstileRetries: attempt > 1 ? 1 : 0,
+    });
     let response;
     try {
       response = await fetchImplementation(
@@ -694,6 +978,7 @@ async function verifyTurnstile(
         attemptCount: attempt,
         networkErrorCode: turnstileNetworkErrorCode(error),
       });
+      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
       throw new CommunityRequestError(
         503,
         "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
@@ -717,6 +1002,7 @@ async function verifyTurnstile(
         attemptCount: attempt,
         serviceErrorCodes: failureResult?.["error-codes"],
       });
+      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
       throw new CommunityRequestError(
         503,
         "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
@@ -738,6 +1024,7 @@ async function verifyTurnstile(
         durationMs: Date.now() - startedAt,
         attemptCount: attempt,
       });
+      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
       throw new CommunityRequestError(
         503,
         "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
@@ -760,6 +1047,7 @@ async function verifyTurnstile(
         durationMs: Date.now() - startedAt,
         attemptCount: attempt,
       });
+      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
       throw new CommunityRequestError(
         503,
         "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
@@ -772,7 +1060,10 @@ async function verifyTurnstile(
     const successCheck = result.success === true;
     const actionCheck = result.action === "community_submission";
     const hostnameCheck = allowedHostnames.has(verifiedHostname);
-    if (successCheck && actionCheck && hostnameCheck) return;
+    if (successCheck && actionCheck && hostnameCheck) {
+      await tryRecordCommunityApiUsage(recordUsage, { turnstileVerified: 1 });
+      return;
+    }
 
     const serviceErrorCodes = Array.isArray(result["error-codes"])
       ? result["error-codes"]
@@ -792,6 +1083,7 @@ async function verifyTurnstile(
       actionCheck,
       hostnameCheck,
     });
+    await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
     throw new CommunityRequestError(
       isInternalServiceError ? 503 : 400,
       isInternalServiceError
@@ -801,6 +1093,7 @@ async function verifyTurnstile(
     );
   }
 
+  await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
   throw new CommunityRequestError(
     503,
     "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
@@ -1121,6 +1414,7 @@ export async function acceptCommunitySubmission(form, context) {
       context.config,
       context.fetchImplementation,
       context.recordTurnstileFailure,
+      context.recordApiUsage,
     );
   }
 
@@ -1162,6 +1456,34 @@ export async function acceptCommunitySubmission(form, context) {
   return { id, kind, status: "pending", createdAt };
 }
 
+const turnstileSubmissionErrorCodes = new Set([
+  "TURNSTILE_FAILED",
+  "TURNSTILE_NOT_CONFIGURED",
+  "TURNSTILE_REQUIRED",
+  "TURNSTILE_UNAVAILABLE",
+]);
+
+function submissionRejectionCategory(error) {
+  if (
+    error instanceof CommunityRequestError &&
+    turnstileSubmissionErrorCodes.has(error.code)
+  ) {
+    return "turnstile";
+  }
+  if (error instanceof CommunityRequestError && error.status < 500) return "validation";
+  return "system";
+}
+
+function submissionRejectionUsage(category) {
+  return {
+    submissionRejected: {
+      turnstile: category === "turnstile" ? 1 : 0,
+      validation: category === "validation" ? 1 : 0,
+      system: category === "system" ? 1 : 0,
+    },
+  };
+}
+
 export async function handleCommunityRequest(
   request,
   response,
@@ -1201,7 +1523,16 @@ export async function handleCommunityRequest(
     return;
   }
 
+  const requestNow = options.now?.() ?? new Date();
+  const recordApiUsage = options.recordApiUsage ??
+    ((delta) => recordCommunityApiUsage(config, delta, { now: requestNow }));
+  await tryRecordCommunityApiUsage(recordApiUsage, { submissionRequests: 1 });
+
   if (activeSubmissionRequests >= maximumConcurrentSubmissions) {
+    await tryRecordCommunityApiUsage(
+      recordApiUsage,
+      submissionRejectionUsage("system"),
+    );
     sendJson(
       response,
       503,
@@ -1218,16 +1549,22 @@ export async function handleCommunityRequest(
       config,
       origin,
       ipAddress: clientAddress(request),
-      now: options.now?.() ?? new Date(),
+      now: requestNow,
       fetchImplementation: options.fetchImplementation ?? fetch,
       imageProcessor: options.imageProcessor ?? reencodeCommunityImage,
       recordTurnstileFailure: options.recordTurnstileFailure ??
         ((diagnostic) => appendTurnstileFailureDiagnostic(config, diagnostic)),
+      recordApiUsage,
     });
+    await tryRecordCommunityApiUsage(recordApiUsage, { submissionAccepted: 1 });
     sendJson(response, 201, { submission }, origin);
   } catch (error) {
     const knownError = error instanceof CommunityRequestError;
     const status = knownError ? error.status : 500;
+    await tryRecordCommunityApiUsage(
+      recordApiUsage,
+      submissionRejectionUsage(submissionRejectionCategory(error)),
+    );
     if (!knownError) {
       console.error("Community submission request failed", {
         error: error instanceof Error ? error.name : "UnknownError",

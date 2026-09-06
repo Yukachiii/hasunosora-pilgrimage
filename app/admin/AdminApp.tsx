@@ -23,7 +23,12 @@ import {
   CommunitySubmissionReview,
   type AdminCommunitySubmission,
 } from "./CommunitySubmissionReview";
-import type { RouteUsageResponse } from "./route-usage-types";
+import type {
+  CommunityReceiverStatus,
+  CommunityUsageResponse,
+  CommunityUsageTotals,
+  RouteUsageResponse,
+} from "./route-usage-types";
 
 export type AdminAsset = {
   id: string;
@@ -288,7 +293,7 @@ export function AdminApp({
   localMode = false,
   localToken = "",
   localNetworkUrl = "",
-  initialSiteVersion = "4.1.0",
+  initialSiteVersion = "4.2.0",
 }: Props) {
   const [tab, setTab] = useState<"photos" | "spots" | "submissions" | "cards" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
@@ -711,28 +716,39 @@ function CardModelDashboard({ cards }: { cards: CardModelLocation[] }) {
 }
 
 function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
-  const [usage, setUsage] = useState<RouteUsageResponse | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [routeUsage, setRouteUsage] = useState<RouteUsageResponse | null>(null);
+  const [communityUsage, setCommunityUsage] = useState<CommunityUsageResponse | null>(null);
+  const [routeError, setRouteError] = useState("");
+  const [communityError, setCommunityError] = useState("");
+  const [routeLoading, setRouteLoading] = useState(true);
+  const [communityLoading, setCommunityLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   function refreshUsage() {
-    setLoading(true);
-    setError("");
+    setRouteLoading(true);
+    setCommunityLoading(true);
+    setRouteError("");
+    setCommunityError("");
     setRefreshKey((value) => value + 1);
   }
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/admin/route-usage", { cache: "no-store" })
-      .then(async (response) => {
-        const result = (await response.json()) as RouteUsageResponse & { error?: string };
+
+    async function loadUsage<T>(
+      url: string,
+      setUsage: (usage: T) => void,
+      setError: (message: string) => void,
+      setLoading: (loading: boolean) => void,
+    ) {
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        const result = (await response.json()) as T & { error?: string };
         if (!response.ok) {
           throw new Error(result.error ?? "API使用状況を読み込めませんでした。");
         }
         if (!cancelled) setUsage(result);
-      })
-      .catch((reason) => {
+      } catch (reason) {
         if (!cancelled) {
           setError(
             reason instanceof Error
@@ -740,16 +756,31 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
               : "API使用状況を読み込めませんでした。",
           );
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    }
+
+    void loadUsage<RouteUsageResponse>(
+      "/api/admin/route-usage",
+      setRouteUsage,
+      setRouteError,
+      setRouteLoading,
+    );
+    void loadUsage<CommunityUsageResponse>(
+      "/api/admin/community-usage",
+      setCommunityUsage,
+      setCommunityError,
+      setCommunityLoading,
+    );
+
     return () => {
       cancelled = true;
     };
   }, [refreshKey]);
 
-  if (loading && !usage) {
+  const loading = routeLoading || communityLoading;
+  if (loading && !routeUsage && !communityUsage) {
     return (
       <section className="admin-usage admin-panel">
         <p className="admin-loading">API使用状況を集計しています…</p>
@@ -757,53 +788,12 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
     );
   }
 
-  if (error) {
-    return (
-      <section className="admin-usage admin-panel">
-        <div className="admin-panel__heading">
-          <div><span>ROUTES API</span><h2>使用状況を読み込めませんでした</h2></div>
-          <button type="button" className="usage-refresh" onClick={refreshUsage}>再読み込み</button>
-        </div>
-        <p className="admin-message" role="alert">{error}</p>
-      </section>
-    );
-  }
-
-  if (!usage?.available) {
-    return (
-      <section className="admin-usage admin-panel">
-        <div className="admin-panel__heading">
-          <div><span>ROUTES API</span><h2>使用状況の接続設定</h2></div>
-        </div>
-        <p className="usage-unavailable">{usage?.message}</p>
-        {localMode && (
-          <p className="usage-note">
-            ローカル管理画面は公開サーバーのデータベースを直接読めないため、共有トークンを使って集計APIだけを取得します。トークンはブラウザやGitHub Pagesへ配信されません。
-          </p>
-        )}
-      </section>
-    );
-  }
-
-  const maximumDailyRequests = Math.max(
-    1,
-    ...usage.daily.map((day) => day.apiRequests),
-  );
-  const generatedAt = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: usage.timeZone,
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(usage.generatedAt));
-
   return (
     <section className="admin-usage">
-      <div className="admin-panel usage-overview">
+      <div className="admin-panel usage-dashboard-heading">
         <div className="admin-panel__heading usage-heading">
-          <div><span>ROUTES API</span><h2>サーバーから送ったリクエスト</h2></div>
+          <div><span>API &amp; RECEIVER</span><h2>外部サービスと投稿受付の状況</h2></div>
           <div className="usage-heading__actions">
-            <small>{generatedAt} 更新</small>
             <button
               type="button"
               className="usage-refresh"
@@ -814,6 +804,244 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
             </button>
           </div>
         </div>
+        <p className="usage-note">サービスごとに計測方法が異なります。請求額の確認には、各サービスの公式画面をご利用ください。</p>
+      </div>
+
+      <CommunityUsagePanel
+        usage={communityUsage}
+        error={communityError}
+        loading={communityLoading}
+      />
+
+      <MapboxUsagePanel />
+
+      <RouteUsagePanel
+        usage={routeUsage}
+        error={routeError}
+        loading={routeLoading}
+        localMode={localMode}
+      />
+    </section>
+  );
+}
+
+function formattedUsageTime(value: string, timeZone = "Asia/Tokyo") {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "時刻不明";
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function receiverStatusLabel(status: CommunityReceiverStatus["status"]) {
+  if (status === "ok") return "稼働中";
+  if (status === "unreachable") return "応答なし";
+  return "確認できません";
+}
+
+function CommunityUsagePanel({
+  usage,
+  error,
+  loading,
+}: {
+  usage: CommunityUsageResponse | null;
+  error: string;
+  loading: boolean;
+}) {
+  if (loading && !usage) {
+    return (
+      <div className="admin-panel usage-service-panel">
+        <p className="admin-loading">投稿受付の使用状況を集計しています…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-panel usage-service-panel">
+        <div className="admin-panel__heading">
+          <div><span>COMMUNITY &amp; TURNSTILE</span><h2>投稿受付の状況を読み込めませんでした</h2></div>
+        </div>
+        <p className="admin-message" role="alert">{error}</p>
+      </div>
+    );
+  }
+
+  if (!usage?.available) {
+    return (
+      <div className="admin-panel usage-service-panel">
+        <div className="admin-panel__heading">
+          <div><span>COMMUNITY &amp; TURNSTILE</span><h2>投稿受付の使用状況</h2></div>
+        </div>
+        {usage?.receiver ? <ReceiverStatus status={usage.receiver} /> : null}
+        <p className="usage-unavailable">{usage?.message ?? "集計データはまだありません。"}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-panel usage-service-panel">
+      <div className="admin-panel__heading usage-heading">
+        <div><span>COMMUNITY &amp; TURNSTILE</span><h2>投稿受付と認証</h2></div>
+        <small>{formattedUsageTime(usage.generatedAt, usage.timeZone)} 更新</small>
+      </div>
+      <ReceiverStatus status={usage.receiver} />
+      <p className="usage-note">
+        投稿受付サーバーが記録した件数です。Turnstileの「実呼出」は、再試行を含めCloudflareへ送ったリクエスト数です。
+      </p>
+
+      <div className="usage-periods usage-periods--three">
+        <CommunityUsagePeriod title="今日" totals={usage.today} />
+        <CommunityUsagePeriod title="今月" totals={usage.currentMonth} />
+        <CommunityUsagePeriod title="計測開始から" totals={usage.allTime} />
+      </div>
+
+      <div className="usage-community-footer">
+        <section className="usage-retained" aria-labelledby="retained-submissions-title">
+          <div>
+            <span>RETAINED SUBMISSIONS</span>
+            <h3 id="retained-submissions-title">現在保持している投稿</h3>
+          </div>
+          <dl>
+            <div><dt>受付待ち <small>pending</small></dt><dd>{usage.retained.pending.toLocaleString("ja-JP")}</dd></div>
+            <div><dt>掲載へ取り込み済み <small>accepted</small></dt><dd>{usage.retained.accepted.toLocaleString("ja-JP")}</dd></div>
+            <div><dt>見送り <small>rejected</small></dt><dd>{usage.retained.rejected.toLocaleString("ja-JP")}</dd></div>
+          </dl>
+        </section>
+        <p className="usage-tracking-start">
+          <span>計測開始</span>
+          <strong>{usage.trackingStartedAt ? formattedUsageTime(usage.trackingStartedAt, usage.timeZone) : "まだ記録がありません"}</strong>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ReceiverStatus({ status }: { status: CommunityReceiverStatus }) {
+  return (
+    <div className={`usage-receiver-status usage-receiver-status--${status.status}`} role="status">
+      <i aria-hidden="true" />
+      <div>
+        <strong>投稿受付サーバー：{receiverStatusLabel(status.status)}</strong>
+        <small>{formattedUsageTime(status.checkedAt)} 確認{status.message ? ` · ${status.message}` : ""}</small>
+      </div>
+    </div>
+  );
+}
+
+function CommunityUsagePeriod({
+  title,
+  totals,
+}: {
+  title: string;
+  totals: CommunityUsageTotals;
+}) {
+  return (
+    <article className="usage-period usage-period--community">
+      <span>{title}</span>
+      <strong>{totals.submissionsAccepted.toLocaleString("ja-JP")}</strong>
+      <small>件を受付</small>
+      <dl>
+        <div><dt>受付試行</dt><dd>{totals.submissionAttempts.toLocaleString("ja-JP")}回</dd></div>
+        <div><dt>受付失敗</dt><dd className={totals.submissionsFailed ? "has-error" : ""}>{totals.submissionsFailed.toLocaleString("ja-JP")}回</dd></div>
+        <div><dt>Turnstile実呼出</dt><dd>{totals.turnstileRequests.toLocaleString("ja-JP")}回</dd></div>
+        <div><dt>認証成功</dt><dd>{totals.turnstileSuccessful.toLocaleString("ja-JP")}回</dd></div>
+        <div><dt>認証失敗</dt><dd className={totals.turnstileFailed ? "has-error" : ""}>{totals.turnstileFailed.toLocaleString("ja-JP")}回</dd></div>
+        <div><dt>再試行</dt><dd>{totals.turnstileRetries.toLocaleString("ja-JP")}回</dd></div>
+      </dl>
+    </article>
+  );
+}
+
+function MapboxUsagePanel() {
+  return (
+    <div className="admin-panel usage-service-panel usage-service-panel--mapbox">
+      <div className="admin-panel__heading">
+        <div><span>MAPBOX</span><h2>地図と経路検索</h2></div>
+        <a
+          className="usage-external-link"
+          href="https://console.mapbox.com/account/statistics/"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Mapbox公式Statisticsを新しいタブで開く"
+        >
+          公式Statisticsを開く <span aria-hidden="true">↗</span>
+        </a>
+      </div>
+      <p className="usage-note">
+        Mapboxは公開ページのブラウザから直接利用しています。このサーバーでは正確な使用数を把握できないため、請求対象の使用量はMapbox公式Statisticsで確認してください。
+      </p>
+    </div>
+  );
+}
+
+function RouteUsagePanel({
+  usage,
+  error,
+  loading,
+  localMode,
+}: {
+  usage: RouteUsageResponse | null;
+  error: string;
+  loading: boolean;
+  localMode: boolean;
+}) {
+  if (loading && !usage) {
+    return (
+      <div className="admin-panel usage-service-panel">
+        <p className="admin-loading">Google Routes APIの使用状況を集計しています…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-panel usage-service-panel">
+        <div className="admin-panel__heading">
+          <div><span>GOOGLE ROUTES API</span><h2>使用状況を読み込めませんでした</h2></div>
+        </div>
+        <p className="usage-note usage-note--context">公開中のGitHub Pages版ではGoogle Routes APIを使用していません。この欄はサーバー版ルート検索用です。</p>
+        <p className="admin-message" role="alert">{error}</p>
+      </div>
+    );
+  }
+
+  if (!usage?.available) {
+    return (
+      <div className="admin-panel usage-service-panel">
+        <div className="admin-panel__heading">
+          <div><span>GOOGLE ROUTES API</span><h2>使用状況の接続設定</h2></div>
+        </div>
+        <p className="usage-note usage-note--context">公開中のGitHub Pages版ではGoogle Routes APIを使用していません。この欄はサーバー版ルート検索用です。</p>
+        <p className="usage-unavailable">{usage?.message}</p>
+        {localMode && (
+          <p className="usage-note">
+            ローカル管理画面は公開サーバーのデータベースを直接読めないため、共有トークンを使って集計APIだけを取得します。トークンはブラウザやGitHub Pagesへ配信されません。
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const maximumDailyRequests = Math.max(
+    1,
+    ...usage.daily.map((day) => day.apiRequests),
+  );
+  const generatedAt = formattedUsageTime(usage.generatedAt, usage.timeZone);
+
+  return (
+    <div className="usage-route-section">
+      <div className="admin-panel usage-overview">
+        <div className="admin-panel__heading usage-heading">
+          <div><span>GOOGLE ROUTES API</span><h2>サーバー版のルート検索</h2></div>
+          <small>{generatedAt} 更新</small>
+        </div>
+        <p className="usage-note usage-note--context">公開中のGitHub Pages版ではGoogle Routes APIを使用していません。以下はサーバー版ルート検索を利用した場合だけ増えます。</p>
         <p className="usage-note">
           このサイトのサーバーがGoogle Routes APIへ実際に送った回数です。Google Cloud側の請求確定値やクォータ表示とは、集計時刻などにより差が出る場合があります。
         </p>
@@ -865,7 +1093,7 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
           )}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 

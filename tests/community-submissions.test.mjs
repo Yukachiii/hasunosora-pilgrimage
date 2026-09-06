@@ -12,11 +12,15 @@ import {
   acceptCommunitySubmission,
   appendTurnstileFailureDiagnostic,
   clientAddress,
+  communityApiUsagePath,
   createCommunitySubmissionServer,
   makeDailyRateKey,
   pruneReviewedCommunitySubmissions,
+  readCommunityApiUsage,
+  recordCommunityApiUsage,
   reencodeCommunityImage,
   sanitizeTurnstileDiagnostic,
+  summarizeCommunityApiUsage,
   turnstileDiagnosticLogPath,
   validateCommunityServerConfig,
   validateUploadedImage,
@@ -943,6 +947,260 @@ test("Turnstile diagnostic write failure does not replace the verification resul
       (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
     );
   } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("community API usage serializes anonymous counters and uses Tokyo calendar days", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-api-usage-"));
+  const config = { submissionsDirectory: temporaryDirectory };
+  try {
+    await Promise.all([
+      recordCommunityApiUsage(
+        config,
+        {
+          submissionRequests: 1,
+          submissionAccepted: 1,
+          turnstileApiRequests: 1,
+          turnstileVerified: 1,
+          token: "TOKEN_SENTINEL",
+        },
+        { now: new Date("2026-09-05T14:59:59.000Z") },
+      ),
+      recordCommunityApiUsage(
+        config,
+        {
+          submissionRequests: 1,
+          submissionRejected: { validation: 1 },
+        },
+        { now: new Date("2026-09-05T15:00:01.000Z") },
+      ),
+      recordCommunityApiUsage(
+        config,
+        {
+          submissionRequests: 1,
+          submissionRejected: { turnstile: 1 },
+          turnstileApiRequests: 2,
+          turnstileFailed: 1,
+          turnstileRetries: 1,
+        },
+        { now: new Date("2026-09-05T15:00:02.000Z") },
+      ),
+    ]);
+
+    const usage = await readCommunityApiUsage(config);
+    assert.equal(usage.schemaVersion, 1);
+    assert.equal(usage.timeZone, "Asia/Tokyo");
+    assert.equal(usage.trackingStartedAt, "2026-09-05T14:59:59.000Z");
+    assert.equal(usage.updatedAt, "2026-09-05T15:00:02.000Z");
+    assert.deepEqual(usage.allTime, {
+      submissionRequests: 3,
+      submissionAccepted: 1,
+      submissionRejected: { turnstile: 1, validation: 1, system: 0 },
+      turnstileApiRequests: 3,
+      turnstileVerified: 1,
+      turnstileFailed: 1,
+      turnstileRetries: 1,
+    });
+    assert.deepEqual(usage.daily.map((day) => day.date), [
+      "2026-09-05",
+      "2026-09-06",
+    ]);
+    assert.equal(usage.daily[0].submissionAccepted, 1);
+    assert.deepEqual(
+      usage.daily[1].submissionRejected,
+      { turnstile: 1, validation: 1, system: 0 },
+    );
+    const serialized = await readFile(communityApiUsagePath(config), "utf8");
+    assert.equal(serialized.includes("TOKEN_SENTINEL"), false);
+
+    assert.deepEqual(
+      summarizeCommunityApiUsage(usage, new Date("2026-09-05T16:00:00.000Z")),
+      {
+        available: true,
+        generatedAt: "2026-09-05T16:00:00.000Z",
+        timeZone: "Asia/Tokyo",
+        trackingStartedAt: "2026-09-05T14:59:59.000Z",
+        today: {
+          submissionAttempts: 2,
+          submissionsAccepted: 0,
+          submissionsFailed: 2,
+          turnstileRequests: 2,
+          turnstileSuccessful: 0,
+          turnstileFailed: 1,
+          turnstileRetries: 1,
+        },
+        currentMonth: {
+          submissionAttempts: 3,
+          submissionsAccepted: 1,
+          submissionsFailed: 2,
+          turnstileRequests: 3,
+          turnstileSuccessful: 1,
+          turnstileFailed: 1,
+          turnstileRetries: 1,
+        },
+        allTime: {
+          submissionAttempts: 3,
+          submissionsAccepted: 1,
+          submissionsFailed: 2,
+          turnstileRequests: 3,
+          turnstileSuccessful: 1,
+          turnstileFailed: 1,
+          turnstileRetries: 1,
+        },
+      },
+    );
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("community API usage keeps cumulative totals and only the latest 90 calendar days", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-api-retention-"));
+  const config = { submissionsDirectory: temporaryDirectory };
+  try {
+    for (let index = 0; index < 91; index += 1) {
+      await recordCommunityApiUsage(
+        config,
+        { submissionRequests: 1 },
+        { now: new Date(Date.UTC(2026, 0, index + 1, 12)) },
+      );
+    }
+    const usage = await readCommunityApiUsage(config);
+    assert.equal(usage.allTime.submissionRequests, 91);
+    assert.equal(usage.daily.length, 90);
+    assert.equal(usage.daily[0].date, "2026-01-02");
+    assert.equal(usage.daily.at(-1).date, "2026-04-01");
+    assert.equal(usage.trackingStartedAt, "2026-01-01T12:00:00.000Z");
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("submission HTTP usage records accepted, validation, and Turnstile activity", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-http-usage-"));
+  const allowedOrigin = "https://guide.example.test";
+  const config = {
+    allowedOrigins: new Set([allowedOrigin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "turnstile-secret",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  const server = createCommunitySubmissionServer({
+    config,
+    now: () => new Date("2026-09-04T12:00:00.000Z"),
+    fetchImplementation: async () => new Response(JSON.stringify({
+      success: true,
+      action: "community_submission",
+      hostname: "guide.example.test",
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+    imageProcessor: async () => Buffer.from("unused"),
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.equal(typeof address, "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const accepted = await fetch(`${baseUrl}/api/submissions`, {
+      method: "POST",
+      headers: { origin: allowedOrigin },
+      body: submissionForm({
+        kind: "spot",
+        payload: {
+          name: "候補地",
+          address: "石川県金沢市",
+          sourceUrl: "https://example.com/source",
+        },
+        creditName: null,
+        turnstileToken: "verified-token",
+      }),
+    });
+    assert.equal(accepted.status, 201);
+
+    const invalid = await fetch(`${baseUrl}/api/submissions`, {
+      method: "POST",
+      headers: { origin: allowedOrigin },
+      body: new FormData(),
+    });
+    assert.equal(invalid.status, 400);
+
+    const usage = await readCommunityApiUsage(config);
+    assert.equal(usage.allTime.submissionRequests, 2);
+    assert.equal(usage.allTime.submissionAccepted, 1);
+    assert.deepEqual(
+      usage.allTime.submissionRejected,
+      { turnstile: 0, validation: 1, system: 0 },
+    );
+    assert.equal(usage.allTime.turnstileApiRequests, 1);
+    assert.equal(usage.allTime.turnstileVerified, 1);
+    assert.equal(usage.allTime.turnstileFailed, 0);
+    assert.equal(usage.allTime.turnstileRetries, 0);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test("API usage write failures never replace a successful submission response", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-http-usage-fail-"));
+  const allowedOrigin = "https://guide.example.test";
+  const originalConsoleError = console.error;
+  const errors = [];
+  console.error = (...values) => errors.push(values.join(" "));
+  const server = createCommunitySubmissionServer({
+    config: {
+      allowedOrigins: new Set([allowedOrigin]),
+      submissionsDirectory: temporaryDirectory,
+      turnstileSecret: "turnstile-secret",
+      rateLimitSecret: "test-rate-secret",
+      consentVersion: "2026-09-04",
+      allowLocalTurnstileBypass: false,
+    },
+    now: () => new Date("2026-09-04T12:00:00.000Z"),
+    fetchImplementation: async () => new Response(JSON.stringify({
+      success: true,
+      action: "community_submission",
+      hostname: "guide.example.test",
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+    imageProcessor: async () => Buffer.from("unused"),
+    recordApiUsage: async () => {
+      throw new Error("METRICS_WRITE_SENTINEL");
+    },
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.equal(typeof address, "object");
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/submissions`, {
+      method: "POST",
+      headers: { origin: allowedOrigin },
+      body: submissionForm({
+        kind: "spot",
+        payload: {
+          name: "候補地",
+          address: "石川県金沢市",
+          sourceUrl: "https://example.com/source",
+        },
+        creditName: null,
+        turnstileToken: "verified-token",
+      }),
+    });
+    assert.equal(response.status, 201);
+    assert.ok(errors.some((message) => message.includes("Community API usage log write failed")));
+    assert.equal(errors.some((message) => message.includes("METRICS_WRITE_SENTINEL")), false);
+  } finally {
+    console.error = originalConsoleError;
+    await new Promise((resolve) => server.close(resolve));
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
 });

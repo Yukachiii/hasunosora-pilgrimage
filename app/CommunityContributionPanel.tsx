@@ -1,5 +1,6 @@
 "use client";
 
+import { gps as readGps } from "exifr/dist/mini.esm.mjs";
 import {
   useEffect,
   useId,
@@ -11,9 +12,13 @@ import type { PilgrimageSpot } from "./spots";
 
 const CONSENT_VERSION = "2026-09-04";
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const AUTOMATIC_SPOT_DISTANCE_LIMIT_M = 500;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 type ContributionKind = "photo" | "spot";
+type PhotoLocationState =
+  | { state: "idle" | "loading" | "none" }
+  | { state: "found" | "far"; spotId: string; spotName: string; distanceM: number };
 type SubmissionResponse = {
   submission?: {
     id: string;
@@ -73,6 +78,37 @@ function textValue(formData: FormData, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function distanceInMeters(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+) {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadius = 6_371_000;
+  const latDelta = radians(b.lat - a.lat);
+  const lngDelta = radians(b.lng - a.lng);
+  const aLat = radians(a.lat);
+  const bLat = radians(b.lat);
+  const value =
+    Math.sin(latDelta / 2) ** 2 +
+    Math.cos(aLat) * Math.cos(bLat) * Math.sin(lngDelta / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function nearestSpot(lat: number, lng: number, spots: PilgrimageSpot[]) {
+  return spots
+    .map((spot) => ({
+      spot,
+      distanceM: distanceInMeters({ lat, lng }, spot),
+    }))
+    .sort((left, right) => left.distanceM - right.distanceM)[0];
+}
+
+function formatDistance(distanceM: number) {
+  return distanceM < 1_000
+    ? `約${Math.max(10, Math.round(distanceM / 10) * 10)}m`
+    : `約${(distanceM / 1_000).toFixed(1)}km`;
+}
+
 export function CommunityContributionPanel({
   spots,
   apiBaseUrl = "",
@@ -82,10 +118,14 @@ export function CommunityContributionPanel({
 }: Props) {
   const panelId = useId();
   const formRef = useRef<HTMLFormElement>(null);
+  const imageSelectionSequenceRef = useRef(0);
+  const photoSpotManuallySelectedRef = useRef(false);
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
   const [kind, setKind] = useState<ContributionKind>("photo");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [photoSpotId, setPhotoSpotId] = useState("");
+  const [photoLocation, setPhotoLocation] = useState<PhotoLocationState>({ state: "idle" });
   const [startedAt, setStartedAt] = useState(() => Date.now());
   const [turnstileToken, setTurnstileToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -143,6 +183,10 @@ export function CommunityContributionPanel({
     setKind(nextKind);
     setStartedAt(Date.now());
     setSelectedFile(null);
+    setPhotoSpotId("");
+    setPhotoLocation({ state: "idle" });
+    photoSpotManuallySelectedRef.current = false;
+    imageSelectionSequenceRef.current += 1;
     setMessage("");
     setError("");
     formRef.current?.reset();
@@ -150,6 +194,51 @@ export function CommunityContributionPanel({
       window.turnstile?.reset(turnstileWidgetIdRef.current);
     }
     setTurnstileToken("");
+  }
+
+  async function selectImage(file: File | null, detectSpot: boolean) {
+    const sequence = imageSelectionSequenceRef.current + 1;
+    imageSelectionSequenceRef.current = sequence;
+    setSelectedFile(file);
+    if (!file || !detectSpot) {
+      setPhotoLocation({ state: "idle" });
+      return;
+    }
+
+    setPhotoLocation({ state: "loading" });
+    try {
+      const gps = await readGps(file);
+      if (imageSelectionSequenceRef.current !== sequence) return;
+      if (!gps || !Number.isFinite(gps.latitude) || !Number.isFinite(gps.longitude)) {
+        setPhotoLocation({ state: "none" });
+        return;
+      }
+      const nearest = nearestSpot(gps.latitude, gps.longitude, spots);
+      if (!nearest) {
+        setPhotoLocation({ state: "none" });
+        return;
+      }
+      if (nearest.distanceM <= AUTOMATIC_SPOT_DISTANCE_LIMIT_M) {
+        if (!photoSpotManuallySelectedRef.current) setPhotoSpotId(nearest.spot.id);
+        setPhotoLocation({
+          state: "found",
+          spotId: nearest.spot.id,
+          spotName: nearest.spot.name,
+          distanceM: nearest.distanceM,
+        });
+      } else {
+        setPhotoLocation({
+          state: "far",
+          spotId: nearest.spot.id,
+          spotName: nearest.spot.name,
+          distanceM: nearest.distanceM,
+        });
+      }
+    } catch {
+      if (imageSelectionSequenceRef.current === sequence) {
+        setPhotoLocation({ state: "none" });
+      }
+    }
   }
 
   function validateImage(file: File | null, required: boolean) {
@@ -230,6 +319,10 @@ export function CommunityContributionPanel({
 
       formRef.current?.reset();
       setSelectedFile(null);
+      setPhotoSpotId("");
+      setPhotoLocation({ state: "idle" });
+      photoSpotManuallySelectedRef.current = false;
+      imageSelectionSequenceRef.current += 1;
       setStartedAt(Date.now());
       setMessage(`投稿を受け付けました。受付番号：${result.submission.id}`);
       if (turnstileWidgetIdRef.current) {
@@ -316,22 +409,55 @@ export function CommunityContributionPanel({
               <>
                 <label>
                   <span>撮影したスポット</span>
-                  <select name="spotId" required defaultValue="">
+                  <select
+                    name="spotId"
+                    required
+                    value={photoSpotId}
+                    onChange={(event) => {
+                      photoSpotManuallySelectedRef.current = true;
+                      setPhotoSpotId(event.target.value);
+                    }}
+                  >
                     <option value="" disabled>スポットを選択</option>
                     {spots.map((spot) => <option value={spot.id} key={spot.id}>{spot.name}</option>)}
                   </select>
                 </label>
-                <label>
+                <div className="community-contribution__file-field">
                   <span>写真</span>
-                  <input
-                    name="image"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    required
-                    onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-                  />
+                  <label className="community-contribution__file-picker">
+                    <input
+                      name="image"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      required
+                      onChange={(event) => void selectImage(event.target.files?.[0] ?? null, true)}
+                    />
+                    <b>写真を選ぶ</b>
+                    <em>{selectedFile?.name ?? "選択されていません"}</em>
+                  </label>
                   <small>JPEG・PNG・WebP、15MBまで。写真は受付時に位置情報を取り除き、公開用に変換します。</small>
-                </label>
+                  {photoLocation.state === "loading" ? (
+                    <small className="community-contribution__location-note">写真の位置情報を確認しています…</small>
+                  ) : null}
+                  {photoLocation.state === "found" && photoSpotId === photoLocation.spotId ? (
+                    <small className="community-contribution__location-note is-found" role="status">
+                      位置情報から「{photoLocation.spotName}」を選びました（{formatDistance(photoLocation.distanceM)}）。違う場合は変更してください。
+                    </small>
+                  ) : null}
+                  {photoLocation.state === "found" && photoSpotId !== photoLocation.spotId ? (
+                    <small className="community-contribution__location-note" role="status">
+                      位置情報の候補は「{photoLocation.spotName}」（{formatDistance(photoLocation.distanceM)}）です。現在の選択は変更していません。
+                    </small>
+                  ) : null}
+                  {photoLocation.state === "far" ? (
+                    <small className="community-contribution__location-note" role="status">
+                      最寄り候補は「{photoLocation.spotName}」ですが{formatDistance(photoLocation.distanceM)}離れているため、スポットは自動選択していません。
+                    </small>
+                  ) : null}
+                  {photoLocation.state === "none" ? (
+                    <small className="community-contribution__location-note">位置情報がない写真です。スポットを手動で選択してください。</small>
+                  ) : null}
+                </div>
               </>
             ) : (
               <>
@@ -387,16 +513,20 @@ export function CommunityContributionPanel({
                   <span>アクセスの補足（任意）</span>
                   <input name="accessNote" type="text" maxLength={160} />
                 </label>
-                <label>
+                <div className="community-contribution__file-field">
                   <span>参考写真（任意）</span>
-                  <input
-                    name="image"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-                  />
+                  <label className="community-contribution__file-picker">
+                    <input
+                      name="image"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(event) => void selectImage(event.target.files?.[0] ?? null, false)}
+                    />
+                    <b>写真を選ぶ</b>
+                    <em>{selectedFile?.name ?? "選択されていません"}</em>
+                  </label>
                   <small>場所が分かる写真を添付できます。確認が終わるまでは公開されません。</small>
-                </label>
+                </div>
               </>
             )}
 
