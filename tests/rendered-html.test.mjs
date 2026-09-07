@@ -40,7 +40,7 @@ test("public entry renders the pilgrimage application", async () => {
   assert.match(app, /href="#\/explore\/community-contribution"/);
   assert.match(html, /lang="ja"/);
   assert.match(html, /og\.png/);
-  assert.equal(site.version, "3.0.1");
+  assert.equal(site.version, "3.0.2");
   assert.equal(packageJson.version, site.version);
   assert.doesNotMatch(entry + app + html, /codex-preview|Your site is taking shape/i);
 });
@@ -183,7 +183,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(entry, /PilgrimageApp/);
   assert.match(index, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "3.0.1");
+  assert.equal(JSON.parse(packageJson).version, "3.0.2");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -502,6 +502,10 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /document\.body\.appendChild\(overlay\)/);
   assert.match(app, /drag\.overlay\.style\.transform = `translate3d/);
   assert.match(app, /removeItineraryDragOverlay\(drag\.overlay\)/);
+  assert.match(app, /itineraryFlipPositionsRef/);
+  assert.match(app, /row\.animate\(/);
+  assert.match(app, /prefers-reduced-motion: reduce/);
+  assert.match(app, /cubic-bezier\(0\.22, 1, 0\.36, 1\)/);
   const moveItineraryDrag = app.match(/function moveItineraryDrag\([\s\S]*?\n  \}/)?.[0] ?? "";
   assert.doesNotMatch(moveItineraryDrag, /setItineraryIds|invalidateRoute/);
   const finishItineraryDrag = app.match(/function finishItineraryDrag\([\s\S]*?\n  \}/)?.[0] ?? "";

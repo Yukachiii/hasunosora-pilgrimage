@@ -1116,6 +1116,10 @@ html.is-itinerary-dragging * {
   user-select: none !important;
 }
 
+html.is-itinerary-dragging .itinerary-editor li:not(.is-dragging) {
+  will-change: transform;
+}
+
 .itinerary-editor li.itinerary-editor__empty {
   min-height: 96px;
   grid-template-columns: minmax(0, 1fr);

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -311,12 +312,38 @@ export function PilgrimageApp({
     pointerY: number;
   } | null>(null);
   const itineraryDragScrollFrameRef = useRef<number | null>(null);
+  const itineraryFlipPositionsRef = useRef<Map<string, number> | null>(null);
   const automaticRouteAttemptRef = useRef("");
   const activePlannerDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const itineraryIds = activePlannerDay.itineraryIds;
   const visitDate = activePlannerDay.visitDate;
   const startTime = activePlannerDay.startTime;
   const activeDayId = activePlannerDay.id;
+
+  useLayoutEffect(() => {
+    const previousPositions = itineraryFlipPositionsRef.current;
+    itineraryFlipPositionsRef.current = null;
+    const drag = itineraryDragRef.current;
+    if (!previousPositions || !drag || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const rows = drag.list.querySelectorAll<HTMLElement>("li[data-itinerary-spot-id]");
+    rows.forEach((row) => {
+      const spotId = row.dataset.itinerarySpotId;
+      const previousTop = spotId ? previousPositions.get(spotId) : undefined;
+      if (previousTop === undefined || spotId === drag.spotId) return;
+      const deltaY = previousTop - row.getBoundingClientRect().top;
+      if (Math.abs(deltaY) < 1) return;
+      row.animate(
+        [
+          { transform: `translate3d(0, ${deltaY}px, 0)` },
+          { transform: "translate3d(0, 0, 0)" },
+        ],
+        {
+          duration: 190,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
+      );
+    });
+  }, [itineraryDragPreview]);
 
   function updateActivePlannerDay(
     update: Partial<PlannerDaySnapshot> | ((day: PlannerDaySnapshot) => PlannerDaySnapshot),
@@ -1245,6 +1272,14 @@ export function PilgrimageApp({
     const insertionIndex = firstRowBelowPointer < 0 ? remainingRows.length : firstRowBelowPointer;
     const nextOrder = reorderIdsForInsertion(drag.previewIds, drag.spotId, insertionIndex);
     if (sameIdOrder(nextOrder, drag.previewIds)) return;
+    itineraryFlipPositionsRef.current = new Map(
+      Array.from(drag.list.querySelectorAll<HTMLElement>("li[data-itinerary-spot-id]"))
+        .map((row) => [row.dataset.itinerarySpotId, row.getBoundingClientRect().top] as const)
+        .filter((entry): entry is readonly [string, number] => Boolean(entry[0])),
+    );
+    drag.list.querySelectorAll<HTMLElement>("li[data-itinerary-spot-id]").forEach((row) => {
+      row.getAnimations().forEach((animation) => animation.cancel());
+    });
     drag.previewIds = nextOrder;
     setItineraryDragPreview(nextOrder);
   }
