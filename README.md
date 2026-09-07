@@ -139,8 +139,6 @@ Mapboxの公開トークンは、GitHub ActionsのSecret `MAPBOX_ACCESS_TOKEN` �
 ```powershell
 npm.cmd run lint
 npm.cmd test
-npm.cmd run build:admin
-npm.cmd run build:pages
 git diff --check
 ```
 
@@ -148,25 +146,6 @@ git diff --check
 - `.env.local` と `.env.pages.local` がGitの追跡対象に入っていない
 - 公開サイトで地図、スポット・カード一覧、予定作成、当日表示、ガイドをスマートフォンとPCの両方で確認する
 - SNSへURLを貼り、タイトル・説明・OG画像が表示されることを確認する
-
-## サーバー側ルート検索
-
-サーバー版では `/api/routes/plan` がルート条件を検証し、専用の
-`GOOGLE_ROUTES_SERVER_API_KEY` を使ってGoogle Routes APIへ問い合わせます。
-APIキーはブラウザへ配信されません。短時間の重複検索をまとめ、1利用元あたり
-1分10回までに制限しています。
-
-- 徒歩・車・自転車: 最初と最後を固定し、中間地点を最適化可能
-- 公共交通: 現在は公開画面で無効化
-- 主要駅: 公共交通検索の再設計まで一時停止
-- 手動調整: 画面で並べ替えた順序をサーバーがそのまま使用
-
-GitHub Pagesの公開画面は、予定に入っているスポットの現在の座標をMapbox
-Directions APIへ直接渡します。別のルートAPIやスポット一覧の二重登録は不要です。
-サーバー版のルート検索はローカル開発用として残していますが、GitHub Pagesからは
-接続しません。
-
-サーバー用キーはブラウザ用と分け、Google Cloud側でRoutes APIのみに制限してください。
 
 ## API使用状況
 
@@ -187,37 +166,10 @@ Directions APIへ直接渡します。別のルートAPIやスポット一覧の
 Statisticsを開いて確認してください。閲覧者を識別する独自のアクセス解析は追加して
 いません。
 
-サーバー版のルート検索は、Google Routes APIへ実際に送ったリクエスト数を
-D1の`route_api_usage`へ記録します。管理画面の「API使用状況」では次を確認できます。
-
-- 今日・今月のGoogle APIリクエスト数
-- ルート計算回数、失敗回数、平均応答時間
-- 直近14日の日別推移
-- 今月の移動手段別内訳
-
-公開中のGitHub Pages版はGoogle Routes APIを使用していないため、この欄は
-サーバー版ルート検索を利用した場合だけ増えます。IPアドレス、出発駅、選択した
-スポットは記録しません。この数値はサイトの
-サーバーが記録した値であり、Google Cloudの請求確定値やクォータ画面とは
-集計時刻などにより差が出る場合があります。
-
-ローカル管理画面から本番サーバーの集計を見る場合は、`.env.local`へ次を設定します。
-
-```dotenv
-ROUTE_USAGE_API_URL=https://サーバーのドメイン/api/admin/route-usage
-ROUTE_USAGE_ADMIN_TOKEN=十分に長いランダムな共有トークン
-```
-
-`ROUTE_USAGE_ADMIN_TOKEN`はルートAPIサーバー側にも同じ値を
-秘密の環境変数として設定してください。トークンはGitへ追加せず、GitHub Pagesや
-ブラウザ用環境変数にも設定しません。
-
 ## 開発用ビルド
 
 ```powershell
 npm.cmd install
 npm.cmd run lint
 npm.cmd test
-npm.cmd run build:admin
-npm.cmd run build:pages
 ```

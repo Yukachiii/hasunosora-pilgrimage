@@ -1,5 +1,3 @@
-"use client";
-
 import { gps as readGps } from "exifr/dist/mini.esm.mjs";
 import {
   useEffect,

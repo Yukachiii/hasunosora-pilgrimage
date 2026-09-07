@@ -1,5 +1,3 @@
-"use client";
-
 import {
   useCallback,
   useEffect,
@@ -203,7 +201,6 @@ type Props = {
   mapboxConfig: {
     accessToken: string;
   };
-  routeServiceUrl?: string;
   spots: PilgrimageSpot[];
   spotPhotoGroups: Record<string, string[]>;
   photoCredits?: Record<string, string>;
@@ -217,7 +214,6 @@ type Props = {
 
 export function PilgrimageApp({
   mapboxConfig,
-  routeServiceUrl = "",
   spots,
   spotPhotoGroups,
   photoCredits = {},
@@ -1816,7 +1812,6 @@ export function PilgrimageApp({
               routeRequest={routeRequest}
               onRouteResult={handleRouteResult}
               accessToken={mapboxConfig.accessToken}
-              routeServiceUrl={routeServiceUrl}
               isVisible={activePage === "explore" || activePage === "planner"}
               viewMode={activePage === "planner" ? "planner" : "explore"}
             />
@@ -1865,7 +1860,6 @@ export function PilgrimageApp({
                           credit: photoCredits[imageUrl],
                         })}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imageUrl} alt="" loading="lazy" decoding="async" />
                         <span>{String(index + 1).padStart(2, "0")}</span>
                         {photoCredits[imageUrl] ? (
@@ -1891,7 +1885,6 @@ export function PilgrimageApp({
                         className={`${card.imageUrl ? "has-image" : ""}${selectedCardModel?.id === card.id ? " is-selected" : ""}`.trim() || undefined}
                       >
                         {card.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={card.imageUrl} alt="" loading="lazy" decoding="async" />
                         ) : null}
                         <div>
@@ -2811,7 +2804,6 @@ export function PilgrimageApp({
                     })}
                   >
                     {/* Static GitHub Pages assets avoid an external image-optimization request. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={card.imageUrl}
                       alt={`${card.card}のカードイラスト`}
@@ -2886,7 +2878,6 @@ export function PilgrimageApp({
                 className="guide-step__screen"
                 onClick={() => setActiveGuideImage({ src: "./guide/02-choose-method.png", alt: "探し方を選ぶ画面" })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/02-choose-method.png" alt="探し方を選ぶ画面" loading="lazy" decoding="async" />
                 <span>大きく見る</span>
               </button>
@@ -2905,7 +2896,6 @@ export function PilgrimageApp({
                 className="guide-step__screen guide-step__screen--spots"
                 onClick={() => setActiveGuideImage({ src: "./guide/03-add-spots.png", alt: "スポット一覧から場所を選ぶ画面" })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/03-add-spots.png" alt="スポット一覧から場所を選ぶ画面" loading="lazy" decoding="async" />
                 <span>スポット</span>
               </button>
@@ -2914,7 +2904,6 @@ export function PilgrimageApp({
                 className="guide-step__screen"
                 onClick={() => setActiveGuideImage({ src: "./guide/07-card-search.png", alt: "カードからモデル地を選ぶ画面" })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/07-card-search.png" alt="カードからモデル地を選ぶ画面" loading="lazy" decoding="async" />
                 <span>カード</span>
               </button>
@@ -2933,7 +2922,6 @@ export function PilgrimageApp({
                 className="guide-step__screen"
                 onClick={() => setActiveGuideImage({ src: "./guide/04-plan-stops.png", alt: "訪問するスポットと滞在時間を編集する画面" })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/04-plan-stops.png" alt="訪問するスポットと滞在時間を編集する画面" loading="lazy" decoding="async" />
                 <span>場所</span>
               </button>
@@ -2942,7 +2930,6 @@ export function PilgrimageApp({
                 className="guide-step__screen"
                 onClick={() => setActiveGuideImage({ src: "./guide/05-plan-time.png", alt: "移動手段と訪問日時を設定する画面" })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/05-plan-time.png" alt="移動手段と訪問日時を設定する画面" loading="lazy" decoding="async" />
                 <span>日時</span>
               </button>
@@ -2961,7 +2948,6 @@ export function PilgrimageApp({
                 className="guide-step__screen"
                 onClick={() => setActiveGuideImage({ src: "./guide/06-plan-check.png", alt: "予定内容を確認して計算する画面" })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="./guide/06-plan-check.png" alt="予定内容を確認して計算する画面" loading="lazy" decoding="async" />
                 <span>大きく見る</span>
               </button>
@@ -3000,7 +2986,7 @@ export function PilgrimageApp({
               ブラウザのデータを消すと予定も消えます。
             </p>
             <p>
-              地図や経路を表示するときは、表示範囲や選んだ地点、移動条件をMapboxやGoogle Routesへ送ります。
+              地図や経路を表示するときは、表示範囲や選んだ地点、移動条件をMapboxへ送ります。
             </p>
             {communitySubmissionsEnabled ? (
               <p>
@@ -3239,7 +3225,6 @@ export function PilgrimageApp({
             </header>
             <figure>
               <div className="guide-image-modal__image-frame">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={activeGuideImage.src} alt={activeGuideImage.alt} />
                 {activeGuideImage.variant === "card" ? (
                   <span className="guide-image-modal__copyright">

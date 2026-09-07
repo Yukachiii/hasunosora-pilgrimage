@@ -22,70 +22,27 @@ test("itinerary order helper moves an id to each insertion point", () => {
   assert.equal(sameIdOrder(reorderIdsForInsertion(original, "market", 3), original), false);
 });
 
-async function requestApp(request) {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
+test("public entry renders the pilgrimage application", async () => {
+  const [entry, app, html, site, packageJson] = await Promise.all([
+    readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../content/site.json", import.meta.url), "utf8").then(JSON.parse),
+    readFile(new URL("../package.json", import.meta.url), "utf8").then(JSON.parse),
+  ]);
 
-  return worker.fetch(
-    request,
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
-}
-
-async function render() {
-  return requestApp(new Request("http://localhost/", {
-    headers: {
-      accept: "text/html",
-      host: "localhost",
-    },
-  }));
-}
-
-test("server-renders the pilgrimage MVP", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
-  assert.match(html, /蓮ノ旅/);
-  assert.doesNotMatch(html, /好きな物語と|同じ景色/);
-  assert.match(html, /hero--magazine/);
-  assert.match(html, /hero-magazine-number/);
-  assert.match(html, /スポットを地図から探す/);
-  assert.match(html, /コラボ/);
-  assert.match(html, /おいでよ！石川大観光Ⅱ/);
-  assert.match(html, /蓮ノ小四辺形の休日/);
-  assert.doesNotMatch(html, /visitor-notice|内容に同意してサイトを見る|同意しない場合/);
-  assert.match(html, /訪れるときのお願い/);
-  assert.match(html, /旅程や所要時間は目安/);
-  assert.doesNotMatch(html, /サイト運営者は責任を負いません/);
-  assert.match(html, /写真・スポットを送る/);
-  assert.match(html, /投稿機能は準備中/);
-  assert.match(html, /href="#\/explore\/community-contribution"/);
-  assert.match(html, /Ver\.\s*(?:<!-- -->)?2\.0\.2/);
-  assert.match(html, /目的に合う方法でスポットやカードを探せます/);
-  assert.doesNotMatch(html, /開催中のコラボ/);
-  assert.match(html, /金沢駅/);
-  assert.match(html, /近江町市場/);
-  assert.match(html, /大野からくり記念館/);
-  assert.match(html, /カードモデル地（.*53.*件）/);
-  assert.doesNotMatch(html, /判定 [ABC]/);
-  assert.match(html, /すべてのキャラクター/);
-  assert.match(html, /等身パネル：.*百生吟子、安養寺姫芽/);
-  assert.match(html, /蓮ノ空歌留多/);
-  assert.match(html, /このサイトの使い方/);
-  assert.match(html, /02-choose-method\.png/);
-  assert.match(html, /07-card-search\.png/);
-  assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
+  assert.match(entry, /createRoot/);
+  assert.match(entry, /<PilgrimageApp/);
+  assert.match(entry, /VITE_MAPBOX_ACCESS_TOKEN/);
+  assert.match(app, /蓮ノ旅/);
+  assert.match(app, /hero--magazine/);
+  assert.match(app, /写真や新しいスポットを送る/);
+  assert.match(app, /href="#\/explore\/community-contribution"/);
+  assert.match(html, /lang="ja"/);
+  assert.match(html, /og\.png/);
+  assert.equal(site.version, "3.0.0");
+  assert.equal(packageJson.version, site.version);
+  assert.doesNotMatch(entry + app + html, /codex-preview|Your site is taking shape/i);
 });
 
 test("illustrated user guide ships every referenced screenshot", async () => {
@@ -218,15 +175,15 @@ test("publishes the complete reviewed location lists", async () => {
 });
 
 test("starter preview is fully replaced", async () => {
-  const [page, layout, packageJson] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+  const [entry, index, packageJson] = await Promise.all([
+    readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/index.html", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /PilgrimageApp/);
-  assert.match(layout, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "2.0.2");
+  assert.match(entry, /PilgrimageApp/);
+  assert.match(index, /og\.png/);
+  assert.equal(JSON.parse(packageJson).version, "3.0.0");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -294,21 +251,20 @@ test("Windows auto updater fast-forwards trusted pushes and health-checks the re
 });
 
 test("Mapbox map and route integration stays guarded", async () => {
-  const [page, map, css] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  const [entry, map, css] = await Promise.all([
+    readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
+  assert.match(entry, /VITE_MAPBOX_ACCESS_TOKEN/);
   assert.match(map, /mapbox:\/\/styles\/mapbox\/streets-v12/);
   assert.match(map, /map\.on\("style\.load"[\s\S]+map\.setLanguage\("ja"\)/);
   assert.doesNotMatch(map, /style: "mapbox:\/\/styles\/mapbox\/standard",\s+language: "ja"/);
   assert.match(map, /optimized-trips\/v1/);
   assert.match(map, /directions\/v5/);
   assert.match(map, /optimizeWaypointOrder/);
-  assert.match(map, /serverError\?\.code === "SPOT_DATA_OUT_OF_DATE"/);
-  assert.match(map, /serverError\?\.error === "登録されていないスポットが含まれています。"/);
+  assert.doesNotMatch(map, /routeServiceUrl|ServerRoutePlan|source: "server"/);
   assert.match(map, /planned: "\.\/map-markers\/green\.png"/);
   assert.match(map, /card: "\.\/map-markers\/blue\.png"/);
   assert.match(map, /collaboration: "\.\/map-markers\/yellow\.png"/);
@@ -356,81 +312,6 @@ test("day planner supports multiple stops without a server dependency", async ()
   assert.match(yahooTransit, /m2: paddedMinute\[1\]/);
 });
 
-test("server route planner validates requests before using Google Routes", async () => {
-  const response = await requestApp(new Request("http://localhost/api/routes/plan", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      stopIds: ["kanazawa-station"],
-      travelMode: "WALKING",
-      optimizeWaypointOrder: true,
-      stayMinutes: { "kanazawa-station": 15 },
-      departureTime: new Date().toISOString(),
-    }),
-  }));
-  assert.equal(response.status, 400);
-  assert.match((await response.json()).error, /2～27か所/);
-
-  const staleDataResponse = await requestApp(new Request("http://localhost/api/routes/plan", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      stopIds: ["kanazawa-station", "newer-public-spot"],
-      travelMode: "WALKING",
-      optimizeWaypointOrder: false,
-      stayMinutes: { "kanazawa-station": 15, "newer-public-spot": 15 },
-      departureTime: new Date().toISOString(),
-    }),
-  }));
-  assert.equal(staleDataResponse.status, 409);
-  assert.equal((await staleDataResponse.json()).code, "SPOT_DATA_OUT_OF_DATE");
-
-  const currentClientResponse = await requestApp(new Request("http://localhost/api/routes/plan", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      stopIds: ["kanazawa-station", "newer-public-spot"],
-      stopLocations: [
-        { id: "kanazawa-station", lat: 36.5778025, lng: 136.647986 },
-        { id: "newer-public-spot", lat: 36.563916, lng: 136.65395 },
-      ],
-      travelMode: "WALKING",
-      optimizeWaypointOrder: false,
-      stayMinutes: { "kanazawa-station": 15, "newer-public-spot": 15 },
-      departureTime: "invalid-for-validation",
-    }),
-  }));
-  assert.equal(currentClientResponse.status, 400);
-  assert.match((await currentClientResponse.json()).error, /出発日時/);
-
-  const [routeApi, map, page, pagesMain, workflow, usageStore] = await Promise.all([
-    readFile(new URL("../app/api/routes/plan/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../.github/workflows/deploy-pages.yml", import.meta.url), "utf8"),
-    readFile(new URL("../db/route-usage.ts", import.meta.url), "utf8"),
-  ]);
-  assert.match(routeApi, /GOOGLE_ROUTES_SERVER_API_KEY/);
-  assert.match(routeApi, /routes\.googleapis\.com\/directions\/v2:computeRoutes/);
-  assert.match(routeApi, /requestsPerWindow = 10/);
-  assert.match(routeApi, /inFlightPlans/);
-  assert.match(routeApi, /departureTime: cursor\.toISOString\(\)/);
-  assert.match(routeApi, /maximumItineraryStops/);
-  assert.match(routeApi, /submittedRouteStops/);
-  assert.match(routeApi, /lat < 20 \|\| lat > 46/);
-  assert.match(routeApi, /stops: plan\.stops\.map\(\(stop\) => \[stop\.id, stop\.lat, stop\.lng\]\)/);
-  assert.match(routeApi, /recordRouteApiUsage/);
-  assert.match(routeApi, /Google Mapsとの通信に失敗しました/);
-  assert.match(usageStore, /INSERT INTO route_api_usage/);
-  assert.doesNotMatch(usageStore, /connecting-ip|x-forwarded-for|spotIds|sourceStationId/);
-  assert.match(map, /source: "server"/);
-  assert.match(map, /stopLocations: requestedRoute\.stops\.map/);
-  assert.match(page, /routeServiceUrl="\/api\/routes\/plan"/);
-  assert.doesNotMatch(pagesMain, /VITE_ROUTE_API_URL|routeServiceUrl=/);
-  assert.doesNotMatch(workflow, /ROUTE_API_URL/);
-});
-
 test("collaboration locations can fill a route plan without an API request", async () => {
   const [app, planner, collaborations] = await Promise.all([
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
@@ -442,7 +323,7 @@ test("collaboration locations can fill a route plan without an API request", asy
   assert.match(app, /このコラボで予定を作る/);
   assert.doesNotMatch(app, /コラボから訪問スポットを自動入力/);
   assert.doesNotMatch(app, /料金区分|API不使用|Google API|サーバー計算|ブラウザ計算/);
-  assert.match(planner, /maximumItineraryStops = 27/);
+  assert.match(planner, /maximumItineraryStops = 25/);
   assert.equal(
     collaborations.find((item) => item.id === "ishikawa-dai-kanko-2").locations.length,
     13,
@@ -453,136 +334,27 @@ test("collaboration locations can fill a route plan without an API request", asy
   );
 });
 
-test("the 13-location Ishikawa collaboration fits in one non-transit route request", async () => {
-  const originalFetch = globalThis.fetch;
-  const originalKey = process.env.GOOGLE_ROUTES_SERVER_API_KEY;
-  const collaborations = JSON.parse(
-    await readFile(new URL("../content/collaborations.json", import.meta.url), "utf8"),
-  );
-  const collaboration = collaborations.find((item) => item.id === "ishikawa-dai-kanko-2");
-  const stopIds = collaboration.locations.map((location) => location.spotId);
-  const googleRequests = [];
-  process.env.GOOGLE_ROUTES_SERVER_API_KEY = "test-only";
-  globalThis.fetch = async (input, init) => {
-    const url = typeof input === "string" ? input : input.url;
-    if (!url.startsWith("https://routes.googleapis.com/")) {
-      return originalFetch(input, init);
-    }
-    googleRequests.push(JSON.parse(init.body));
-    return new Response(JSON.stringify({
-      routes: [{
-        distanceMeters: 125000,
-        duration: "14400s",
-        legs: Array.from({ length: stopIds.length - 1 }, () => ({ duration: "1200s" })),
-        optimizedIntermediateWaypointIndex: Array.from(
-          { length: stopIds.length - 2 },
-          (_, index) => index,
-        ),
-        polyline: { encodedPolyline: "_p~iF~ps|U" },
-      }],
-    }), { status: 200, headers: { "content-type": "application/json" } });
-  };
-
-  try {
-    const response = await requestApp(new Request("http://localhost/api/routes/plan", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        stopIds,
-        travelMode: "DRIVING",
-        optimizeWaypointOrder: true,
-        stayMinutes: Object.fromEntries(stopIds.map((id) => [id, 30])),
-        departureTime: new Date(Date.now() + 86_400_000).toISOString(),
-      }),
-    }));
-    assert.equal(response.status, 200);
-    const result = await response.json();
-    assert.equal(result.orderedStopIds.length, 13);
-    assert.equal(result.apiRequestCount, 1);
-    assert.equal(googleRequests.length, 1);
-    assert.equal(googleRequests[0].intermediates.length, 11);
-  } finally {
-    globalThis.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.GOOGLE_ROUTES_SERVER_API_KEY;
-    else process.env.GOOGLE_ROUTES_SERVER_API_KEY = originalKey;
-  }
-});
-
-test("Routes API usage is private and available in the admin dashboard", async () => {
-  const response = await requestApp(new Request("http://localhost/api/admin/route-usage"));
-  assert.equal(response.status, 403);
-
-  const [adminApp, adminApi, schema, migration, localServer] = await Promise.all([
+test("API dashboard covers only services used by the public system", async () => {
+  const [adminApp, localServer, envExample, packageJson] = await Promise.all([
     readFile(new URL("../app/admin/AdminApp.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/admin/route-usage/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
-    readFile(new URL("../drizzle/0001_bored_firelord.sql", import.meta.url), "utf8"),
     readFile(new URL("../server.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../.env.example", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
   assert.match(adminApp, /API使用状況/);
   assert.match(adminApp, /カードモデル地の確認/);
   assert.match(adminApp, /信頼度は管理用です/);
-  assert.match(adminApp, /Google Cloud側の請求確定値/);
-  assert.match(adminApp, /直近14日間のAPIリクエスト数/);
-  assert.match(adminApi, /hasRouteUsageAdminToken/);
-  assert.match(schema, /routeApiUsage/);
-  assert.match(migration, /CREATE TABLE `route_api_usage`/);
-  assert.match(migration, /route_api_usage_month_mode_idx/);
-  assert.match(localServer, /ROUTE_USAGE_ADMIN_TOKEN/);
-  assert.match(localServer, /"x-route-usage-admin-token": token/);
-});
-
-test("server route planner sends public transit to Yahoo without using Google Routes", async () => {
-  const originalFetch = globalThis.fetch;
-  const originalKey = process.env.GOOGLE_ROUTES_SERVER_API_KEY;
-  const googleRequests = [];
-  const departure = new Date(Date.now() + 86_400_000);
-  departure.setUTCSeconds(0, 0);
-  process.env.GOOGLE_ROUTES_SERVER_API_KEY = "test-only";
-  globalThis.fetch = async (input, init) => {
-    const url = typeof input === "string" ? input : input.url;
-    if (!url.startsWith("https://routes.googleapis.com/")) {
-      return originalFetch(input, init);
-    }
-    googleRequests.push(JSON.parse(init.body));
-    return new Response(JSON.stringify({
-      routes: [{
-        distanceMeters: 1000,
-        duration: "600s",
-        legs: [{ duration: "600s" }],
-        polyline: { encodedPolyline: "_p~iF~ps|U" },
-      }],
-    }), { status: 200, headers: { "content-type": "application/json" } });
-  };
-
-  try {
-    const response = await requestApp(new Request("http://localhost/api/routes/plan", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        stopIds: ["kanazawa-station", "ohmicho-market", "kanazawa-katani"],
-        travelMode: "TRANSIT",
-        optimizeWaypointOrder: false,
-        stayMinutes: {
-          "kanazawa-station": 15,
-          "ohmicho-market": 30,
-          "kanazawa-katani": 35,
-        },
-        sourceStationId: "tokyo",
-        departureTime: departure.toISOString(),
-      }),
-    }));
-    assert.equal(response.status, 400);
-    const result = await response.json();
-    assert.equal(result.code, "EXTERNAL_TRANSIT");
-    assert.match(result.error, /Yahoo!乗換案内/);
-    assert.equal(googleRequests.length, 0);
-  } finally {
-    globalThis.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.GOOGLE_ROUTES_SERVER_API_KEY;
-    else process.env.GOOGLE_ROUTES_SERVER_API_KEY = originalKey;
-  }
+  assert.match(adminApp, /投稿受付と認証/);
+  assert.match(adminApp, /Mapbox公式Statistics/);
+  assert.match(localServer, /\/api\/admin\/community-usage/);
+  assert.doesNotMatch(adminApp + localServer + envExample + packageJson, /Google Routes|route-usage|ROUTE_USAGE|GOOGLE_ROUTES|vinext|drizzle-orm/);
+  await Promise.all([
+    "../app/page.tsx",
+    "../app/api/routes/plan/route.ts",
+    "../db/schema.ts",
+    "../worker/index.ts",
+  ].map((path) => assert.rejects(access(new URL(path, import.meta.url)))));
 });
 
 test("spot photos can be used as readable card backgrounds", async () => {
@@ -615,7 +387,7 @@ test("local admin writes publishable files before an explicit GitHub push", asyn
   assert.match(adminApp, /exifr/);
   assert.match(adminApp, /makePublicDerivative/);
   assert.match(adminApp, /スポットを編集/);
-  assert.match(localMain, /localMode/);
+  assert.match(localMain, /<AdminApp/);
   assert.match(localServer, /127\.0\.0\.1/);
   assert.match(localServer, /isPrivateIpv4/);
   assert.match(localServer, /lanAdminUrl/);
@@ -663,13 +435,12 @@ test("local admin writes publishable files before an explicit GitHub push", asyn
 });
 
 test("planner persistence, opening hours, and today mode avoid extra route requests", async () => {
-  const [app, storage, routePlanner, adminApp, schema, migration, css, contributionPanel] = await Promise.all([
+  const [app, storage, routePlanner, adminApp, spotsSource, css, contributionPanel] = await Promise.all([
     readFile(new URL("../app/PilgrimageApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/planner-storage.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/route-planner.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/AdminApp.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
-    readFile(new URL("../drizzle/0002_lucky_the_hood.sql", import.meta.url), "utf8"),
+    readFile(new URL("../app/spots.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/CommunityContributionPanel.tsx", import.meta.url), "utf8"),
   ]);
@@ -795,8 +566,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(routePlanner, /営業時間は公式情報を確認/);
   assert.match(adminApp, /通常の休業曜日/);
   assert.match(adminApp, /営業時間の確認日/);
-  assert.match(schema, /openingHoursCheckedAt/);
-  assert.match(migration, /opening_hours_checked_at/);
+  assert.match(spotsSource, /openingHoursCheckedAt/);
   assert.match(css, /\.today-mode__dialog/);
   assert.match(css, /\.spot-card__hours/);
   assert.match(css, /Public page: touch-first layout/);
@@ -820,7 +590,6 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.itinerary-editor li\.is-dragging\s*\{[^}]*box-shadow:/s);
   assert.match(css, /grid-template-areas:\s*"spot remove drag"\s*"stay remove drag"/s);
   assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.planner-overview\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
-  assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.selected-spot-bar strong\s*\{[^}]*white-space:\s*normal/s);
   assert.doesNotMatch(css, /scroll-snap-(?:type|align)/);
   assert.match(css, /\.route-planner \.itinerary-editor > ol\s*\{[^}]*max-height:\s*none/s);
   assert.match(css, /@media \(max-width:\s*1080px\)[\s\S]*?\.route-planner\s*\{[^}]*max-height:\s*none/s);
@@ -847,9 +616,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
 });
 
 test("Mapbox is the main map and the comparison version is removed", async () => {
-  const [map, page, pagesEntry, pagesConfig, envExample, app, workflow] = await Promise.all([
+  const [map, pagesEntry, pagesConfig, envExample, app, workflow] = await Promise.all([
     readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/main.tsx", import.meta.url), "utf8"),
     readFile(new URL("../vite.pages.config.ts", import.meta.url), "utf8"),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
@@ -872,10 +640,10 @@ test("Mapbox is the main map and the comparison version is removed", async () =>
   assert.doesNotMatch(map, /cluster:\s*true/);
   assert.doesNotMatch(map, /SPOT_CLUSTER/);
   assert.doesNotMatch(map, /getClusterExpansionZoom/);
-  assert.match(page, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
   assert.match(pagesEntry, /VITE_MAPBOX_ACCESS_TOKEN/);
   assert.doesNotMatch(pagesConfig, /github-pages\/mapbox\/index\.html/);
-  assert.match(envExample, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
+  assert.match(envExample, /VITE_MAPBOX_ACCESS_TOKEN/);
+  assert.doesNotMatch(envExample, /MAPBOX_PUBLIC_ACCESS_TOKEN/);
   assert.match(workflow, /MAPBOX_ACCESS_TOKEN/);
   assert.match(app, /MapboxPilgrimageMap/);
   assert.match(app, /id="map-freeword-search"/);

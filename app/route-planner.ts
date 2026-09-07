@@ -2,8 +2,8 @@ import type { PilgrimageSpot, SpotCategory } from "./spots";
 
 export type TravelMode = "WALKING" | "DRIVING" | "TRANSIT" | "BICYCLING";
 
-// Compute Routes supports an origin, a destination, and up to 25 intermediates.
-export const maximumItineraryStops = 27;
+// Mapbox Directions accepts up to 25 coordinates in one request.
+export const maximumItineraryStops = 25;
 
 export type RouteLocation = {
   id: string;

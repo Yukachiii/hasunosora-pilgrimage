@@ -60,14 +60,11 @@ function LocalAdminRoot() {
 
   return (
     <AdminApp
-      userName="ローカル管理"
-      signOutPath="/admin/"
       baseSpots={state.spots}
       initialSpots={state.spots}
       overriddenSpotIds={[]}
       initialAssets={state.assets}
       initialSubmissions={state.submissions}
-      localMode
       localToken={state.writeToken}
       localNetworkUrl={state.lanUrl}
       initialSiteVersion={state.siteVersion}

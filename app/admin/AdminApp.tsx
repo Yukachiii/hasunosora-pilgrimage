@@ -1,5 +1,3 @@
-"use client";
-
 import { gps as readGps } from "exifr/dist/mini.esm.mjs";
 import mapboxgl from "mapbox-gl";
 import {
@@ -18,7 +16,6 @@ import {
   type CardModelLocation,
   type PilgrimageSpot,
 } from "@/app/spots";
-import type { TravelMode } from "@/app/route-planner";
 import {
   CommunitySubmissionReview,
   type AdminCommunitySubmission,
@@ -27,8 +24,7 @@ import type {
   CommunityReceiverStatus,
   CommunityUsageResponse,
   CommunityUsageTotals,
-  RouteUsageResponse,
-} from "./route-usage-types";
+} from "./community-usage-types";
 
 export type AdminAsset = {
   id: string;
@@ -44,14 +40,11 @@ export type AdminAsset = {
 };
 
 type Props = {
-  userName: string;
-  signOutPath: string;
   baseSpots: PilgrimageSpot[];
   initialSpots: PilgrimageSpot[];
   overriddenSpotIds: string[];
   initialAssets: AdminAsset[];
   initialSubmissions?: AdminCommunitySubmission[];
-  localMode?: boolean;
   localToken?: string;
   localNetworkUrl?: string;
   initialSiteVersion?: string;
@@ -65,13 +58,6 @@ type PublishStatus = {
   publishToken: string;
   hasLocalChanges: boolean;
   error?: string;
-};
-
-const travelModeLabels: Record<TravelMode, string> = {
-  WALKING: "徒歩",
-  DRIVING: "車",
-  TRANSIT: "公共交通",
-  BICYCLING: "自転車",
 };
 
 async function loadPublishStatus(): Promise<PublishStatus> {
@@ -283,17 +269,14 @@ function formatDistance(distanceM: number) {
 }
 
 export function AdminApp({
-  userName,
-  signOutPath,
   baseSpots,
   initialSpots,
   overriddenSpotIds,
   initialAssets,
   initialSubmissions = [],
-  localMode = false,
   localToken = "",
   localNetworkUrl = "",
-  initialSiteVersion = "2.0.2",
+  initialSiteVersion = "3.0.0",
 }: Props) {
   const [tab, setTab] = useState<"photos" | "spots" | "submissions" | "cards" | "usage">("photos");
   const [managedSpots, setManagedSpots] = useState(initialSpots);
@@ -314,7 +297,6 @@ export function AdminApp({
   const [versionMessage, setVersionMessage] = useState("");
 
   useEffect(() => {
-    if (!localMode) return;
     let cancelled = false;
     void loadPublishStatus().then((result) => {
       if (!cancelled) setPublishStatus(result);
@@ -322,7 +304,7 @@ export function AdminApp({
     return () => {
       cancelled = true;
     };
-  }, [localMode]);
+  }, []);
 
   async function publishToGitHub() {
     if (!publishStatus?.publishToken || publishing) return;
@@ -354,7 +336,7 @@ export function AdminApp({
   }
 
   async function shutdownServer() {
-    if (!localMode || !localToken || shuttingDown || serverStopped) return;
+    if (!localToken || shuttingDown || serverStopped) return;
     if (!window.confirm(
       "管理サーバーを終了しますか？まだ保存していない入力内容は失われます。",
     )) return;
@@ -388,7 +370,7 @@ export function AdminApp({
 
   async function saveSiteVersion(event: FormEvent) {
     event.preventDefault();
-    if (!localMode || !localToken || versionSaving) return;
+    if (!localToken || versionSaving) return;
     const normalized = versionDraft.trim().replace(/^ver\.\s*/i, "");
     if (!/^\d+\.\d+\.\d+$/.test(normalized)) {
       setVersionMessage("3桁の形式（例：3.1.0）で入力してください。");
@@ -428,7 +410,7 @@ export function AdminApp({
       <header className="admin-header">
         <a
           className="admin-brand"
-          href={localMode ? "https://yukachiii.github.io/hasunosora-pilgrimage/" : "/"}
+          href="https://yukachiii.github.io/hasunosora-pilgrimage/"
         >
           <span>蓮</span>
           <div>
@@ -437,41 +419,32 @@ export function AdminApp({
           </div>
         </a>
         <div className="admin-account">
-          {localMode ? (
-            <>
-              <span>{publishStatus?.hasLocalChanges ? "未公開の変更あり" : "ローカル専用"}</span>
-              <div className="admin-account__actions">
-                <button
-                  className="admin-publish admin-publish--compact"
-                  type="button"
-                  disabled={
-                    publishing ||
-                    shuttingDown ||
-                    serverStopped ||
-                    !publishStatus?.available ||
-                    !publishStatus.remoteConfigured ||
-                    !publishStatus.identityConfigured
-                  }
-                  onClick={publishToGitHub}
-                >
-                  {publishing ? "公開中…" : "GitHub Pagesへ公開"}
-                </button>
-                <button
-                  className="admin-shutdown"
-                  type="button"
-                  disabled={shuttingDown || serverStopped}
-                  onClick={shutdownServer}
-                >
-                  {serverStopped ? "終了済み" : shuttingDown ? "終了中…" : "サーバーを終了"}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <span>{userName}</span>
-              <a href={signOutPath}>ログアウト</a>
-            </>
-          )}
+          <span>{publishStatus?.hasLocalChanges ? "未公開の変更あり" : "ローカル専用"}</span>
+          <div className="admin-account__actions">
+            <button
+              className="admin-publish admin-publish--compact"
+              type="button"
+              disabled={
+                publishing ||
+                shuttingDown ||
+                serverStopped ||
+                !publishStatus?.available ||
+                !publishStatus.remoteConfigured ||
+                !publishStatus.identityConfigured
+              }
+              onClick={publishToGitHub}
+            >
+              {publishing ? "公開中…" : "GitHub Pagesへ公開"}
+            </button>
+            <button
+              className="admin-shutdown"
+              type="button"
+              disabled={shuttingDown || serverStopped}
+              onClick={shutdownServer}
+            >
+              {serverStopped ? "終了済み" : shuttingDown ? "終了中…" : "サーバーを終了"}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -482,22 +455,17 @@ export function AdminApp({
           <div className="admin-intro__copy">
             <p>ADMIN / CONTENT MANAGEMENT</p>
             <h1>写真とスポット情報を、<br />落ち着いて整える場所。</h1>
-            <div className="admin-intro__rule" aria-label={`${localMode ? 5 : 4}つの管理項目`}>
-              <span>{localMode ? "05" : "04"} SECTIONS</span>
+            <div className="admin-intro__rule" aria-label="5つの管理項目">
+              <span>05 SECTIONS</span>
               <span>LOCAL / PRIVATE</span>
             </div>
-            <p>
-              {localMode
-                ? "変更はこのPC内の公開用ファイルへ保存されます。GitHub Pagesへ反映するまでは外部公開されません。"
-                : "元写真は非公開で保管し、公開用画像からはEXIFを除去して透かしを入れます。スポット名などの修正は公開画面へすぐ反映されます。"}
-            </p>
+            <p>変更はこのPC内の公開用ファイルへ保存されます。GitHub Pagesへ反映するまでは外部公開されません。</p>
           </div>
           <div className="admin-intro__side" aria-hidden="true">
             HASUNOSORA PILGRIMAGE · ADMIN
           </div>
         </div>
-        {localMode ? (
-          <div className="admin-lan-access">
+        <div className="admin-lan-access">
             <div>
               <small>SAME WI-FI ACCESS</small>
               <strong>スマホから管理画面を開く</strong>
@@ -514,10 +482,8 @@ export function AdminApp({
               PCとスマホを同じ信頼できるWi-Fiへ接続してください。作業後はサーバーを終了してください。
               {networkCopyMessage ? <b>{networkCopyMessage}</b> : null}
             </p>
-          </div>
-        ) : null}
-        {localMode ? (
-          <form className="admin-version-control" onSubmit={saveSiteVersion}>
+        </div>
+        <form className="admin-version-control" onSubmit={saveSiteVersion}>
             <div>
               <small>PUBLIC VERSION</small>
               <strong>公開ページのバージョン表記</strong>
@@ -537,13 +503,12 @@ export function AdminApp({
               {versionSaving ? "保存中…" : "表記を保存"}
             </button>
             {versionMessage ? <p role="status">{versionMessage}</p> : null}
-          </form>
-        ) : null}
-        {localMode && publishMessage && <p className="admin-message" role="status">{publishMessage}</p>}
-        {localMode && publishStatus?.error && <p className="admin-message" role="status">{publishStatus.error}</p>}
+        </form>
+        {publishMessage && <p className="admin-message" role="status">{publishMessage}</p>}
+        {publishStatus?.error && <p className="admin-message" role="status">{publishStatus.error}</p>}
       </section>
 
-      <nav className={`admin-tabs${localMode ? " admin-tabs--local" : ""}`} aria-label="管理項目">
+      <nav className="admin-tabs admin-tabs--local" aria-label="管理項目">
         <button
           type="button"
           className={tab === "photos" ? "is-active" : ""}
@@ -558,29 +523,27 @@ export function AdminApp({
         >
           <span>02</span>スポットを編集
         </button>
-        {localMode ? (
-          <button
-            type="button"
-            className={tab === "submissions" ? "is-active" : ""}
-            onClick={() => setTab("submissions")}
-          >
-            <span>03</span>投稿を審査
-            {submissionPendingCount ? <b>{submissionPendingCount}</b> : null}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className={tab === "submissions" ? "is-active" : ""}
+          onClick={() => setTab("submissions")}
+        >
+          <span>03</span>投稿を審査
+          {submissionPendingCount ? <b>{submissionPendingCount}</b> : null}
+        </button>
         <button
           type="button"
           className={tab === "cards" ? "is-active" : ""}
           onClick={() => setTab("cards")}
         >
-          <span>{localMode ? "04" : "03"}</span>カードを確認
+          <span>04</span>カードを確認
         </button>
         <button
           type="button"
           className={tab === "usage" ? "is-active" : ""}
           onClick={() => setTab("usage")}
         >
-          <span>{localMode ? "05" : "04"}</span>API使用状況
+          <span>05</span>API使用状況
         </button>
       </nav>
 
@@ -589,7 +552,6 @@ export function AdminApp({
           spots={managedSpots}
           assets={assets}
           setAssets={setAssets}
-          localMode={localMode}
           localToken={localToken}
         />
       ) : tab === "spots" ? (
@@ -599,7 +561,6 @@ export function AdminApp({
           baseSpots={baseSpots}
           overrideIds={overrideIds}
           setOverrideIds={setOverrideIds}
-          localMode={localMode}
           localToken={localToken}
         />
       ) : tab === "cards" ? (
@@ -620,7 +581,7 @@ export function AdminApp({
           }}
         />
       ) : (
-        <ApiUsageDashboard localMode={localMode} />
+        <ApiUsageDashboard />
       )}
     </main>
   );
@@ -715,19 +676,14 @@ function CardModelDashboard({ cards }: { cards: CardModelLocation[] }) {
   );
 }
 
-function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
-  const [routeUsage, setRouteUsage] = useState<RouteUsageResponse | null>(null);
+function ApiUsageDashboard() {
   const [communityUsage, setCommunityUsage] = useState<CommunityUsageResponse | null>(null);
-  const [routeError, setRouteError] = useState("");
   const [communityError, setCommunityError] = useState("");
-  const [routeLoading, setRouteLoading] = useState(true);
   const [communityLoading, setCommunityLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
   function refreshUsage() {
-    setRouteLoading(true);
     setCommunityLoading(true);
-    setRouteError("");
     setCommunityError("");
     setRefreshKey((value) => value + 1);
   }
@@ -761,12 +717,6 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
       }
     }
 
-    void loadUsage<RouteUsageResponse>(
-      "/api/admin/route-usage",
-      setRouteUsage,
-      setRouteError,
-      setRouteLoading,
-    );
     void loadUsage<CommunityUsageResponse>(
       "/api/admin/community-usage",
       setCommunityUsage,
@@ -779,8 +729,7 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
     };
   }, [refreshKey]);
 
-  const loading = routeLoading || communityLoading;
-  if (loading && !routeUsage && !communityUsage) {
+  if (communityLoading && !communityUsage) {
     return (
       <section className="admin-usage admin-panel">
         <p className="admin-loading">API使用状況を集計しています…</p>
@@ -797,10 +746,10 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
             <button
               type="button"
               className="usage-refresh"
-              disabled={loading}
+              disabled={communityLoading}
               onClick={refreshUsage}
             >
-              {loading ? "更新中…" : "更新"}
+              {communityLoading ? "更新中…" : "更新"}
             </button>
           </div>
         </div>
@@ -814,13 +763,6 @@ function ApiUsageDashboard({ localMode }: { localMode: boolean }) {
       />
 
       <MapboxUsagePanel />
-
-      <RouteUsagePanel
-        usage={routeUsage}
-        error={routeError}
-        loading={routeLoading}
-        localMode={localMode}
-      />
     </section>
   );
 }
@@ -980,160 +922,15 @@ function MapboxUsagePanel() {
   );
 }
 
-function RouteUsagePanel({
-  usage,
-  error,
-  loading,
-  localMode,
-}: {
-  usage: RouteUsageResponse | null;
-  error: string;
-  loading: boolean;
-  localMode: boolean;
-}) {
-  if (loading && !usage) {
-    return (
-      <div className="admin-panel usage-service-panel">
-        <p className="admin-loading">Google Routes APIの使用状況を集計しています…</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="admin-panel usage-service-panel">
-        <div className="admin-panel__heading">
-          <div><span>GOOGLE ROUTES API</span><h2>使用状況を読み込めませんでした</h2></div>
-        </div>
-        <p className="usage-note usage-note--context">公開中のGitHub Pages版ではGoogle Routes APIを使用していません。この欄はサーバー版ルート検索用です。</p>
-        <p className="admin-message" role="alert">{error}</p>
-      </div>
-    );
-  }
-
-  if (!usage?.available) {
-    return (
-      <div className="admin-panel usage-service-panel">
-        <div className="admin-panel__heading">
-          <div><span>GOOGLE ROUTES API</span><h2>使用状況の接続設定</h2></div>
-        </div>
-        <p className="usage-note usage-note--context">公開中のGitHub Pages版ではGoogle Routes APIを使用していません。この欄はサーバー版ルート検索用です。</p>
-        <p className="usage-unavailable">{usage?.message}</p>
-        {localMode && (
-          <p className="usage-note">
-            ローカル管理画面は公開サーバーのデータベースを直接読めないため、共有トークンを使って集計APIだけを取得します。トークンはブラウザやGitHub Pagesへ配信されません。
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  const maximumDailyRequests = Math.max(
-    1,
-    ...usage.daily.map((day) => day.apiRequests),
-  );
-  const generatedAt = formattedUsageTime(usage.generatedAt, usage.timeZone);
-
-  return (
-    <div className="usage-route-section">
-      <div className="admin-panel usage-overview">
-        <div className="admin-panel__heading usage-heading">
-          <div><span>GOOGLE ROUTES API</span><h2>サーバー版のルート検索</h2></div>
-          <small>{generatedAt} 更新</small>
-        </div>
-        <p className="usage-note usage-note--context">公開中のGitHub Pages版ではGoogle Routes APIを使用していません。以下はサーバー版ルート検索を利用した場合だけ増えます。</p>
-        <p className="usage-note">
-          このサイトのサーバーがGoogle Routes APIへ実際に送った回数です。Google Cloud側の請求確定値やクォータ表示とは、集計時刻などにより差が出る場合があります。
-        </p>
-
-        <div className="usage-periods">
-          <UsagePeriod title="今日" totals={usage.today} />
-          <UsagePeriod title="今月" totals={usage.currentMonth} />
-        </div>
-      </div>
-
-      <div className="usage-grid">
-        <div className="admin-panel">
-          <div className="admin-panel__heading">
-            <div><span>LAST 14 DAYS</span><h2>日別リクエスト数</h2></div>
-          </div>
-          <div className="usage-chart" aria-label="直近14日間のAPIリクエスト数">
-            {usage.daily.map((day) => (
-              <div className="usage-chart__day" key={day.date}>
-                <span>{day.apiRequests}</span>
-                <div className="usage-chart__track">
-                  <i
-                    className={day.failed ? "has-error" : ""}
-                    style={{ height: `${Math.max(3, (day.apiRequests / maximumDailyRequests) * 100)}%` }}
-                  />
-                </div>
-                <small>{day.date.slice(5).replace("-", "/")}</small>
-              </div>
-            ))}
-          </div>
-          <p className="usage-chart__caption">赤い棒は、その日に失敗したルート計算が含まれることを示します。</p>
-        </div>
-
-        <div className="admin-panel">
-          <div className="admin-panel__heading">
-            <div><span>THIS MONTH</span><h2>移動手段別</h2></div>
-          </div>
-          {usage.byMode.length ? (
-            <div className="usage-mode-list">
-              {usage.byMode.map((mode) => (
-                <div key={mode.travelMode}>
-                  <strong>{travelModeLabels[mode.travelMode] ?? mode.travelMode}</strong>
-                  <span>{mode.apiRequests.toLocaleString("ja-JP")} リクエスト</span>
-                  <small>計算 {mode.calculations.toLocaleString("ja-JP")}回・失敗 {mode.failed.toLocaleString("ja-JP")}回</small>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-note">今月のサーバー経由ルート検索はまだありません。</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UsagePeriod({
-  title,
-  totals,
-}: {
-  title: string;
-  totals: {
-    calculations: number;
-    apiRequests: number;
-    failed: number;
-    averageResponseTimeMs: number;
-  };
-}) {
-  return (
-    <article className="usage-period">
-      <span>{title}</span>
-      <strong>{totals.apiRequests.toLocaleString("ja-JP")}</strong>
-      <small>Google APIリクエスト</small>
-      <dl>
-        <div><dt>ルート計算</dt><dd>{totals.calculations.toLocaleString("ja-JP")}回</dd></div>
-        <div><dt>失敗</dt><dd className={totals.failed ? "has-error" : ""}>{totals.failed.toLocaleString("ja-JP")}回</dd></div>
-        <div><dt>平均応答</dt><dd>{(totals.averageResponseTimeMs / 1000).toFixed(1)}秒</dd></div>
-      </dl>
-    </article>
-  );
-}
-
 function PhotoManager({
   spots,
   assets,
   setAssets,
-  localMode,
   localToken,
 }: {
   spots: PilgrimageSpot[];
   assets: AdminAsset[];
   setAssets: React.Dispatch<React.SetStateAction<AdminAsset[]>>;
-  localMode: boolean;
   localToken: string;
 }) {
   const [queue, setQueue] = useState<QueuedPhoto[]>([]);
@@ -1308,37 +1105,18 @@ function PhotoManager({
           photo.gpsState.state === "found" || photo.gpsState.state === "far" ? photo.gpsState.nearestSpotId : null,
       };
 
-      let response: Response;
-      if (localMode) {
-        response = await fetch("/api/admin/media", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-local-admin-token": localToken,
-          },
-          body: JSON.stringify({
-            derivativeBase64: await blobToBase64(derivative),
-            contentType: derivative.type,
-            metadata,
-          }),
-        });
-      } else {
-        const formData = new FormData();
-        formData.append("original", photo.file);
-        formData.append(
-          "derivative",
-          new File(
-            [derivative],
-            derivative.type === "image/webp" ? "public.webp" : "public.jpg",
-            { type: derivative.type },
-          ),
-        );
-        formData.append("metadata", JSON.stringify(metadata));
-        response = await fetch("/api/admin/media", {
-          method: "POST",
-          body: formData,
-        });
-      }
+      const response = await fetch("/api/admin/media", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-local-admin-token": localToken,
+        },
+        body: JSON.stringify({
+          derivativeBase64: await blobToBase64(derivative),
+          contentType: derivative.type,
+          metadata,
+        }),
+      });
       const result = (await response.json()) as { asset?: AdminAsset; error?: string };
       if (!response.ok || !result.asset) {
         throw new Error(result.error ?? "画像を公開できませんでした。");
@@ -1355,11 +1133,7 @@ function PhotoManager({
       const asset = await uploadPhoto(currentPhoto);
       setAssets((current) => [asset, ...current]);
       removeQueuedPhoto(currentPhoto.id);
-      setMessage(
-        localMode
-          ? "透かし済み画像をローカルファイルへ保存しました。GitHub Pagesへはまだ公開されていません。"
-          : "公開しました。次の写真があれば続けて調整できます。",
-      );
+      setMessage("透かし済み画像をローカルファイルへ保存しました。GitHub Pagesへはまだ公開されていません。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "画像を公開できませんでした。");
     } finally {
@@ -1403,11 +1177,7 @@ function PhotoManager({
     if (failures.length) {
       setMessage(`${uploaded.length}枚を保存、${failures.length}枚を未処理のまま残しました。${failures.join(" / ")}`);
     } else {
-      setMessage(
-        localMode
-          ? `${uploaded.length}枚をローカルファイルへ一括保存しました。GitHub Pagesへはまだ公開されていません。`
-          : `${uploaded.length}枚を一括公開しました。`,
-      );
+      setMessage(`${uploaded.length}枚をローカルファイルへ一括保存しました。GitHub Pagesへはまだ公開されていません。`);
     }
     setBatchProgress(null);
     setSaving(false);
@@ -1418,13 +1188,11 @@ function PhotoManager({
       ? "\nこの画像は現在トップ画像候補にも使われています。"
       : "";
     if (!window.confirm(
-      localMode
-        ? `「${asset.originalName}」をローカルの公開用ファイルから削除しますか？${heroWarning}`
-        : `「${asset.originalName}」を公開一覧と非公開保管領域から削除しますか？${heroWarning}`,
+      `「${asset.originalName}」をローカルの公開用ファイルから削除しますか？${heroWarning}`,
     )) return;
     const response = await fetch(`/api/admin/media/${asset.id}`, {
       method: "DELETE",
-      headers: localMode ? { "x-local-admin-token": localToken } : undefined,
+      headers: { "x-local-admin-token": localToken },
     });
     if (!response.ok) {
       const result = (await response.json().catch(() => ({}))) as { error?: string };
@@ -1436,7 +1204,7 @@ function PhotoManager({
   }
 
   async function changeHeroCandidate(asset: AdminAsset, enabled: boolean) {
-    if (!localMode || changingHeroCandidateId) return;
+    if (changingHeroCandidateId) return;
     setChangingHeroCandidateId(asset.id);
     setMessage("");
     try {
@@ -1529,7 +1297,6 @@ function PhotoManager({
                         aria-label={`${photo.file.name}を編集`}
                         onClick={() => setSelectedPhotoId(photo.id)}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={photo.url} alt="" />
                         <span>{String(index + 1).padStart(2, "0")}</span>
                       </button>
@@ -1647,7 +1414,7 @@ function PhotoManager({
               <p className="privacy-note">
                 公開用画像はWebP/JPEGへ再生成され、{watermarkText}の透かしを焼き込みます。
                 GPS・端末名・ISO・撮影日時などのEXIFは含まれず、
-                {localMode ? "選択した元写真はプロジェクト内へ保存しません。" : "元写真は非公開で保管します。"}
+                選択した元写真はプロジェクト内へ保存しません。
               </p>
             </div>
           </>
@@ -1667,7 +1434,6 @@ function PhotoManager({
           {heroAssets.length ? (
             <div className="hero-candidate-thumbnails">
               {heroAssets.map((asset) => (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img key={asset.id} src={asset.imageUrl} alt={asset.originalName} />
               ))}
             </div>
@@ -1682,7 +1448,6 @@ function PhotoManager({
               const isHeroCandidate = asset.heroCandidate ?? asset.placement === "hero";
               return (
                 <article key={asset.id} className={isHeroCandidate ? "is-hero-candidate" : undefined}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={asset.imageUrl} alt="" />
                   <div className="published-list__copy">
                     <div>
@@ -1692,20 +1457,18 @@ function PhotoManager({
                     <span>{asset.originalName}</span>
                   </div>
                   <div className="published-list__actions">
-                    {localMode ? (
-                      <button
-                        type="button"
-                        aria-pressed={isHeroCandidate}
-                        disabled={changingHeroCandidateId === asset.id}
-                        onClick={() => changeHeroCandidate(asset, !isHeroCandidate)}
-                      >
-                        {changingHeroCandidateId === asset.id
-                          ? "変更中…"
-                          : isHeroCandidate
-                            ? "候補から外す"
-                            : "候補に追加"}
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      aria-pressed={isHeroCandidate}
+                      disabled={changingHeroCandidateId === asset.id}
+                      onClick={() => changeHeroCandidate(asset, !isHeroCandidate)}
+                    >
+                      {changingHeroCandidateId === asset.id
+                        ? "変更中…"
+                        : isHeroCandidate
+                          ? "候補から外す"
+                          : "候補に追加"}
+                    </button>
                     <button type="button" onClick={() => deleteAsset(asset)}>削除</button>
                   </div>
                 </article>
@@ -1724,7 +1487,6 @@ function SpotManager({
   baseSpots,
   overrideIds,
   setOverrideIds,
-  localMode,
   localToken,
 }: {
   spots: PilgrimageSpot[];
@@ -1732,7 +1494,6 @@ function SpotManager({
   baseSpots: PilgrimageSpot[];
   overrideIds: Set<string>;
   setOverrideIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-  localMode: boolean;
   localToken: string;
 }) {
   const [selectedId, setSelectedId] = useState(spots[0]?.id ?? "");
@@ -1795,7 +1556,7 @@ function SpotManager({
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          ...(localMode ? { "x-local-admin-token": localToken } : {}),
+          "x-local-admin-token": localToken,
         },
         body: JSON.stringify(draft),
       });
@@ -1803,11 +1564,7 @@ function SpotManager({
       if (!response.ok || !result.spot) throw new Error(result.error ?? "保存できませんでした。");
       setSpots((current) => current.map((spot) => spot.id === draft.id ? result.spot! : spot));
       setOverrideIds((current) => new Set(current).add(draft.id));
-      setMessage(
-        localMode
-          ? "ローカルファイルへ保存しました。GitHub Pagesへはまだ公開されていません。"
-          : "保存しました。公開画面にも反映されています。",
-      );
+      setMessage("ローカルファイルへ保存しました。GitHub Pagesへはまだ公開されていません。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存できませんでした。");
     } finally {
@@ -1819,7 +1576,7 @@ function SpotManager({
     if (!window.confirm("このスポットの修正を取り消し、登録時の情報へ戻しますか？")) return;
     const response = await fetch(`/api/admin/spots/${draft.id}`, {
       method: "DELETE",
-      headers: localMode ? { "x-local-admin-token": localToken } : undefined,
+      headers: { "x-local-admin-token": localToken },
     });
     if (!response.ok) {
       const result = (await response.json().catch(() => ({}))) as { error?: string };
@@ -1836,11 +1593,7 @@ function SpotManager({
       next.delete(draft.id);
       return next;
     });
-    setMessage(
-      localMode
-        ? "サーバー起動時の内容へ戻し、ローカルファイルへ保存しました。"
-        : "登録時の情報へ戻しました。",
-    );
+    setMessage("サーバー起動時の内容へ戻し、ローカルファイルへ保存しました。");
   }
 
   return (

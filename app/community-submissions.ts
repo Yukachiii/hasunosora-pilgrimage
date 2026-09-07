@@ -1,15 +1,7 @@
 export const communitySubmissionKinds = ["photo", "spot"] as const;
-export const communitySubmissionStatuses = [
-  "pending",
-  "approved",
-  "rejected",
-  "imported",
-] as const;
 
 export type CommunitySubmissionKind =
   (typeof communitySubmissionKinds)[number];
-export type CommunitySubmissionStatus =
-  (typeof communitySubmissionStatuses)[number];
 
 export type PhotoSubmissionPayload = {
   spotId: string;
@@ -34,9 +26,6 @@ export type CommunitySubmissionPayloadByKind = {
   photo: PhotoSubmissionPayload;
   spot: SpotSubmissionPayload;
 };
-
-export type CommunitySubmissionPayload =
-  CommunitySubmissionPayloadByKind[CommunitySubmissionKind];
 
 export class CommunitySubmissionValidationError extends Error {
   constructor(message: string) {
@@ -218,21 +207,7 @@ export function parseCommunitySubmissionKind(
   throw new CommunitySubmissionValidationError("投稿の種類が正しくありません。");
 }
 
-export function parseCommunitySubmissionStatus(
-  value: unknown,
-): CommunitySubmissionStatus {
-  if (
-    value === "pending" ||
-    value === "approved" ||
-    value === "rejected" ||
-    value === "imported"
-  ) {
-    return value;
-  }
-  throw new CommunitySubmissionValidationError("投稿の状態が正しくありません。");
-}
-
-export function parsePhotoSubmissionPayload(
+function parsePhotoSubmissionPayload(
   value: unknown,
 ): PhotoSubmissionPayload {
   const payload = assertPlainObject(value);
@@ -249,7 +224,7 @@ export function parsePhotoSubmissionPayload(
   return { spotId, ...(comment ? { comment } : {}) };
 }
 
-export function parseSpotSubmissionPayload(
+function parseSpotSubmissionPayload(
   value: unknown,
 ): SpotSubmissionPayload {
   const payload = assertPlainObject(value);

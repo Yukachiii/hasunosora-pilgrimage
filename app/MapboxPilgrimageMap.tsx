@@ -1,9 +1,6 @@
-"use client";
-
 import mapboxgl from "mapbox-gl";
 import type * as GeoJSON from "geojson";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ServerRoutePlanError, ServerRoutePlanResponse } from "./route-api";
 import type { PilgrimageSpot } from "./spots";
 import type { RouteLocation, TravelMode } from "./route-planner";
 
@@ -25,8 +22,6 @@ export type RouteResult = {
   accessDurationMinutes?: number;
   legDurationMinutes?: number[];
   orderedStopIds?: string[];
-  source?: "server" | "browser";
-  apiRequestCount?: number;
   message?: string;
 };
 
@@ -40,7 +35,6 @@ type Props = {
   routeRequest: RouteRequest | null;
   onRouteResult: (result: RouteResult) => void;
   accessToken: string;
-  routeServiceUrl: string;
   isVisible?: boolean;
   viewMode?: "explore" | "planner";
 };
@@ -100,31 +94,6 @@ function formatTravelTime(minutes: number) {
   const remainder = roundedMinutes % 60;
   if (!hours) return `${remainder}分`;
   return remainder ? `${hours}時間${remainder}分` : `${hours}時間`;
-}
-
-function decodeEncodedPolyline(encoded: string) {
-  const coordinates: Array<[number, number]> = [];
-  let index = 0;
-  let latitude = 0;
-  let longitude = 0;
-  while (index < encoded.length) {
-    const deltas = [0, 0];
-    for (let coordinate = 0; coordinate < 2; coordinate += 1) {
-      let result = 0;
-      let shift = 0;
-      let byte = 0;
-      do {
-        byte = encoded.charCodeAt(index++) - 63;
-        result |= (byte & 0x1f) << shift;
-        shift += 5;
-      } while (byte >= 0x20 && index <= encoded.length);
-      deltas[coordinate] = result & 1 ? ~(result >> 1) : result >> 1;
-    }
-    latitude += deltas[0];
-    longitude += deltas[1];
-    coordinates.push([longitude / 1e5, latitude / 1e5]);
-  }
-  return coordinates;
 }
 
 function mapboxProfile(mode: TravelMode) {
@@ -248,7 +217,6 @@ export function MapboxPilgrimageMap({
   routeRequest,
   onRouteResult,
   accessToken,
-  routeServiceUrl,
   isVisible = true,
   viewMode = "explore",
 }: Props) {
@@ -514,67 +482,6 @@ export function MapboxPilgrimageMap({
       onRouteResult({ state: "loading" });
       clearRoute();
       try {
-        if (routeServiceUrl) {
-          let serverResponse: Response | null = null;
-          try {
-            serverResponse = await fetch(routeServiceUrl, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                stopIds: requestedRoute.stops.map((spot) => spot.id),
-                stopLocations: requestedRoute.stops.map((spot) => ({
-                  id: spot.id,
-                  lat: spot.lat,
-                  lng: spot.lng,
-                })),
-                travelMode: requestedRoute.travelMode,
-                optimizeWaypointOrder: requestedRoute.optimizeWaypointOrder,
-                stayMinutes: Object.fromEntries(
-                  requestedRoute.stops.map((spot) => [
-                    spot.id,
-                    requestedRoute.stayMinutes[spot.id] ?? 0,
-                  ]),
-                ),
-                departureTime: requestedRoute.departureTime,
-              }),
-              signal: controller.signal,
-            });
-          } catch (error) {
-            if (error instanceof DOMException && error.name === "AbortError") return;
-          }
-
-          if (serverResponse?.ok) {
-            const result = await serverResponse.json() as ServerRoutePlanResponse;
-            if (cancelled) return;
-            drawRoute(result.encodedPolylines.map(decodeEncodedPolyline));
-            onRouteResult({
-              state: "success",
-              distance: formatDistance(result.distanceMeters),
-              duration: formatTravelTime(result.travelDurationMinutes),
-              travelDurationMinutes: result.travelDurationMinutes,
-              accessDurationMinutes: result.accessDurationMinutes,
-              legDurationMinutes: result.legDurationMinutes,
-              orderedStopIds: result.orderedStopIds,
-              source: "server",
-              apiRequestCount: result.apiRequestCount,
-            });
-            return;
-          }
-
-          const serverError = serverResponse
-            ? await serverResponse.json().catch(() => ({})) as ServerRoutePlanError
-            : null;
-          const shouldFallbackToMapbox = serverResponse && (
-            serverResponse.status === 404 ||
-            serverResponse.status >= 500 ||
-            serverError?.code === "SPOT_DATA_OUT_OF_DATE" ||
-            serverError?.error === "登録されていないスポットが含まれています。"
-          );
-          if (serverResponse && !shouldFallbackToMapbox) {
-            throw new Error(serverError?.error || "ルートを計算できませんでした。");
-          }
-        }
-
         if (!token) {
           onRouteResult({
             state: "fallback",
@@ -632,8 +539,6 @@ export function MapboxPilgrimageMap({
           accessDurationMinutes: 0,
           legDurationMinutes: route.legs.map((leg) => Math.max(1, Math.round(leg.duration / 60))),
           orderedStopIds,
-          source: "browser",
-          apiRequestCount: 1,
         });
       } catch (error) {
         if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
@@ -649,7 +554,7 @@ export function MapboxPilgrimageMap({
       cancelled = true;
       controller.abort();
     };
-  }, [clearRoute, drawRoute, onRouteResult, routeRequest, routeServiceUrl, token]);
+  }, [clearRoute, drawRoute, onRouteResult, routeRequest, token]);
 
   const fallbackMode = mapState === "fallback" || mapState === "error";
 
