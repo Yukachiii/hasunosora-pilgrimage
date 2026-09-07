@@ -5,7 +5,8 @@ export const SHARED_PLAN_VERSION = 1 as const;
 export const SHARED_PLAN_MAX_TOKEN_LENGTH = 8_000;
 
 const maximumSharedDays = 7;
-const maximumSharedStopsPerDay = 27;
+// Keep shared links within the Mapbox Directions coordinate limit used by the planner.
+const maximumSharedStopsPerDay = 25;
 const maximumSharedStayMinutes = 480;
 const travelModes: TravelMode[] = ["WALKING", "DRIVING", "TRANSIT", "BICYCLING"];
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -171,6 +172,49 @@ export function sanitizeSharedPlanSnapshot(
     stayMinutes,
     travelMode: value.travelMode as TravelMode,
     optimizeOrder: value.optimizeOrder,
+    activeDayIndex,
+  };
+}
+
+function dateWithDayOffset(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
+/** Converts a reviewed public share into a fresh local planner draft. */
+export function createPlannerSnapshotFromSharedPlan(
+  snapshot: SharedPlanSnapshot,
+  validSpotIds: ReadonlySet<string>,
+  fallbackStartDate: string,
+): PlannerSnapshot | null {
+  if (!datePattern.test(fallbackStartDate)) return null;
+  const shared = sanitizeSharedPlanSnapshot(snapshot, validSpotIds);
+  if (!shared) return null;
+  const plannerDays = shared.days.map((day, index) => ({
+    id: `shared-day-${index + 1}`,
+    visitDate: day.visitDate ?? dateWithDayOffset(fallbackStartDate, index),
+    startTime: day.startTime,
+    endTime: day.endTime,
+    itineraryIds: [...day.itineraryIds],
+    hotelName: "",
+    appointments: [],
+  }));
+  const activeDayIndex = Math.max(0, Math.min(plannerDays.length - 1, shared.activeDayIndex));
+  const activeDay = plannerDays[activeDayIndex];
+  return {
+    itineraryIds: [...activeDay.itineraryIds],
+    stayMinutes: { ...shared.stayMinutes },
+    travelMode: shared.travelMode,
+    optimizeOrder: shared.optimizeOrder,
+    sourceStationId: "",
+    visitDate: activeDay.visitDate,
+    startTime: activeDay.startTime,
+    itineraryCollaborationId: "",
+    completedSpotIds: [],
+    todayOffsetMinutes: 0,
+    transitLegProgress: {},
+    plannerDays,
     activeDayIndex,
   };
 }

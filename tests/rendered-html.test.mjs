@@ -264,6 +264,7 @@ test("Mapbox map and route integration stays guarded", async () => {
   assert.match(map, /optimized-trips\/v1/);
   assert.match(map, /directions\/v5/);
   assert.match(map, /optimizeWaypointOrder/);
+  assert.match(map, /if \(mapState !== "ready" \|\| !routeLinesRef\.current\.length\) return/);
   assert.doesNotMatch(map, /routeServiceUrl|ServerRoutePlan|source: "server"/);
   assert.match(map, /planned: "\.\/map-markers\/green\.png"/);
   assert.match(map, /card: "\.\/map-markers\/blue\.png"/);
@@ -615,6 +616,16 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /automaticRouteAttemptRef/);
   assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]*?searchRoute\(\);[\s\S]*?\}, 650\)/);
   assert.match(app, /自動で予定を作成します/);
+  assert.match(app, /PLANNER_SHARE_MESSAGE = "訪問予定を共有します。\\n#蓮ノ旅"/);
+  assert.match(app, /text: PLANNER_SHARE_MESSAGE/);
+  assert.match(app, /className="shared-plan-route-preview"/);
+  assert.match(app, /routeRequest=\{sharedRouteRequest\}/);
+  assert.match(app, /onRouteResult=\{handleSharedRouteResult\}/);
+  assert.match(app, /createPlannerSnapshotFromSharedPlan/);
+  assert.match(app, /現在この端末に保存されている予定は、共有された予定で上書きされます/);
+  assert.match(app, /onClick=\{importSharedPlan\}/);
+  assert.match(css, /\.shared-plan-route-preview \.map-shell\s*\{[^}]*height:\s*390px/s);
+  assert.match(css, /\.shared-plan-import\s*\{/);
   assert.match(app, /className="itinerary-spot-focus"/);
   assert.match(app, /focusSpotRequest=\{mapFocusRequest\}/);
   assert.doesNotMatch(app, /className="itinerary-add"|className="planner-find-spots"/);

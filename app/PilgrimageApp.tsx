@@ -50,6 +50,7 @@ import {
 } from "./yahoo-transit";
 import { reorderIdsForInsertion, sameIdOrder } from "./itinerary-order";
 import {
+  createPlannerSnapshotFromSharedPlan,
   createSharedPlanSnapshot,
   decodeSharedPlanSnapshot,
   encodeSharedPlanSnapshot,
@@ -65,6 +66,7 @@ const CARD_MODEL_SPOT_IDS = Array.from(new Set(
 const GENERIC_SPOT_DESCRIPTION = "活動記録・関連映像・協力クレジットなどから整理した巡礼スポットです。訪問前に最新の施設情報を確認しましょう。";
 const GENERIC_ACCESS_NOTE = "訪問前に営業時間・利用案内を確認";
 const CARD_ILLUSTRATION_COPYRIGHT = "©︎PL!HS ©︎S ©︎2023 BNML ©︎ODD No.";
+const PLANNER_SHARE_MESSAGE = "訪問予定を共有します。\n#蓮ノ旅";
 
 function publicSpotDescription(description: string) {
   return description === GENERIC_SPOT_DESCRIPTION
@@ -261,6 +263,8 @@ export function PilgrimageApp({
   const [sharedPlan, setSharedPlan] = useState<SharedPlanSnapshot | null>(null);
   const [sharedPlanLoaded, setSharedPlanLoaded] = useState(false);
   const [sharedPlanDayIndex, setSharedPlanDayIndex] = useState(0);
+  const [sharedSelectedSpotId, setSharedSelectedSpotId] = useState("");
+  const [sharedRouteResult, setSharedRouteResult] = useState<RouteResult>({ state: "idle" });
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [includeDatesInShare, setIncludeDatesInShare] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
@@ -548,12 +552,17 @@ export function PilgrimageApp({
           sectionId,
           new Set(spots.map((spot) => spot.id)),
         );
+        const initialDayIndex = plan?.activeDayIndex ?? 0;
         setSharedPlan(plan);
-        setSharedPlanDayIndex(plan?.activeDayIndex ?? 0);
+        setSharedPlanDayIndex(initialDayIndex);
+        setSharedSelectedSpotId(plan?.days[initialDayIndex]?.itineraryIds[0] ?? "");
+        setSharedRouteResult({ state: "idle" });
         setSharedPlanLoaded(true);
       } else {
         setSharedPlan(null);
         setSharedPlanLoaded(false);
+        setSharedSelectedSpotId("");
+        setSharedRouteResult({ state: "idle" });
       }
       const nextExplorePanel =
         nextPage === "explore" && (sectionId === "spots" || sectionId === "card-models")
@@ -840,6 +849,34 @@ export function PilgrimageApp({
       .filter((spot): spot is PilgrimageSpot => Boolean(spot)),
     [sharedActiveDay, spots],
   );
+  const sharedPreviewSpots = useMemo(() => {
+    if (sharedRouteResult.state !== "success" || !sharedRouteResult.orderedStopIds?.length) {
+      return sharedDaySpots;
+    }
+    const byId = new Map(sharedDaySpots.map((spot) => [spot.id, spot]));
+    return sharedRouteResult.orderedStopIds
+      .map((id) => byId.get(id))
+      .filter((spot): spot is PilgrimageSpot => Boolean(spot));
+  }, [sharedDaySpots, sharedRouteResult]);
+  const sharedPreviewSelectedId = sharedPreviewSpots.some((spot) => spot.id === sharedSelectedSpotId)
+    ? sharedSelectedSpotId
+    : sharedPreviewSpots[0]?.id ?? "";
+  const sharedRouteRequest = useMemo<RouteRequest | null>(() => {
+    if (activePage !== "shared" || !sharedPlan || !sharedActiveDay || sharedDaySpots.length < 2) {
+      return null;
+    }
+    return {
+      requestId: sharedPlanDayIndex + 1,
+      stops: sharedDaySpots,
+      travelMode: sharedPlan.travelMode,
+      optimizeWaypointOrder: sharedPlan.travelMode !== "TRANSIT" && sharedPlan.optimizeOrder,
+      stayMinutes: { ...sharedPlan.stayMinutes },
+      departureTime: departureIso(
+        sharedActiveDay.visitDate ?? japanDate(),
+        sharedActiveDay.startTime,
+      ),
+    };
+  }, [activePage, sharedActiveDay, sharedDaySpots, sharedPlan, sharedPlanDayIndex]);
   const sharedTravelModeLabel = sharedPlan
     ? travelModes.find((mode) => mode.value === sharedPlan.travelMode)?.label ?? "徒歩"
     : "";
@@ -1031,7 +1068,7 @@ export function PilgrimageApp({
       try {
         await navigator.share({
           title: "蓮ノ旅の予定",
-          text: "訪問予定を共有します。",
+          text: PLANNER_SHARE_MESSAGE,
           url: shareUrl,
         });
         setShareFeedback("共有画面を開きました。");
@@ -1041,6 +1078,37 @@ export function PilgrimageApp({
       }
     }
     await copyShareUrl();
+  }
+
+  function importSharedPlan() {
+    if (!sharedPlan || !hasRestoredPlannerStorage) return;
+    const imported = createPlannerSnapshotFromSharedPlan(
+      sharedPlan,
+      new Set(spots.map((spot) => spot.id)),
+      japanDate(),
+    );
+    if (!imported) return;
+    const confirmed = window.confirm(
+      "現在この端末に保存されている予定は、共有された予定で上書きされます。取り込みますか？",
+    );
+    if (!confirmed) return;
+    setPlannerDays(imported.plannerDays);
+    setActiveDayIndex(imported.activeDayIndex);
+    setStayMinutes(imported.stayMinutes);
+    setTravelMode(imported.travelMode);
+    setOptimizeOrder(imported.optimizeOrder);
+    setSourceStationId(imported.sourceStationId);
+    setItineraryCollaborationId("");
+    setCompletedSpotIds([]);
+    setTodayOffsetMinutes(0);
+    setTransitLegProgress({});
+    setDayRouteCache({});
+    setRouteRequest(null);
+    setRouteResult({ state: "idle" });
+    setSelectedCardModelId(null);
+    setSelectedId(imported.itineraryIds[0] ?? spots[0].id);
+    automaticRouteAttemptRef.current = "";
+    navigateToPage("planner");
   }
 
   function navigateToPage(page: NavigableAppPage, sectionId?: string) {
@@ -1104,6 +1172,10 @@ export function PilgrimageApp({
       }));
     }
   }, [activeDayId, routeRequest]);
+
+  const handleSharedRouteResult = useCallback((result: RouteResult) => {
+    setSharedRouteResult(result);
+  }, []);
 
   const searchRoute = useCallback(() => {
     if (itinerarySpots.length < 2) {
@@ -3111,13 +3183,63 @@ export function PilgrimageApp({
                     type="button"
                     key={`${day.startTime}-${index}`}
                     aria-current={index === sharedPlanDayIndex ? "date" : undefined}
-                    onClick={() => setSharedPlanDayIndex(index)}
+                    onClick={() => {
+                      setSharedPlanDayIndex(index);
+                      setSharedSelectedSpotId(day.itineraryIds[0] ?? "");
+                      setSharedRouteResult({ state: "idle" });
+                    }}
                   >
                     <strong>{index + 1}日目</strong>
                     <span>{day.visitDate?.replaceAll("-", "/") ?? "日付非公開"}</span>
                   </button>
                 ))}
               </nav>
+            ) : null}
+
+            {sharedActiveDay && sharedDaySpots.length ? (
+              <section className="shared-plan-route-preview" aria-labelledby="shared-route-preview-title">
+                <header>
+                  <div>
+                    <small>ROUTE PREVIEW</small>
+                    <h2 id="shared-route-preview-title">共有された経路</h2>
+                  </div>
+                  <span>{sharedPlanDayIndex + 1}日目 · {sharedDaySpots.length}か所</span>
+                </header>
+                <MapboxPilgrimageMap
+                  spots={sharedPreviewSpots}
+                  selectedId={sharedPreviewSelectedId}
+                  plannedSpotIds={sharedActiveDay.itineraryIds}
+                  cardModelSpotIds={CARD_MODEL_SPOT_IDS}
+                  onSelect={setSharedSelectedSpotId}
+                  routeRequest={sharedRouteRequest}
+                  onRouteResult={handleSharedRouteResult}
+                  accessToken={mapboxConfig.accessToken}
+                  isVisible={activePage === "shared"}
+                  viewMode="planner"
+                />
+                <div className={`shared-plan-route-preview__status is-${sharedRouteResult.state}`} aria-live="polite">
+                  {sharedPlan.travelMode === "TRANSIT" ? (
+                    <>
+                      <strong>訪問先を地図で確認できます</strong>
+                      <span>公共交通の区間検索は、取り込み後の予定画面から確認してください。</span>
+                    </>
+                  ) : sharedDaySpots.length < 2 ? (
+                    <strong>訪問先を地図で表示しています</strong>
+                  ) : sharedRouteResult.state === "success" ? (
+                    <>
+                      <strong>{sharedRouteResult.distance} · {sharedRouteResult.duration}</strong>
+                      <span>経路と移動時間はMapboxによる目安です。</span>
+                    </>
+                  ) : sharedRouteResult.state === "error" || sharedRouteResult.state === "fallback" ? (
+                    <>
+                      <strong>経路を表示できませんでした</strong>
+                      <span>{sharedRouteResult.message}</span>
+                    </>
+                  ) : (
+                    <strong>{sharedRouteResult.state === "loading" ? "経路を計算しています…" : "経路を準備しています…"}</strong>
+                  )}
+                </div>
+              </section>
             ) : null}
 
             {sharedActiveDay ? (
@@ -3130,7 +3252,7 @@ export function PilgrimageApp({
                   <span>{sharedActiveDay.startTime}開始 · {sharedActiveDay.endTime}終了目安</span>
                 </header>
                 <ol>
-                  {sharedDaySpots.map((spot, index) => (
+                  {sharedPreviewSpots.map((spot, index) => (
                     <li key={spot.id}>
                       <span className="shared-plan-day__number">{String(index + 1).padStart(2, "0")}</span>
                       <div>
@@ -3145,10 +3267,29 @@ export function PilgrimageApp({
                 </ol>
                 <p>
                   {sharedPlan.optimizeOrder ? "おすすめの訪問順" : "共有された順番"}
-                  <span>経路と移動時間はこの画面では表示しません。</span>
+                  <span>地図上の経路と移動時間は目安です。</span>
                 </p>
               </article>
             ) : null}
+
+            <section className="shared-plan-import" aria-labelledby="shared-plan-import-title">
+              <div>
+                <small>IMPORT PLAN</small>
+                <strong id="shared-plan-import-title">この予定を自分の予定に取り込む</strong>
+                <p>
+                  現在この端末に保存されている予定は、共有された予定で上書きされます。
+                  訪問日が共有されていない場合は、今日からの日程として取り込みます。
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={!hasRestoredPlannerStorage}
+                onClick={importSharedPlan}
+              >
+                {hasRestoredPlannerStorage ? "予定に取り込む" : "保存済み予定を確認中…"}
+                <span aria-hidden="true">→</span>
+              </button>
+            </section>
 
             <aside className="shared-plan-privacy">
               <strong>共有されない情報</strong>

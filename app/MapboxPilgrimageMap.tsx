@@ -266,9 +266,9 @@ export function MapboxPilgrimageMap({
   const drawRoute = useCallback((lines: Array<Array<[number, number]>>) => {
     const map = mapRef.current;
     const usableLines = lines.filter((line) => line.length > 1);
-    if (!map?.isStyleLoaded() || !usableLines.length) return;
     clearRoute();
     routeLinesRef.current = usableLines;
+    if (!map?.isStyleLoaded() || !usableLines.length) return;
     const feature: GeoJSON.Feature<GeoJSON.MultiLineString> = {
       type: "Feature",
       properties: {},
@@ -293,6 +293,11 @@ export function MapboxPilgrimageMap({
     usableLines.flat().forEach(([lng, lat]) => bounds.extend([lng, lat]));
     map.fitBounds(bounds, { padding: 64, maxZoom: 15, duration: 650 });
   }, [clearRoute]);
+
+  useEffect(() => {
+    if (mapState !== "ready" || !routeLinesRef.current.length) return;
+    drawRoute(routeLinesRef.current);
+  }, [drawRoute, mapState]);
 
   const fitPlannerView = useCallback((duration: number) => {
     const map = mapRef.current;

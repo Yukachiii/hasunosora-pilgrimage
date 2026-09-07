@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createSharedPlanSnapshot,
+  createPlannerSnapshotFromSharedPlan,
   decodeSharedPlanSnapshot,
   encodeSharedPlanSnapshot,
   SHARED_PLAN_MAX_TOKEN_LENGTH,
@@ -92,6 +93,28 @@ test("shared plan includes dates only when explicitly requested", () => {
     "2026-09-12",
     "2026-09-13",
   ]);
+});
+
+test("shared plan imports as a fresh local draft without private planner data", () => {
+  const shared = createSharedPlanSnapshot(plannerSnapshot(), validSpotIds);
+  assert.ok(shared);
+  const imported = createPlannerSnapshotFromSharedPlan(
+    shared,
+    validSpotIds,
+    "2026-10-20",
+  );
+  assert.ok(imported);
+  assert.deepEqual(imported.plannerDays.map((day) => day.visitDate), [
+    "2026-10-20",
+    "2026-10-21",
+  ]);
+  assert.deepEqual(imported.itineraryIds, ["兼六園"]);
+  assert.equal(imported.travelMode, "WALKING");
+  assert.equal(imported.sourceStationId, "");
+  assert.equal(imported.itineraryCollaborationId, "");
+  assert.deepEqual(imported.completedSpotIds, []);
+  assert.deepEqual(imported.transitLegProgress, {});
+  assert.ok(imported.plannerDays.every((day) => day.hotelName === "" && day.appointments.length === 0));
 });
 
 test("shared plan never serializes private planner fields", () => {
