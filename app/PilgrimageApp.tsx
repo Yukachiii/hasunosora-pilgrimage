@@ -99,6 +99,20 @@ function pageFromHash(hash: string): AppPage {
     : "explore";
 }
 
+function resetWindowScroll() {
+  const scrollToTop = () => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  };
+  scrollToTop();
+  window.requestAnimationFrame(() => {
+    scrollToTop();
+    window.requestAnimationFrame(scrollToTop);
+  });
+  window.setTimeout(scrollToTop, 120);
+}
+
 const travelModes: Array<{
   value: TravelMode;
   label: string;
@@ -542,6 +556,14 @@ export function PilgrimageApp({
   }
 
   useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
+  useEffect(() => {
     const syncPage = () => {
       const nextPage = pageFromHash(window.location.hash);
       setActivePage(nextPage);
@@ -577,13 +599,13 @@ export function PilgrimageApp({
       }
       window.setTimeout(() => {
         if (nextPage === "shared") {
-          window.scrollTo({ top: 0 });
+          resetWindowScroll();
         } else if (sectionId && sectionId !== "spots" && sectionId !== "card-models") {
           const section = document.getElementById(sectionId);
           if (sectionId === "community-contribution") section?.focus({ preventScroll: true });
           section?.scrollIntoView({ block: "start" });
         } else if (!sectionId) {
-          window.scrollTo({ top: 0 });
+          resetWindowScroll();
         }
         if (nextPage === "explore") window.dispatchEvent(new Event("resize"));
       }, 0);
@@ -1122,11 +1144,8 @@ export function PilgrimageApp({
     plannerUrl.hash = "#/planner";
     window.history.replaceState(window.history.state, "", plannerUrl);
     setActivePage("planner");
-    window.scrollTo({ top: 0 });
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0 });
-      window.dispatchEvent(new Event("resize"));
-    });
+    resetWindowScroll();
+    window.requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
   }
 
   function navigateToPage(page: NavigableAppPage, sectionId?: string) {
@@ -1142,10 +1161,11 @@ export function PilgrimageApp({
     exploreSheetDragRef.current = null;
     exploreSheetSwipeStartYRef.current = null;
     const hash = `#/${page}${sectionId ? `/${sectionId}` : ""}`;
+    if (page !== activePage || !sectionId) resetWindowScroll();
     setActivePage(page);
     if (window.location.hash === hash) {
       if (sectionId) document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      else window.scrollTo({ top: 0, behavior: "smooth" });
+      else resetWindowScroll();
       return;
     }
     window.location.hash = hash;
