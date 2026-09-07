@@ -628,6 +628,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /setSharedPlan\(null\)/);
   assert.match(app, /function resetWindowScroll\(\)/);
   assert.match(app, /window\.history\.scrollRestoration = "manual"/);
+  assert.match(app, /activePage !== "shared" \? \(\s*<MapboxPilgrimageMap/);
+  assert.match(app, /activePage === "shared" && sharedActiveDay && sharedDaySpots\.length \? \(/);
   assert.match(css, /\.shared-plan-route-preview \.map-shell\s*\{[^}]*height:\s*390px/s);
   assert.match(css, /\.shared-plan-import\s*\{/);
   assert.match(app, /className="itinerary-spot-focus"/);

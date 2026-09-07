@@ -1972,22 +1972,24 @@ export function PilgrimageApp({
                 <span>{itinerarySpots.length}か所</span>
               </div>
             )}
-            <MapboxPilgrimageMap
-              spots={activePage === "planner" ? itinerarySpots : spots}
-              selectedId={selectedId}
-              focusSpotRequest={mapFocusRequest}
-              plannedSpotIds={itineraryIds}
-              cardModelSpotIds={CARD_MODEL_SPOT_IDS}
-              onSelect={(id) => {
-                setSelectedId(id);
-                setSelectedCardModelId(null);
-              }}
-              routeRequest={routeRequest}
-              onRouteResult={handleRouteResult}
-              accessToken={mapboxConfig.accessToken}
-              isVisible={activePage === "explore" || activePage === "planner"}
-              viewMode={activePage === "planner" ? "planner" : "explore"}
-            />
+            {activePage !== "shared" ? (
+              <MapboxPilgrimageMap
+                spots={activePage === "planner" ? itinerarySpots : spots}
+                selectedId={selectedId}
+                focusSpotRequest={mapFocusRequest}
+                plannedSpotIds={itineraryIds}
+                cardModelSpotIds={CARD_MODEL_SPOT_IDS}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                  setSelectedCardModelId(null);
+                }}
+                routeRequest={routeRequest}
+                onRouteResult={handleRouteResult}
+                accessToken={mapboxConfig.accessToken}
+                isVisible={activePage === "explore" || activePage === "planner"}
+                viewMode={activePage === "planner" ? "planner" : "explore"}
+              />
+            ) : null}
           </div>
           <div className="selected-map-detail" hidden={activePage !== "explore"}>
               <div className="selected-map-detail__heading">
@@ -3234,7 +3236,7 @@ export function PilgrimageApp({
               </nav>
             ) : null}
 
-            {sharedActiveDay && sharedDaySpots.length ? (
+            {activePage === "shared" && sharedActiveDay && sharedDaySpots.length ? (
               <section className="shared-plan-route-preview" aria-labelledby="shared-route-preview-title">
                 <header>
                   <div>
