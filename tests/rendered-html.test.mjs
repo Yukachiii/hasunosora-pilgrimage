@@ -624,6 +624,8 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /createPlannerSnapshotFromSharedPlan/);
   assert.match(app, /現在この端末に保存されている予定は、共有された予定で上書きされます/);
   assert.match(app, /onClick=\{importSharedPlan\}/);
+  assert.match(app, /window\.history\.replaceState\(window\.history\.state, "", plannerUrl\)/);
+  assert.match(app, /setSharedPlan\(null\)/);
   assert.match(css, /\.shared-plan-route-preview \.map-shell\s*\{[^}]*height:\s*390px/s);
   assert.match(css, /\.shared-plan-import\s*\{/);
   assert.match(app, /className="itinerary-spot-focus"/);

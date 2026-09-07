@@ -1107,8 +1107,26 @@ export function PilgrimageApp({
     setRouteResult({ state: "idle" });
     setSelectedCardModelId(null);
     setSelectedId(imported.itineraryIds[0] ?? spots[0].id);
+    setSharedPlan(null);
+    setSharedPlanLoaded(false);
+    setSharedPlanDayIndex(0);
+    setSharedSelectedSpotId("");
+    setSharedRouteResult({ state: "idle" });
     automaticRouteAttemptRef.current = "";
-    navigateToPage("planner");
+
+    // Replace the shared URL in place so Safari does not retain the long
+    // preview page's scroll position while the planner map becomes visible.
+    // Clearing the shared state in the same update also releases its Mapbox
+    // instance before the planner map is resized.
+    const plannerUrl = new URL(window.location.href);
+    plannerUrl.hash = "#/planner";
+    window.history.replaceState(window.history.state, "", plannerUrl);
+    setActivePage("planner");
+    window.scrollTo({ top: 0 });
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0 });
+      window.dispatchEvent(new Event("resize"));
+    });
   }
 
   function navigateToPage(page: NavigableAppPage, sectionId?: string) {
