@@ -306,6 +306,8 @@ export function PilgrimageApp({
     originalIds: string[];
     previewIds: string[];
     list: HTMLOListElement;
+    overlay: HTMLElement;
+    startY: number;
     pointerY: number;
   } | null>(null);
   const itineraryDragScrollFrameRef = useRef<number | null>(null);
@@ -1264,6 +1266,11 @@ export function PilgrimageApp({
     itineraryDragScrollFrameRef.current = null;
   }
 
+  function removeItineraryDragOverlay(overlay: HTMLElement) {
+    overlay.remove();
+    document.documentElement.classList.remove("is-itinerary-dragging");
+  }
+
   function runItineraryDragAutoScroll() {
     itineraryDragScrollFrameRef.current = null;
     const drag = itineraryDragRef.current;
@@ -1291,15 +1298,33 @@ export function PilgrimageApp({
   function startItineraryDrag(event: ReactPointerEvent<HTMLButtonElement>, spotId: string) {
     if (!event.isPrimary || event.button !== 0 || itineraryIds.length < 2) return;
     const list = event.currentTarget.closest("ol") as HTMLOListElement | null;
-    if (!list) return;
+    const row = event.currentTarget.closest<HTMLElement>("li[data-itinerary-spot-id]");
+    if (!list || !row) return;
     event.preventDefault();
     const previewIds = [...itineraryIds];
+    const bounds = row.getBoundingClientRect();
+    const overlay = row.cloneNode(true) as HTMLElement;
+    overlay.className = "itinerary-drag-overlay";
+    overlay.removeAttribute("data-itinerary-spot-id");
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.setAttribute("role", "presentation");
+    overlay.style.left = `${bounds.left}px`;
+    overlay.style.top = `${bounds.top}px`;
+    overlay.style.width = `${bounds.width}px`;
+    overlay.style.height = `${bounds.height}px`;
+    overlay.querySelectorAll<HTMLElement>("button, input").forEach((control) => {
+      control.tabIndex = -1;
+    });
+    document.body.appendChild(overlay);
+    document.documentElement.classList.add("is-itinerary-dragging");
     itineraryDragRef.current = {
       pointerId: event.pointerId,
       spotId,
       originalIds: previewIds,
       previewIds,
       list,
+      overlay,
+      startY: event.clientY,
       pointerY: event.clientY,
     };
     list.setPointerCapture(event.pointerId);
@@ -1312,6 +1337,7 @@ export function PilgrimageApp({
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.preventDefault();
     drag.pointerY = event.clientY;
+    drag.overlay.style.transform = `translate3d(0, ${event.clientY - drag.startY}px, 0)`;
     updateItineraryDragPreview(event.clientY);
     syncItineraryDragAutoScroll(event.clientY);
   }
@@ -1321,6 +1347,7 @@ export function PilgrimageApp({
     if (!drag || drag.pointerId !== event.pointerId) return;
     stopItineraryDragAutoScroll();
     itineraryDragRef.current = null;
+    removeItineraryDragOverlay(drag.overlay);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -1336,6 +1363,7 @@ export function PilgrimageApp({
     if (!drag || drag.pointerId !== event.pointerId) return;
     stopItineraryDragAutoScroll();
     itineraryDragRef.current = null;
+    removeItineraryDragOverlay(drag.overlay);
     setDraggedItinerarySpotId(null);
     setItineraryDragPreview(null);
   }

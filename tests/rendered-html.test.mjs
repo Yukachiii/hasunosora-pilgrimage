@@ -40,7 +40,7 @@ test("public entry renders the pilgrimage application", async () => {
   assert.match(app, /href="#\/explore\/community-contribution"/);
   assert.match(html, /lang="ja"/);
   assert.match(html, /og\.png/);
-  assert.equal(site.version, "3.0.0");
+  assert.equal(site.version, "3.0.1");
   assert.equal(packageJson.version, site.version);
   assert.doesNotMatch(entry + app + html, /codex-preview|Your site is taking shape/i);
 });
@@ -183,7 +183,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(entry, /PilgrimageApp/);
   assert.match(index, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "3.0.0");
+  assert.equal(JSON.parse(packageJson).version, "3.0.1");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
@@ -498,6 +498,10 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(app, /onPointerDown=\{\(event\) => startItineraryDrag\(event, spot\.id\)\}/);
   assert.match(app, /list\.setPointerCapture\(event\.pointerId\)/);
   assert.match(app, /setItineraryDragPreview\(nextOrder\)/);
+  assert.match(app, /row\.cloneNode\(true\)/);
+  assert.match(app, /document\.body\.appendChild\(overlay\)/);
+  assert.match(app, /drag\.overlay\.style\.transform = `translate3d/);
+  assert.match(app, /removeItineraryDragOverlay\(drag\.overlay\)/);
   const moveItineraryDrag = app.match(/function moveItineraryDrag\([\s\S]*?\n  \}/)?.[0] ?? "";
   assert.doesNotMatch(moveItineraryDrag, /setItineraryIds|invalidateRoute/);
   const finishItineraryDrag = app.match(/function finishItineraryDrag\([\s\S]*?\n  \}/)?.[0] ?? "";
@@ -588,6 +592,7 @@ test("planner persistence, opening hours, and today mode avoid extra route reque
   assert.match(css, /\.route-workspace__controls/);
   assert.match(css, /\.itinerary-drag-handle\s*\{[^}]*touch-action:\s*none/s);
   assert.match(css, /\.itinerary-editor li\.is-dragging\s*\{[^}]*box-shadow:/s);
+  assert.match(css, /\.itinerary-drag-overlay\s*\{[^}]*position:\s*fixed[^}]*pointer-events:\s*none/s);
   assert.match(css, /grid-template-areas:\s*"spot remove drag"\s*"stay remove drag"/s);
   assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*?\.planner-overview\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
   assert.doesNotMatch(css, /scroll-snap-(?:type|align)/);

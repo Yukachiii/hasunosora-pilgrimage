@@ -1068,9 +1068,52 @@ button {
 
 .itinerary-editor li.is-dragging {
   z-index: 2;
-  border-color: var(--ice-deep);
+  opacity: 0;
+  box-shadow: none;
+}
+
+.itinerary-drag-overlay {
+  position: fixed;
+  z-index: 1200;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 28px 36px;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--ice-deep);
+  border-radius: 5px;
   background: white;
-  box-shadow: 0 10px 24px rgba(18, 29, 43, 0.16);
+  color: var(--ink);
+  box-shadow: 0 18px 40px rgba(18, 29, 43, 0.24);
+  opacity: 0.98;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+}
+
+.itinerary-drag-overlay label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.itinerary-drag-overlay input {
+  width: 56px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+}
+
+html.is-itinerary-dragging,
+html.is-itinerary-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
 }
 
 .itinerary-editor li.itinerary-editor__empty {
@@ -3806,6 +3849,43 @@ footer > span {
       "spot remove drag"
       "stay remove drag";
     grid-template-columns: minmax(0, 1fr) 44px 44px;
+  }
+
+  .itinerary-drag-overlay {
+    grid-template-areas:
+      "spot remove drag"
+      "stay remove drag";
+    grid-template-columns: minmax(0, 1fr) 44px 44px;
+    gap: 6px;
+    padding: 11px 9px;
+  }
+
+  .itinerary-drag-overlay .itinerary-spot-focus {
+    grid-area: spot;
+  }
+
+  .itinerary-drag-overlay label {
+    grid-area: stay;
+  }
+
+  .itinerary-drag-overlay .itinerary-remove {
+    grid-area: remove;
+  }
+
+  .itinerary-drag-overlay .itinerary-drag-handle {
+    grid-area: drag;
+  }
+
+  .itinerary-drag-overlay input {
+    width: 64px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .itinerary-drag-overlay :is(.itinerary-remove, .itinerary-drag-handle) {
+    width: 44px;
+    height: 44px;
+    font-size: 13px;
   }
 
   .itinerary-spot-focus {
