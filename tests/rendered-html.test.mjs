@@ -143,6 +143,9 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /className="ui-trial__modal ui-trial__spot-window"/);
   assert.match(app, /aria-labelledby="ui-trial-spot-window-title"/);
   assert.match(app, /if \(nextMode === "spots"\)[\s\S]*setIsSpotWindowOpen\(true\)/);
+  assert.match(app, /spotQuery, setSpotQuery/);
+  assert.match(app, /spotAreaFilter, setSpotAreaFilter/);
+  assert.match(app, /spotSourceFilter, setSpotSourceFilter/);
   const todayPage = app.match(/function TodayPage[\s\S]*?function SharedPreviewPage/)?.[0] ?? "";
   assert.doesNotMatch(todayPage, /<img/);
   assert.doesNotMatch(app, /実働テスト|本番データ非干渉/);
@@ -157,6 +160,7 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(css, /ui-trial__search-filters\.is-expanded/);
   assert.match(css, /\.ui-trial__spot-window-dialog/);
   assert.match(css, /@keyframes ui-trial-spot-sheet-enter/);
+  assert.match(css, /body:has\(\.ui-trial__spot-window\) \.ui-trial__mobile-nav/);
   assert.doesNotMatch(css, /!important/);
 });
 

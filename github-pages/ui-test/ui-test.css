@@ -2831,6 +2831,10 @@ a {
     padding: 0;
   }
 
+  body:has(.ui-trial__spot-window) .ui-trial__mobile-nav {
+    z-index: 120;
+  }
+
   .ui-trial__spot-window-dialog {
     width: 100%;
     height: min(88dvh, 820px);
@@ -2877,7 +2881,7 @@ a {
   }
 
   .ui-trial__spot-window-body {
-    padding: 12px 14px calc(24px + env(safe-area-inset-bottom));
+    padding: 12px 14px calc(96px + env(safe-area-inset-bottom));
   }
 
   .ui-trial__spot-window-body .ui-trial__spot-results {

@@ -205,6 +205,10 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   const [areaFilter, setAreaFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState<ExploreSourceFilter>("all");
+  const [spotQuery, setSpotQuery] = useState("");
+  const [spotAreaFilter, setSpotAreaFilter] = useState("all");
+  const [spotCategoryFilter, setSpotCategoryFilter] = useState("all");
+  const [spotSourceFilter, setSpotSourceFilter] = useState<ExploreSourceFilter>("all");
   const [selectedId, setSelectedId] = useState(initialSpot?.id ?? "");
   const today = japanDate();
   const activeCollaborations = collaborations.filter((collaboration) => (
@@ -214,27 +218,34 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   const [selectedCollaborationId, setSelectedCollaborationId] = useState(availableCollaborations[0]?.id ?? "");
   const spotWindowCloseRef = useRef<HTMLButtonElement>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase("ja");
+  const normalizedSpotQuery = spotQuery.trim().toLocaleLowerCase("ja");
   const currentCollaboration = availableCollaborations.find(
     (collaboration) => collaboration.id === selectedCollaborationId,
   ) ?? availableCollaborations[0];
   const collaborationSpotIds = new Set(currentCollaboration?.locations.map((location) => location.spotId) ?? []);
-  const matchesSource = (spot: PilgrimageSpot) => (
-    sourceFilter === "all" ||
-    (sourceFilter === "activity" && Boolean(spot.activityRecords?.length)) ||
-    (sourceFilter === "sehas" && Boolean(spot.sehasEpisodes?.length)) ||
-    (sourceFilter === "with-meets" && Boolean(spot.withMeetsEpisodes?.length))
+  const matchesSource = (spot: PilgrimageSpot, filter: ExploreSourceFilter) => (
+    filter === "all" ||
+    (filter === "activity" && Boolean(spot.activityRecords?.length)) ||
+    (filter === "sehas" && Boolean(spot.sehasEpisodes?.length)) ||
+    (filter === "with-meets" && Boolean(spot.withMeetsEpisodes?.length))
   );
   const filteredStandardSpots = spots.filter((spot) => {
+    if (spotAreaFilter !== "all" && spot.area !== spotAreaFilter) return false;
+    if (spotCategoryFilter !== "all" && spot.category !== spotCategoryFilter) return false;
+    if (!matchesSource(spot, spotSourceFilter)) return false;
+    if (!normalizedSpotQuery) return true;
+    return [spot.name, spot.shortName, spot.area, spot.category, spot.address, spot.description]
+      .some((value) => value.toLocaleLowerCase("ja").includes(normalizedSpotQuery));
+  });
+  const filteredSpots = spots.filter((spot) => {
+    if (mode === "collaboration" && !collaborationSpotIds.has(spot.id)) return false;
     if (areaFilter !== "all" && spot.area !== areaFilter) return false;
     if (categoryFilter !== "all" && spot.category !== categoryFilter) return false;
-    if (!matchesSource(spot)) return false;
+    if (!matchesSource(spot, sourceFilter)) return false;
     if (!normalizedQuery) return true;
     return [spot.name, spot.shortName, spot.area, spot.category, spot.address, spot.description]
       .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
   });
-  const filteredSpots = mode === "collaboration"
-    ? filteredStandardSpots.filter((spot) => collaborationSpotIds.has(spot.id))
-    : filteredStandardSpots;
   const filteredCards = cardModels.filter((card) => {
     if (!card.spotId) return false;
     const spot = spots.find((item) => item.id === card.spotId);
@@ -260,7 +271,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
     ? filteredCards.findIndex((card) => card.spotId === selectedSpot?.id)
     : filteredSpots.findIndex((spot) => spot.id === selectedSpot?.id)) + 1;
   const activeFilterCount = Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all" && mode !== "cards");
-  const standardFilterCount = Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all");
+  const standardFilterCount = Number(spotAreaFilter !== "all") + Number(spotCategoryFilter !== "all") + Number(spotSourceFilter !== "all");
   const choices = [
     { number: "01", label: "地図", note: "場所から", mode: "map" as const },
     { number: "02", label: "定番", note: "登録スポット", mode: "spots" as const },
@@ -305,7 +316,8 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   }
 
   return (
-    <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title">
+    <>
+      <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title">
       <div className="ui-trial__explore-copy">
         <p className="ui-trial__eyebrow">ISHIKAWA / KANAZAWA</p>
         <h1 id="ui-trial-explore-title">作品の景色を、<br />旅の予定へ。</h1>
@@ -498,7 +510,8 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
           </article>
         ) : null}
       </div>
-      <button className="ui-trial__explore-plan-link" type="button" onClick={() => onNavigate("planner")}>予定を確認する</button>
+        <button className="ui-trial__explore-plan-link" type="button" onClick={() => onNavigate("planner")}>予定を確認する</button>
+      </section>
       {isSpotWindowOpen ? (
         <div
           className="ui-trial__modal ui-trial__spot-window"
@@ -524,17 +537,17 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
                 <span className="ui-trial__visually-hidden">スポットを検索</span>
                 <input
                   type="search"
-                  value={query}
+                  value={spotQuery}
                   placeholder="施設名・住所・登場回で検索"
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => setSpotQuery(event.target.value)}
                 />
                 <span aria-hidden="true">⌕</span>
               </label>
               <div>
-                <label><span>エリア</span><select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
-                <label><span>カテゴリ</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
-                <label><span>出典</span><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label>
-                <button type="button" disabled={!standardFilterCount} onClick={() => { setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all"); }}>条件をクリア</button>
+                <label><span>エリア</span><select value={spotAreaFilter} onChange={(event) => setSpotAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
+                <label><span>カテゴリ</span><select value={spotCategoryFilter} onChange={(event) => setSpotCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
+                <label><span>出典</span><select value={spotSourceFilter} onChange={(event) => setSpotSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label>
+                <button type="button" disabled={!standardFilterCount} onClick={() => { setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all"); }}>条件をクリア</button>
               </div>
             </div>
             <div className="ui-trial__spot-window-body">
@@ -558,7 +571,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
           </section>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }
 
