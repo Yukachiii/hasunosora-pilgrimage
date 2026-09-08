@@ -1212,13 +1212,17 @@ a {
 }
 
 .ui-trial__guide-notice strong {
-  font-size: 9px;
+  flex: 0 0 auto;
+  font-family: var(--trial-serif);
+  font-size: 18px;
+  font-weight: 400;
 }
 
 .ui-trial__guide-notice p {
   margin: 0;
   color: var(--trial-muted);
-  font-size: 8px;
+  font-size: 9px;
+  line-height: 1.7;
 }
 
 .ui-trial__guide-source {
@@ -2520,12 +2524,14 @@ a {
   .ui-trial__guide-notice {
     display: block;
     margin-top: 23px;
-    padding: 15px 20px;
-    text-align: center;
+    padding: 20px;
+    text-align: left;
   }
 
   .ui-trial__guide-notice p {
-    display: none;
+    display: block;
+    margin-top: 8px;
+    font-size: 8px;
   }
 
   .ui-trial__guide-source {
