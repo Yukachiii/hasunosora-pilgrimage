@@ -137,6 +137,7 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /selectedCollaborationId/);
   assert.match(app, /ui-trial__feature-context/);
   assert.match(app, /ui-trial__explore-window-filters/);
+  assert.match(app, /modalFilterCount > 0/);
   assert.match(app, /ExploreSourceFilter/);
   assert.match(app, /useLayoutEffect/);
   assert.match(app, /label: "地図"[\s\S]*label: "スポット"[\s\S]*label: "カード"[\s\S]*label: "コラボ"/);
@@ -168,6 +169,9 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(css, /ui-trial__explore-window-filters/);
   assert.match(css, /\.ui-trial__map-page-map/);
   assert.match(css, /\.ui-trial__explore-window-dialog/);
+  assert.match(css, /height: min\(92dvh, 840px\)/);
+  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.ui-trial__explore-window-filters select \{[\s\S]*?min-height: 44px/);
   assert.match(css, /@keyframes ui-trial-spot-sheet-enter/);
   assert.match(css, /body:has\(\.ui-trial__explore-window\) \.ui-trial__mobile-nav/);
   assert.doesNotMatch(css, /!important/);

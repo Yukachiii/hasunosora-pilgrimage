@@ -273,6 +273,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
     : filteredSpots.findIndex((spot) => spot.id === selectedSpot?.id)) + 1;
   const activeFilterCount = Number(Boolean(normalizedQuery)) + Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all" && openExploreModal === "collaboration");
   const standardFilterCount = Number(Boolean(normalizedSpotQuery)) + Number(spotAreaFilter !== "all") + Number(spotCategoryFilter !== "all") + Number(spotSourceFilter !== "all");
+  const modalFilterCount = openExploreModal === "spots" ? standardFilterCount : activeFilterCount;
   const choices = [
     { number: "01", label: "地図", note: "場所から", mode: "map" as const },
     { number: "02", label: "スポット", note: "登録スポット", mode: "spots" as const },
@@ -484,17 +485,18 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
                 <label><span>エリア</span><select value={openExploreModal === "spots" ? spotAreaFilter : areaFilter} onChange={(event) => openExploreModal === "spots" ? setSpotAreaFilter(event.target.value) : setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
                 <label><span>カテゴリ</span><select value={openExploreModal === "spots" ? spotCategoryFilter : categoryFilter} onChange={(event) => openExploreModal === "spots" ? setSpotCategoryFilter(event.target.value) : setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
                 {openExploreModal !== "cards" ? <label><span>出典</span><select value={openExploreModal === "spots" ? spotSourceFilter : sourceFilter} onChange={(event) => openExploreModal === "spots" ? setSpotSourceFilter(event.target.value as ExploreSourceFilter) : setSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label> : null}
-                <button
-                  type="button"
-                  disabled={openExploreModal === "spots" ? !standardFilterCount : !activeFilterCount}
-                  onClick={() => {
-                    if (openExploreModal === "spots") {
-                      setSpotQuery(""); setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all");
-                    } else {
-                      setQuery(""); setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all");
-                    }
-                  }}
-                >条件をクリア</button>
+                {modalFilterCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (openExploreModal === "spots") {
+                        setSpotQuery(""); setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all");
+                      } else {
+                        setQuery(""); setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all");
+                      }
+                    }}
+                  >条件をクリア</button>
+                ) : null}
               </div>
             </div>
             <div className="ui-trial__explore-window-body">
