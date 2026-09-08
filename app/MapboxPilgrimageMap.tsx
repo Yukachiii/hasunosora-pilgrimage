@@ -158,10 +158,13 @@ function createNumberedMarkerImage(image: HTMLImageElement, label: string) {
 async function ensureNumberedMarkerImages(
   map: mapboxgl.Map,
   features: GeoJSON.Feature<GeoJSON.Point>[],
+  isCancelled: () => boolean,
 ) {
   const kinds = [...new Set(features.map((feature) => feature.properties?.markerKind as MarkerKind))];
   const assets = new Map(await Promise.all(kinds.map(async (kind) => [kind, await loadMarkerAsset(kind)] as const)));
+  if (isCancelled()) return false;
   for (const feature of features) {
+    if (isCancelled()) return false;
     const kind = feature.properties?.markerKind as MarkerKind;
     const label = String(feature.properties?.indexLabel ?? "");
     const imageId = numberedMarkerImageId(kind, label);
@@ -171,6 +174,7 @@ async function ensureNumberedMarkerImages(
       });
     }
   }
+  return true;
 }
 
 function markerKindForSpot(
@@ -365,8 +369,8 @@ export function MapboxPilgrimageMap({
 
     return () => {
       cancelled = true;
+      if (mapRef.current === map) mapRef.current = null;
       map.remove();
-      mapRef.current = null;
     };
   }, [token]);
 
@@ -381,9 +385,14 @@ export function MapboxPilgrimageMap({
     };
     const showPointer = () => { map.getCanvas().style.cursor = "pointer"; };
     const clearPointer = () => { map.getCanvas().style.cursor = ""; };
+    let listenersAttached = false;
 
-    void ensureNumberedMarkerImages(map, data.features).then(() => {
-      if (cancelled) return;
+    void ensureNumberedMarkerImages(
+      map,
+      data.features,
+      () => cancelled || mapRef.current !== map,
+    ).then((imagesReady) => {
+      if (!imagesReady || cancelled || mapRef.current !== map) return;
       const existingSource = map.getSource(SPOT_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
       if (existingSource) {
         existingSource.setData(data);
@@ -429,17 +438,17 @@ export function MapboxPilgrimageMap({
       map.on("click", SPOT_LAYER_ID, handleSpotClick);
       map.on("mouseenter", SPOT_LAYER_ID, showPointer);
       map.on("mouseleave", SPOT_LAYER_ID, clearPointer);
+      listenersAttached = true;
     }).catch(() => {
-      if (!cancelled) setMapState("error");
+      if (!cancelled && mapRef.current === map) setMapState("error");
     });
 
     return () => {
       cancelled = true;
-      if (map.getLayer(SPOT_LAYER_ID)) {
-        map.off("click", SPOT_LAYER_ID, handleSpotClick);
-        map.off("mouseenter", SPOT_LAYER_ID, showPointer);
-        map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
-      }
+      if (!listenersAttached || mapRef.current !== map) return;
+      map.off("click", SPOT_LAYER_ID, handleSpotClick);
+      map.off("mouseenter", SPOT_LAYER_ID, showPointer);
+      map.off("mouseleave", SPOT_LAYER_ID, clearPointer);
     };
   }, [cardModelSpotIdSet, mapState, plannedSpotIdSet, selectedId, spots]);
 

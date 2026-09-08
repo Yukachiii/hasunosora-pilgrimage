@@ -1,4 +1,9 @@
-import { StrictMode } from "react";
+import {
+  Component,
+  StrictMode,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import { createRoot } from "react-dom/client";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { PilgrimageApp } from "../app/PilgrimageApp";
@@ -82,21 +87,55 @@ const initialHeroIndex = chooseHeroIndex(heroImages);
 const communityApiUrl = import.meta.env.VITE_COMMUNITY_API_URL?.trim() ?? "";
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
 
+class PublicAppErrorBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Public application rendering failed", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <main className="public-app-error" role="alert">
+          <span aria-hidden="true">蓮</span>
+          <small>DISPLAY RECOVERY</small>
+          <h1>画面の表示を続けられませんでした</h1>
+          <p>予定はこの端末に保存されています。再読み込みして、もう一度お試しください。</p>
+          <button type="button" onClick={() => window.location.reload()}>
+            再読み込み
+          </button>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <PilgrimageApp
-      mapboxConfig={{
-        accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "",
-      }}
-      spots={publicSpots}
-      spotPhotoGroups={spotPhotoGroups}
-      photoCredits={photoCredits}
-      heroImages={heroImages}
-      initialHeroIndex={initialHeroIndex}
-      siteVersion={siteSettings.version}
-      communityApiUrl={communityApiUrl}
-      turnstileSiteKey={turnstileSiteKey}
-      communitySubmissionsEnabled={Boolean(communityApiUrl)}
-    />
+    <PublicAppErrorBoundary>
+      <PilgrimageApp
+        mapboxConfig={{
+          accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "",
+        }}
+        spots={publicSpots}
+        spotPhotoGroups={spotPhotoGroups}
+        photoCredits={photoCredits}
+        heroImages={heroImages}
+        initialHeroIndex={initialHeroIndex}
+        siteVersion={siteSettings.version}
+        communityApiUrl={communityApiUrl}
+        turnstileSiteKey={turnstileSiteKey}
+        communitySubmissionsEnabled={Boolean(communityApiUrl)}
+      />
+    </PublicAppErrorBoundary>
   </StrictMode>,
 );

@@ -6221,6 +6221,66 @@ footer > span {
   display: none !important;
 }
 
+.public-app-error {
+  display: grid;
+  width: min(620px, calc(100% - 32px));
+  min-height: 100dvh;
+  margin: 0 auto;
+  place-content: center;
+  justify-items: start;
+  gap: 14px;
+  padding: 48px 0;
+}
+
+.public-app-error > span {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: 23px;
+}
+
+.public-app-error small {
+  color: var(--ice-deep);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.public-app-error h1,
+.public-app-error p {
+  margin: 0;
+}
+
+.public-app-error h1 {
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: clamp(25px, 6vw, 38px);
+  font-weight: 500;
+}
+
+.public-app-error p {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+.public-app-error button {
+  min-height: 46px;
+  margin-top: 8px;
+  padding: 0 24px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .desktop-nav a[aria-current="page"]::after {
   transform: scaleX(1);
 }

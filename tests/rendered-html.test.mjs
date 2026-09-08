@@ -33,6 +33,9 @@ test("public entry renders the pilgrimage application", async () => {
 
   assert.match(entry, /createRoot/);
   assert.match(entry, /<PilgrimageApp/);
+  assert.match(entry, /class PublicAppErrorBoundary/);
+  assert.match(entry, /<PublicAppErrorBoundary>/);
+  assert.match(entry, /画面の表示を続けられませんでした/);
   assert.match(entry, /VITE_MAPBOX_ACCESS_TOKEN/);
   assert.match(app, /蓮ノ旅/);
   assert.match(app, /hero--magazine/);
@@ -655,6 +658,9 @@ test("Mapbox is the main map and the comparison version is removed", async () =>
   assert.match(map, /directions\/v5/);
   assert.match(map, /mapbox:\/\/styles\/mapbox\/streets-v12/);
   assert.match(map, /map\.setLanguage\("ja"\)/);
+  assert.match(map, /if \(mapRef\.current === map\) mapRef\.current = null;\s*map\.remove\(\)/);
+  assert.match(map, /if \(!listenersAttached \|\| mapRef\.current !== map\) return;/);
+  assert.doesNotMatch(map, /if \(map\.getLayer\(SPOT_LAYER_ID\)\) \{\s*map\.off/);
   assert.match(map, /showCompass:\s*true/);
   assert.match(map, /map\.easeTo\(\{ center: \[selected\.lng, selected\.lat\], duration: 450 \}\)/);
   assert.match(map, /focusSpotRequest/);
