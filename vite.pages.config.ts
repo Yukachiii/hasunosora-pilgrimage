@@ -15,6 +15,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve("github-pages/index.html"),
+        guideTest: resolve("github-pages/guide-test/index.html"),
+        uiTest: resolve("github-pages/ui-test/index.html"),
       },
     },
   },

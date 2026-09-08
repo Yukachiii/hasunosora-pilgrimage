@@ -88,6 +88,53 @@ test("illustrated user guide ships every referenced screenshot", async () => {
   assert.match(css, /\.guide-image-modal__copyright\s*\{/);
 });
 
+test("standalone guide redesign test stays isolated from the public application", async () => {
+  const [html, entry, page, css] = await Promise.all([
+    readFile(new URL("../github-pages/guide-test/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/guide-test/main.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/guide-test/GuideTestPage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/guide-test/guide-test.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /noindex, nofollow/);
+  assert.match(entry, /GuideTestPage/);
+  assert.doesNotMatch(entry, /globals\.css/);
+  assert.match(page, /旅の準備は/);
+  assert.match(page, /parsePlannerDraftCookie/);
+  assert.equal((page.match(/src: `\$\{baseUrl\}guide\//g) ?? []).length, 6);
+  assert.match(page, /role="dialog"/);
+  assert.match(page, /event\.key === "Escape"/);
+  assert.match(page, /event\.target === event\.currentTarget/);
+  assert.match(css, /object-fit: contain/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.doesNotMatch(css, /!important/);
+});
+
+test("full UI redesign trial provides four isolated interactive pages", async () => {
+  const [html, entry, app, css, viteConfig] = await Promise.all([
+    readFile(new URL("../github-pages/ui-test/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/ui-test/main.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/ui-test/UiTrialApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/ui-test/ui-test.css", import.meta.url), "utf8"),
+    readFile(new URL("../vite.pages.config.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /noindex, nofollow/);
+  assert.match(entry, /UiTrialApp/);
+  assert.doesNotMatch(entry, /globals\.css/);
+  assert.match(viteConfig, /uiTest: resolve\("github-pages\/ui-test\/index\.html"\)/);
+  for (const page of ["ExplorePage", "PlannerPage", "TodayPage", "GuidePage"]) {
+    assert.match(app, new RegExp(`function ${page}\\(`));
+  }
+  assert.match(app, /onDragStart/);
+  assert.match(app, /移動時間を計算する/);
+  assert.match(app, /訪問済みにする/);
+  assert.match(app, /role="dialog"/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /object-fit: contain/);
+  assert.doesNotMatch(css, /!important/);
+});
+
 test("publishes the complete reviewed location lists", async () => {
   const [spots, cardModels, collaborations] = await Promise.all([
     readFile(new URL("../content/spots.json", import.meta.url), "utf8").then(JSON.parse),
