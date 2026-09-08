@@ -45,7 +45,6 @@ type ModalState =
   | null;
 
 const baseUrl = import.meta.env.BASE_URL;
-const cardModelSpotIds = Array.from(new Set(cardModels.flatMap((card) => card.spotId ? [card.spotId] : [])));
 const exploreAreas = Array.from(new Set(spots.map((spot) => spot.area))).sort((a, b) => a.localeCompare(b, "ja"));
 const exploreCategories = Array.from(new Set(spots.map((spot) => spot.category))).sort((a, b) => a.localeCompare(b, "ja"));
 const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "";
@@ -61,7 +60,7 @@ const guideSteps = [
   {
     number: "01",
     title: "探し方を選ぶ",
-    description: "地図・定番・カード・コラボから入口を選ぶ。",
+    description: "地図・スポット・カード・コラボから入口を選ぶ。",
     image: "guide/02-choose-method.png",
     alt: "探し方を選ぶ画面",
   },
@@ -199,9 +198,8 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
 }) {
   const initialSpot = spots.find((spot) => spot.id === "kanazawa-station") ?? spots[0];
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<ExploreMode>("map");
-  const [isSpotWindowOpen, setIsSpotWindowOpen] = useState(false);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [mode, setMode] = useState<Exclude<ExploreMode, "map">>("spots");
+  const [openExploreModal, setOpenExploreModal] = useState<Exclude<ExploreMode, "map"> | null>(null);
   const [areaFilter, setAreaFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState<ExploreSourceFilter>("all");
@@ -216,7 +214,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   ));
   const availableCollaborations = activeCollaborations.length > 0 ? activeCollaborations : collaborations;
   const [selectedCollaborationId, setSelectedCollaborationId] = useState(availableCollaborations[0]?.id ?? "");
-  const spotWindowCloseRef = useRef<HTMLButtonElement>(null);
+  const exploreModalCloseRef = useRef<HTMLButtonElement>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase("ja");
   const normalizedSpotQuery = spotQuery.trim().toLocaleLowerCase("ja");
   const currentCollaboration = availableCollaborations.find(
@@ -270,23 +268,37 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   const selectedNumber = Math.max(0, mode === "cards"
     ? filteredCards.findIndex((card) => card.spotId === selectedSpot?.id)
     : filteredSpots.findIndex((spot) => spot.id === selectedSpot?.id)) + 1;
-  const activeFilterCount = Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all" && mode !== "cards");
-  const standardFilterCount = Number(spotAreaFilter !== "all") + Number(spotCategoryFilter !== "all") + Number(spotSourceFilter !== "all");
+  const activeFilterCount = Number(Boolean(normalizedQuery)) + Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all" && openExploreModal === "collaboration");
+  const standardFilterCount = Number(Boolean(normalizedSpotQuery)) + Number(spotAreaFilter !== "all") + Number(spotCategoryFilter !== "all") + Number(spotSourceFilter !== "all");
   const choices = [
     { number: "01", label: "地図", note: "場所から", mode: "map" as const },
-    { number: "02", label: "定番", note: "登録スポット", mode: "spots" as const },
+    { number: "02", label: "スポット", note: "登録スポット", mode: "spots" as const },
     { number: "03", label: "カード", note: "モデル地から", mode: "cards" as const },
     { number: "04", label: "コラボ", note: "開催情報から", mode: "collaboration" as const },
   ];
-  const noopRouteResult = useCallback(() => undefined, []);
+  const modalTitle = openExploreModal === "cards"
+    ? "カードモデル地"
+    : openExploreModal === "collaboration"
+      ? "コラボスポット"
+      : "スポット一覧";
+  const modalEyebrow = openExploreModal === "cards"
+    ? "CARD LOCATIONS"
+    : openExploreModal === "collaboration"
+      ? "COLLABORATION"
+      : "SPOTS";
+  const modalResultCount = openExploreModal === "cards"
+    ? filteredCards.length
+    : openExploreModal === "collaboration"
+      ? filteredSpots.length
+      : filteredStandardSpots.length;
 
   useEffect(() => {
-    if (!isSpotWindowOpen) return undefined;
+    if (!openExploreModal) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusTimer = window.setTimeout(() => spotWindowCloseRef.current?.focus(), 0);
+    const focusTimer = window.setTimeout(() => exploreModalCloseRef.current?.focus(), 0);
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsSpotWindowOpen(false);
+      if (event.key === "Escape") setOpenExploreModal(null);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -294,25 +306,24 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isSpotWindowOpen]);
+  }, [openExploreModal]);
 
-  function selectMode(nextMode: ExploreMode) {
-    if (nextMode === "spots") {
-      setIsSpotWindowOpen(true);
-      return;
+  function openMode(nextMode: Exclude<ExploreMode, "map">) {
+    if (mode !== nextMode) {
+      setQuery("");
+      setAreaFilter("all");
+      setCategoryFilter("all");
+      setSourceFilter("all");
     }
     setMode(nextMode);
     if (nextMode === "collaboration") {
       setSelectedId(currentCollaboration?.locations[0]?.spotId ?? "");
-      return;
-    }
-    if (nextMode === "cards") {
+    } else if (nextMode === "cards") {
       setSelectedId(filteredCards[0]?.spotId ?? "");
-      return;
-    }
-    if (!filteredSpots.some((spot) => spot.id === selectedId)) {
+    } else if (!spots.some((spot) => spot.id === selectedId)) {
       setSelectedId(filteredSpots[0]?.id ?? "");
     }
+    setOpenExploreModal(nextMode);
   }
 
   return (
@@ -322,161 +333,23 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
         <p className="ui-trial__eyebrow">ISHIKAWA / KANAZAWA</p>
         <h1 id="ui-trial-explore-title">作品の景色を、<br />旅の予定へ。</h1>
         <p className="ui-trial__explore-lead">蓮ノ空に関連するスポットから、行きたい場所を見つけて、そのまま予定へ追加できます。</p>
-        <div className="ui-trial__search-row">
-          <label className="ui-trial__search">
-            <span className="ui-trial__visually-hidden">スポットを検索</span>
-            <input
-              type="search"
-              value={query}
-              placeholder="場所・エリア・登場回で探す"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <span aria-hidden="true">⌕</span>
-          </label>
-          <button
-            className={`ui-trial__filter-toggle${activeFilterCount ? " is-active" : ""}`}
-            type="button"
-            aria-expanded={filtersExpanded}
-            aria-controls="ui-trial-search-filters"
-            onClick={() => setFiltersExpanded((current) => !current)}
-          >
-            <span>絞り込み</span>
-            <b>{activeFilterCount ? `${activeFilterCount}項目` : `${mode === "cards" ? filteredCards.length : filteredSpots.length}件`}</b>
-          </button>
-        </div>
-        <div className={`ui-trial__search-filters${filtersExpanded ? " is-expanded" : ""}`} id="ui-trial-search-filters">
-          <label><span>エリア</span><select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
-          <label><span>カテゴリ</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
-          {mode !== "cards" ? (
-            <label><span>出典</span><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label>
-          ) : null}
-          <button type="button" disabled={!activeFilterCount} onClick={() => { setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all"); }}>条件をクリア</button>
-        </div>
         <h2>探し方を選ぶ</h2>
         <div className="ui-trial__choices">
-          {choices.map((choice) => (
+          {choices.map((choice) => choice.mode === "map" ? (
+            <a href={`${baseUrl}#/explore/map`} key={choice.number}>
+              <small>{choice.number}</small><strong>{choice.label}</strong><span>{choice.note}</span><i aria-hidden="true">→</i>
+            </a>
+          ) : (
             <button
-              className={choice.mode === "spots" ? (isSpotWindowOpen ? "is-active" : "") : (mode === choice.mode ? "is-active" : "")}
+              className={openExploreModal === choice.mode ? "is-active" : ""}
               type="button"
               key={choice.number}
-              onClick={() => selectMode(choice.mode)}
+              onClick={() => openMode(choice.mode)}
             >
-              <small>{choice.number}</small>
-              <strong>{choice.label}</strong>
-              <span>{choice.note}</span>
-              <i aria-hidden="true">→</i>
+              <small>{choice.number}</small><strong>{choice.label}</strong><span>{choice.note}</span><i aria-hidden="true">→</i>
             </button>
           ))}
         </div>
-        <div className="ui-trial__collaboration">
-          <div className="ui-trial__collaboration-heading">
-            <small>{activeCollaborations.length > 0 ? "開催中のコラボ" : "コラボから探す"}</small>
-            <span>{availableCollaborations.length}件</span>
-          </div>
-          <div className="ui-trial__collaboration-options" aria-label="コラボを選択">
-            {availableCollaborations.map((collaboration) => (
-              <button
-                className={currentCollaboration?.id === collaboration.id ? "is-active" : ""}
-                type="button"
-                key={collaboration.id}
-                onClick={() => {
-                  setSelectedCollaborationId(collaboration.id);
-                  setMode("collaboration");
-                  setSelectedId(collaboration.locations[0]?.spotId ?? "");
-                }}
-              >
-                <strong>{collaboration.name}</strong>
-                <span>{collaboration.subtitle}</span>
-              </button>
-            ))}
-          </div>
-          {currentCollaboration ? (
-            <div className="ui-trial__collaboration-summary">
-              <p>{currentCollaboration.description}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("collaboration");
-                  setSelectedId(currentCollaboration.locations[0]?.spotId ?? "");
-                }}
-              >
-                対象スポット {currentCollaboration.locations.length}件 <span aria-hidden="true">→</span>
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        <section className="ui-trial__explorer" aria-labelledby="ui-trial-explorer-title">
-          <header>
-            <div>
-              <small>SEARCH RESULT</small>
-              <h2 id="ui-trial-explorer-title">{choices.find((choice) => choice.mode === mode)?.label}</h2>
-            </div>
-            <span>{mode === "cards" ? filteredCards.length : filteredSpots.length}件</span>
-          </header>
-          {mode === "map" ? (
-            <>
-              <div className="ui-trial__explore-map">
-                <MapboxPilgrimageMap
-                  spots={filteredSpots}
-                  selectedId={selectedSpot?.id ?? ""}
-                  plannedSpotIds={planned.map((spot) => spot.id)}
-                  cardModelSpotIds={cardModelSpotIds}
-                  onSelect={setSelectedId}
-                  routeRequest={null}
-                  onRouteResult={noopRouteResult}
-                  accessToken={mapboxAccessToken}
-                  isVisible
-                  viewMode="explore"
-                />
-              </div>
-              {selectedSpot ? (
-                <article className="ui-trial__map-selection">
-                  <div><small>{selectedSpot.area} · {selectedSpot.category}</small><strong><SpotName name={selectedSpot.name} /></strong></div>
-                  <button type="button" onClick={() => onTogglePlanned(selectedSpot)}>
-                    {planned.some((spot) => spot.id === selectedSpot.id) ? "予定から外す" : "予定に追加"}
-                  </button>
-                </article>
-              ) : null}
-            </>
-          ) : mode === "cards" ? (
-            <div className="ui-trial__card-results">
-              {filteredCards.slice(0, 24).map((card) => {
-                const spot = spots.find((item) => item.id === card.spotId);
-                if (!spot) return null;
-                const isPlanned = planned.some((item) => item.id === spot.id);
-                return (
-                  <article
-                    className={selectedSpot?.id === spot.id ? "is-selected" : ""}
-                    key={card.id}
-                    onClick={() => setSelectedId(spot.id)}
-                  >
-                    {card.imageUrl ? <img src={assetUrl(card.imageUrl)} alt="" loading="lazy" /> : null}
-                    <div><small>{card.card}</small><strong><SpotName name={card.model} /></strong><span><SpotName name={spot.name} /></span></div>
-                    <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "外す" : "追加"}</button>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="ui-trial__spot-results">
-              {filteredSpots.slice(0, 30).map((spot) => {
-                const isPlanned = planned.some((item) => item.id === spot.id);
-                return (
-                  <article
-                    className={selectedSpot?.id === spot.id ? "is-selected" : ""}
-                    key={spot.id}
-                    onClick={() => setSelectedId(spot.id)}
-                  >
-                    <div><small>{spot.area} · {spot.category}</small><strong><SpotName name={spot.name} /></strong><span>{spot.address}</span></div>
-                    <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-          {(mode === "cards" ? filteredCards.length : filteredSpots.length) === 0 ? <p>条件に合う場所がありません。</p> : null}
-        </section>
       </div>
 
       <div className="ui-trial__feature">
@@ -505,68 +378,122 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
               <button type="button" onClick={() => onTogglePlanned(selectedSpot)}>
                 {selectedIsPlanned ? "予定から外す" : "予定に追加"} <span aria-hidden="true">{selectedIsPlanned ? "−" : "+"}</span>
               </button>
-              <button type="button" onClick={() => selectMode("map")}>地図で見る <span aria-hidden="true">→</span></button>
+              <a href={`${baseUrl}#/explore/map`}>地図で見る <span aria-hidden="true">→</span></a>
             </div>
           </article>
         ) : null}
       </div>
         <button className="ui-trial__explore-plan-link" type="button" onClick={() => onNavigate("planner")}>予定を確認する</button>
       </section>
-      {isSpotWindowOpen ? (
+      {openExploreModal ? (
         <div
-          className="ui-trial__modal ui-trial__spot-window"
-          onClick={(event) => { if (event.target === event.currentTarget) setIsSpotWindowOpen(false); }}
+          className="ui-trial__modal ui-trial__explore-window"
+          onClick={(event) => { if (event.target === event.currentTarget) setOpenExploreModal(null); }}
         >
           <section
-            className="ui-trial__modal-dialog ui-trial__spot-window-dialog"
+            className={`ui-trial__modal-dialog ui-trial__explore-window-dialog${openExploreModal === "collaboration" ? " ui-trial__explore-window-dialog--collaboration" : ""}`}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="ui-trial-spot-window-title"
+            aria-labelledby="ui-trial-explore-window-title"
           >
-            <div className="ui-trial__spot-window-handle" aria-hidden="true" />
+            <div className="ui-trial__explore-window-handle" aria-hidden="true" />
             <header>
               <div>
-                <small>STANDARD SPOTS</small>
-                <strong id="ui-trial-spot-window-title">スポット一覧</strong>
-                <span>{filteredStandardSpots.length}件</span>
+                <small>{modalEyebrow}</small>
+                <strong id="ui-trial-explore-window-title">{modalTitle}</strong>
+                <span>{modalResultCount}件</span>
               </div>
-              <button ref={spotWindowCloseRef} type="button" onClick={() => setIsSpotWindowOpen(false)} aria-label="スポット一覧を閉じる">×</button>
+              <button ref={exploreModalCloseRef} type="button" onClick={() => setOpenExploreModal(null)} aria-label={`${modalTitle}を閉じる`}>×</button>
             </header>
-            <div className="ui-trial__spot-window-filters">
+            {openExploreModal === "collaboration" ? (
+              <div className="ui-trial__collaboration-options" aria-label="コラボを選択">
+                {availableCollaborations.map((collaboration) => (
+                  <button
+                    className={currentCollaboration?.id === collaboration.id ? "is-active" : ""}
+                    type="button"
+                    key={collaboration.id}
+                    onClick={() => {
+                      setSelectedCollaborationId(collaboration.id);
+                      setSelectedId(collaboration.locations[0]?.spotId ?? "");
+                    }}
+                  >
+                    <strong>{collaboration.name}</strong>
+                    <span>{collaboration.subtitle}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="ui-trial__explore-window-filters">
               <label className="ui-trial__search">
-                <span className="ui-trial__visually-hidden">スポットを検索</span>
+                <span className="ui-trial__visually-hidden">{modalTitle}を検索</span>
                 <input
                   type="search"
-                  value={spotQuery}
-                  placeholder="施設名・住所・登場回で検索"
-                  onChange={(event) => setSpotQuery(event.target.value)}
+                  value={openExploreModal === "spots" ? spotQuery : query}
+                  placeholder={openExploreModal === "cards" ? "カード名・モデル地・キャラクターで検索" : "施設名・住所・登場回で検索"}
+                  onChange={(event) => openExploreModal === "spots" ? setSpotQuery(event.target.value) : setQuery(event.target.value)}
                 />
                 <span aria-hidden="true">⌕</span>
               </label>
               <div>
-                <label><span>エリア</span><select value={spotAreaFilter} onChange={(event) => setSpotAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
-                <label><span>カテゴリ</span><select value={spotCategoryFilter} onChange={(event) => setSpotCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
-                <label><span>出典</span><select value={spotSourceFilter} onChange={(event) => setSpotSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label>
-                <button type="button" disabled={!standardFilterCount} onClick={() => { setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all"); }}>条件をクリア</button>
+                <label><span>エリア</span><select value={openExploreModal === "spots" ? spotAreaFilter : areaFilter} onChange={(event) => openExploreModal === "spots" ? setSpotAreaFilter(event.target.value) : setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
+                <label><span>カテゴリ</span><select value={openExploreModal === "spots" ? spotCategoryFilter : categoryFilter} onChange={(event) => openExploreModal === "spots" ? setSpotCategoryFilter(event.target.value) : setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
+                {openExploreModal !== "cards" ? <label><span>出典</span><select value={openExploreModal === "spots" ? spotSourceFilter : sourceFilter} onChange={(event) => openExploreModal === "spots" ? setSpotSourceFilter(event.target.value as ExploreSourceFilter) : setSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label> : null}
+                <button
+                  type="button"
+                  disabled={openExploreModal === "spots" ? !standardFilterCount : !activeFilterCount}
+                  onClick={() => {
+                    if (openExploreModal === "spots") {
+                      setSpotQuery(""); setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all");
+                    } else {
+                      setQuery(""); setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all");
+                    }
+                  }}
+                >条件をクリア</button>
               </div>
             </div>
-            <div className="ui-trial__spot-window-body">
-              <div className="ui-trial__spot-results">
-                {filteredStandardSpots.map((spot) => {
+            <div className="ui-trial__explore-window-body">
+              {openExploreModal === "collaboration" && currentCollaboration ? (
+                <div className="ui-trial__collaboration-summary">
+                  <strong>{currentCollaboration.name}</strong>
+                  <p>{currentCollaboration.description}</p>
+                </div>
+              ) : null}
+              {openExploreModal === "cards" ? (
+                <div className="ui-trial__card-results">
+                  {filteredCards.map((card) => {
+                    const spot = spots.find((item) => item.id === card.spotId);
+                    if (!spot) return null;
+                    const isPlanned = planned.some((item) => item.id === spot.id);
+                    return (
+                      <article className={selectedId === spot.id ? "is-selected" : ""} key={card.id} onClick={() => setSelectedId(spot.id)}>
+                        {card.imageUrl ? <img src={assetUrl(card.imageUrl)} alt="" loading="lazy" /> : null}
+                        <div><small>{card.card}</small><strong><SpotName name={card.model} /></strong><span><SpotName name={spot.name} /></span></div>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="ui-trial__spot-results">
+                {(openExploreModal === "spots" ? filteredStandardSpots : filteredSpots).map((spot) => {
                   const isPlanned = planned.some((item) => item.id === spot.id);
+                  const collaborationLocation = openExploreModal === "collaboration"
+                    ? currentCollaboration?.locations.find((location) => location.spotId === spot.id)
+                    : undefined;
                   return (
                     <article
                       className={selectedId === spot.id ? "is-selected" : ""}
                       key={spot.id}
                       onClick={() => setSelectedId(spot.id)}
                     >
-                      <div><small>{spot.area} · {spot.category}</small><strong><SpotName name={spot.name} /></strong><span>{spot.address}</span></div>
+                      <div><small>{spot.area} · {spot.category}</small><strong><SpotName name={spot.name} /></strong><span>{collaborationLocation?.role ?? spot.address}</span></div>
                       <button type="button" onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
                     </article>
                   );
                 })}
               </div>
-              {filteredStandardSpots.length === 0 ? <p>条件に合うスポットがありません。</p> : null}
+              )}
+              {modalResultCount === 0 ? <p>条件に合う場所がありません。</p> : null}
             </div>
           </section>
         </div>

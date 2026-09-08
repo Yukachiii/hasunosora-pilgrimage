@@ -136,13 +136,17 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /role="dialog"/);
   assert.match(app, /selectedCollaborationId/);
   assert.match(app, /ui-trial__feature-context/);
-  assert.match(app, /ui-trial__search-filters/);
+  assert.match(app, /ui-trial__explore-window-filters/);
   assert.match(app, /ExploreSourceFilter/);
   assert.match(app, /useLayoutEffect/);
-  assert.match(app, /label: "地図"[\s\S]*label: "定番"[\s\S]*label: "カード"[\s\S]*label: "コラボ"/);
-  assert.match(app, /className="ui-trial__modal ui-trial__spot-window"/);
-  assert.match(app, /aria-labelledby="ui-trial-spot-window-title"/);
-  assert.match(app, /if \(nextMode === "spots"\)[\s\S]*setIsSpotWindowOpen\(true\)/);
+  assert.match(app, /label: "地図"[\s\S]*label: "スポット"[\s\S]*label: "カード"[\s\S]*label: "コラボ"/);
+  assert.match(app, /href=\{`\$\{baseUrl\}#\/explore\/map`\}/);
+  assert.match(app, /className="ui-trial__modal ui-trial__explore-window"/);
+  assert.match(app, /aria-labelledby="ui-trial-explore-window-title"/);
+  assert.match(app, /openMode\(choice\.mode\)/);
+  assert.match(app, /openExploreModal === "cards"/);
+  assert.match(app, /openExploreModal === "collaboration"/);
+  assert.doesNotMatch(app, /className="ui-trial__explorer"/);
   assert.match(app, /spotQuery, setSpotQuery/);
   assert.match(app, /spotAreaFilter, setSpotAreaFilter/);
   assert.match(app, /spotSourceFilter, setSpotSourceFilter/);
@@ -157,10 +161,10 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /object-fit: contain/);
   assert.match(css, /ui-trial__route-map[\s\S]*?height: clamp/);
-  assert.match(css, /ui-trial__search-filters\.is-expanded/);
-  assert.match(css, /\.ui-trial__spot-window-dialog/);
+  assert.match(css, /ui-trial__explore-window-filters/);
+  assert.match(css, /\.ui-trial__explore-window-dialog/);
   assert.match(css, /@keyframes ui-trial-spot-sheet-enter/);
-  assert.match(css, /body:has\(\.ui-trial__spot-window\) \.ui-trial__mobile-nav/);
+  assert.match(css, /body:has\(\.ui-trial__explore-window\) \.ui-trial__mobile-nav/);
   assert.doesNotMatch(css, /!important/);
 });
 
