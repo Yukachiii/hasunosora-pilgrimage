@@ -140,7 +140,11 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /ExploreSourceFilter/);
   assert.match(app, /useLayoutEffect/);
   assert.match(app, /label: "地図"[\s\S]*label: "スポット"[\s\S]*label: "カード"[\s\S]*label: "コラボ"/);
-  assert.match(app, /href=\{`\$\{baseUrl\}#\/explore\/map`\}/);
+  assert.match(app, /href="#\/explore\/map"/);
+  assert.doesNotMatch(app, /baseUrl\}#\/explore\/map/);
+  assert.match(app, /setExploreMapView\(nextPage === "explore" && parts\[1\] === "map"\)/);
+  assert.match(app, /mapView=\{exploreMapView\}/);
+  assert.match(app, /className="ui-trial__page ui-trial__map-page"/);
   assert.match(app, /className="ui-trial__modal ui-trial__explore-window"/);
   assert.match(app, /aria-labelledby="ui-trial-explore-window-title"/);
   assert.match(app, /openMode\(choice\.mode\)/);
@@ -162,6 +166,7 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(css, /object-fit: contain/);
   assert.match(css, /ui-trial__route-map[\s\S]*?height: clamp/);
   assert.match(css, /ui-trial__explore-window-filters/);
+  assert.match(css, /\.ui-trial__map-page-map/);
   assert.match(css, /\.ui-trial__explore-window-dialog/);
   assert.match(css, /@keyframes ui-trial-spot-sheet-enter/);
   assert.match(css, /body:has\(\.ui-trial__explore-window\) \.ui-trial__mobile-nav/);

@@ -45,6 +45,7 @@ type ModalState =
   | null;
 
 const baseUrl = import.meta.env.BASE_URL;
+const cardModelSpotIds = Array.from(new Set(cardModels.flatMap((card) => card.spotId ? [card.spotId] : [])));
 const exploreAreas = Array.from(new Set(spots.map((spot) => spot.area))).sort((a, b) => a.localeCompare(b, "ja"));
 const exploreCategories = Array.from(new Set(spots.map((spot) => spot.category))).sort((a, b) => a.localeCompare(b, "ja"));
 const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "";
@@ -191,8 +192,9 @@ function TrialNavigation({ page, itineraryCount, onNavigate }: {
   );
 }
 
-function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
+function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
   planned: PilgrimageSpot[];
+  mapView: boolean;
   onTogglePlanned: (spot: PilgrimageSpot) => void;
   onNavigate: (page: TrialPage) => void;
 }) {
@@ -255,6 +257,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
       .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
   });
   const selectedCandidate = spots.find((spot) => spot.id === selectedId);
+  const mapSelectedSpot = selectedCandidate ?? spots[0];
   const cardSpotIds = new Set(filteredCards.flatMap((card) => card.spotId ? [card.spotId] : []));
   const selectedSpot = mode === "cards"
     ? (selectedCandidate && cardSpotIds.has(selectedCandidate.id)
@@ -291,6 +294,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
     : openExploreModal === "collaboration"
       ? filteredSpots.length
       : filteredStandardSpots.length;
+  const noopRouteResult = useCallback(() => undefined, []);
 
   useEffect(() => {
     if (!openExploreModal) return undefined;
@@ -328,6 +332,47 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
 
   return (
     <>
+      {mapView ? (
+        <section className="ui-trial__page ui-trial__map-page" aria-labelledby="ui-trial-map-title">
+          <header className="ui-trial__map-page-heading">
+            <div>
+              <p className="ui-trial__eyebrow">MAP / 97 SPOTS</p>
+              <h1 id="ui-trial-map-title">地図から探す</h1>
+            </div>
+            <a href="#/explore"><span aria-hidden="true">←</span> 探し方へ戻る</a>
+          </header>
+          <div className="ui-trial__map-page-layout">
+            <div className="ui-trial__map-page-map">
+              <MapboxPilgrimageMap
+                spots={spots}
+                selectedId={mapSelectedSpot?.id ?? ""}
+                plannedSpotIds={planned.map((spot) => spot.id)}
+                cardModelSpotIds={cardModelSpotIds}
+                onSelect={setSelectedId}
+                routeRequest={null}
+                onRouteResult={noopRouteResult}
+                accessToken={mapboxAccessToken}
+                isVisible={mapView}
+                viewMode="explore"
+              />
+            </div>
+            {mapSelectedSpot ? (
+              <aside className="ui-trial__map-page-detail">
+                <img src={spotPhoto(mapSelectedSpot)} alt={`${mapSelectedSpot.name}の写真`} />
+                <div>
+                  <small>{mapSelectedSpot.area} · {mapSelectedSpot.category}</small>
+                  <h2><SpotName name={mapSelectedSpot.name} /></h2>
+                  <p>{mapSelectedSpot.address}</p>
+                  <p>{mapSelectedSpot.description}</p>
+                  <button type="button" onClick={() => onTogglePlanned(mapSelectedSpot)}>
+                    {planned.some((spot) => spot.id === mapSelectedSpot.id) ? "予定から外す" : "予定に追加"}
+                  </button>
+                </div>
+              </aside>
+            ) : null}
+          </div>
+        </section>
+      ) : (
       <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title">
       <div className="ui-trial__explore-copy">
         <p className="ui-trial__eyebrow">ISHIKAWA / KANAZAWA</p>
@@ -336,7 +381,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
         <h2>探し方を選ぶ</h2>
         <div className="ui-trial__choices">
           {choices.map((choice) => choice.mode === "map" ? (
-            <a href={`${baseUrl}#/explore/map`} key={choice.number}>
+            <a href="#/explore/map" key={choice.number}>
               <small>{choice.number}</small><strong>{choice.label}</strong><span>{choice.note}</span><i aria-hidden="true">→</i>
             </a>
           ) : (
@@ -378,14 +423,15 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
               <button type="button" onClick={() => onTogglePlanned(selectedSpot)}>
                 {selectedIsPlanned ? "予定から外す" : "予定に追加"} <span aria-hidden="true">{selectedIsPlanned ? "−" : "+"}</span>
               </button>
-              <a href={`${baseUrl}#/explore/map`}>地図で見る <span aria-hidden="true">→</span></a>
+              <a href="#/explore/map">地図で見る <span aria-hidden="true">→</span></a>
             </div>
           </article>
         ) : null}
       </div>
         <button className="ui-trial__explore-plan-link" type="button" onClick={() => onNavigate("planner")}>予定を確認する</button>
       </section>
-      {openExploreModal ? (
+      )}
+      {!mapView && openExploreModal ? (
         <div
           className="ui-trial__modal ui-trial__explore-window"
           onClick={(event) => { if (event.target === event.currentTarget) setOpenExploreModal(null); }}
@@ -1018,6 +1064,7 @@ function TrialModal({ modal, onClose, onUpdateShareDates }: {
 export function UiTrialApp() {
   const planner = useLivePlanner(spots);
   const [view, setView] = useState<TrialView>("explore");
+  const [exploreMapView, setExploreMapView] = useState(false);
   const [sharedPlan, setSharedPlan] = useState<SharedPlanSnapshot | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const closeModal = useCallback(() => setModal(null), []);
@@ -1028,6 +1075,7 @@ export function UiTrialApp() {
       const parts = window.location.hash.replace(/^#\/?/, "").split("/");
       if (parts[0] === "shared") {
         setSharedPlan(decodeSharedPlanSnapshot(parts.slice(1).join("/"), new Set(spots.map((spot) => spot.id))));
+        setExploreMapView(false);
         setView("shared");
         return;
       }
@@ -1035,6 +1083,7 @@ export function UiTrialApp() {
         ? parts[0] as TrialPage
         : "explore";
       setSharedPlan(null);
+      setExploreMapView(nextPage === "explore" && parts[1] === "map");
       setView(nextPage);
     };
     syncLocation();
@@ -1056,6 +1105,7 @@ export function UiTrialApp() {
 
   const navigate = (nextPage: TrialPage) => {
     setView(nextPage);
+    setExploreMapView(false);
     setSharedPlan(null);
     const hash = `#/${nextPage}`;
     if (window.location.hash !== hash) window.history.pushState(null, "", hash);
@@ -1089,7 +1139,7 @@ export function UiTrialApp() {
         onOpenShare={openShare}
       />
       <main>
-        {view === "explore" ? <ExplorePage planned={planner.itinerarySpots} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={navigate} /> : null}
+        {view === "explore" ? <ExplorePage planned={planner.itinerarySpots} mapView={exploreMapView} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={navigate} /> : null}
         {view === "planner" ? <PlannerPage planner={planner} onOpenShare={openShare} onNavigateExplore={() => navigate("explore")} /> : null}
         {view === "today" ? <TodayPage planner={planner} onOpenPlanner={() => navigate("planner")} /> : null}
         {view === "guide" ? <GuidePage onNavigate={navigate} onOpenImage={(src, alt) => setModal({ kind: "guide", src, alt })} /> : null}
