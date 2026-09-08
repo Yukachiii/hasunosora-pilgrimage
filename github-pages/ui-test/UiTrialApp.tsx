@@ -144,7 +144,7 @@ function TrialHeader({ page, itineraryCount, completedCount, visitDate, sharedPr
           </div>
         )}
       </div>
-      <nav className="ui-trial__desktop-nav" aria-label="テスト版メインナビゲーション">
+      <nav className="ui-trial__desktop-nav" aria-label="メインナビゲーション">
         {(Object.keys(pageLabels) as TrialPage[]).map((navPage) => (
           <PageLink page={navPage} currentPage={page} onNavigate={onNavigate} key={navPage}>
             {pageLabels[navPage]}
@@ -156,7 +156,6 @@ function TrialHeader({ page, itineraryCount, completedCount, visitDate, sharedPr
         <button className="ui-trial__mobile-share" type="button" onClick={onOpenShare}>共有する <span aria-hidden="true">↗</span></button>
       ) : null}
       {page === "today" ? <strong className="ui-trial__mobile-progress">{completedCount} / {itineraryCount}</strong> : null}
-      <span className="ui-trial__live-badge">実働テスト・本番データ非干渉</span>
       <a className="ui-trial__official" href="https://www.lovelive-anime.jp/hasunosora/" target="_blank" rel="noreferrer">
         作品公式サイト <span aria-hidden="true">↗</span>
       </a>
@@ -170,7 +169,7 @@ function TrialNavigation({ page, itineraryCount, onNavigate }: {
   onNavigate: (page: TrialPage) => void;
 }) {
   return (
-    <nav className="ui-trial__mobile-nav" aria-label="テスト版スマートフォン用メニュー">
+    <nav className="ui-trial__mobile-nav" aria-label="スマートフォン用メニュー">
       {(Object.keys(pageLabels) as TrialPage[]).map((navPage) => (
         <PageLink page={navPage} currentPage={page} onNavigate={onNavigate} key={navPage}>
           {pageLabels[navPage]}
@@ -186,16 +185,20 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   onTogglePlanned: (spot: PilgrimageSpot) => void;
   onNavigate: (page: TrialPage) => void;
 }) {
-  const featured = spots.find((spot) => spot.id === "kanazawa-station") ?? spots[0];
-  const featuredIsPlanned = planned.some((spot) => spot.id === featured?.id);
+  const initialSpot = spots.find((spot) => spot.id === "kanazawa-station") ?? spots[0];
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<ExploreMode>("spots");
-  const [selectedId, setSelectedId] = useState(featured?.id ?? spots[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(initialSpot?.id ?? "");
+  const today = japanDate();
+  const activeCollaborations = collaborations.filter((collaboration) => (
+    collaboration.startDate <= today && collaboration.endDate >= today
+  ));
+  const availableCollaborations = activeCollaborations.length > 0 ? activeCollaborations : collaborations;
+  const [selectedCollaborationId, setSelectedCollaborationId] = useState(availableCollaborations[0]?.id ?? "");
   const normalizedQuery = query.trim().toLocaleLowerCase("ja");
-  const currentCollaboration = collaborations.find((collaboration) => {
-    const today = japanDate();
-    return collaboration.startDate <= today && collaboration.endDate >= today;
-  }) ?? collaborations[0];
+  const currentCollaboration = availableCollaborations.find(
+    (collaboration) => collaboration.id === selectedCollaborationId,
+  ) ?? availableCollaborations[0];
   const collaborationSpotIds = new Set(currentCollaboration?.locations.map((location) => location.spotId) ?? []);
   const filteredSpots = spots.filter((spot) => {
     if (mode === "collaboration" && !collaborationSpotIds.has(spot.id)) return false;
@@ -209,7 +212,20 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
     return [card.card, card.model, card.address, card.note, ...card.characters]
       .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
   });
-  const selectedSpot = spots.find((spot) => spot.id === selectedId) ?? filteredSpots[0] ?? featured;
+  const selectedCandidate = spots.find((spot) => spot.id === selectedId);
+  const cardSpotIds = new Set(filteredCards.flatMap((card) => card.spotId ? [card.spotId] : []));
+  const selectedSpot = mode === "cards"
+    ? (selectedCandidate && cardSpotIds.has(selectedCandidate.id)
+      ? selectedCandidate
+      : spots.find((spot) => spot.id === filteredCards[0]?.spotId))
+    : (filteredSpots.find((spot) => spot.id === selectedCandidate?.id) ?? filteredSpots[0]);
+  const selectedIsPlanned = Boolean(selectedSpot && planned.some((spot) => spot.id === selectedSpot.id));
+  const selectedCollaborationLocation = mode === "collaboration"
+    ? currentCollaboration?.locations.find((location) => location.spotId === selectedSpot?.id)
+    : undefined;
+  const selectedNumber = Math.max(0, mode === "cards"
+    ? filteredCards.findIndex((card) => card.spotId === selectedSpot?.id)
+    : filteredSpots.findIndex((spot) => spot.id === selectedSpot?.id)) + 1;
   const choices = [
     { number: "01", label: "定番", note: "登録スポット", mode: "spots" as const },
     { number: "02", label: "コラボ", note: "開催情報から", mode: "collaboration" as const },
@@ -217,6 +233,21 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
     { number: "04", label: "カード", note: "モデル地から", mode: "cards" as const },
   ];
   const noopRouteResult = useCallback(() => undefined, []);
+
+  function selectMode(nextMode: ExploreMode) {
+    setMode(nextMode);
+    if (nextMode === "collaboration") {
+      setSelectedId(currentCollaboration?.locations[0]?.spotId ?? "");
+      return;
+    }
+    if (nextMode === "cards") {
+      setSelectedId(filteredCards[0]?.spotId ?? "");
+      return;
+    }
+    if (!filteredSpots.some((spot) => spot.id === selectedId)) {
+      setSelectedId(filteredSpots[0]?.id ?? "");
+    }
+  }
 
   return (
     <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title">
@@ -240,7 +271,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
               className={mode === choice.mode ? "is-active" : ""}
               type="button"
               key={choice.number}
-              onClick={() => setMode(choice.mode)}
+              onClick={() => selectMode(choice.mode)}
             >
               <small>{choice.number}</small>
               <strong>{choice.label}</strong>
@@ -250,16 +281,47 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
           ))}
         </div>
         <div className="ui-trial__collaboration">
-          <small>NOW IN ISHIKAWA</small>
-          <h2>{currentCollaboration?.name ?? "コラボスポット"}</h2>
-          <p>{currentCollaboration?.subtitle ?? "作品に関連する開催情報"}</p>
-          <button type="button" onClick={() => setMode("collaboration")}>対象スポットを見る <span aria-hidden="true">→</span></button>
+          <div className="ui-trial__collaboration-heading">
+            <small>{activeCollaborations.length > 0 ? "開催中のコラボ" : "コラボから探す"}</small>
+            <span>{availableCollaborations.length}件</span>
+          </div>
+          <div className="ui-trial__collaboration-options" aria-label="コラボを選択">
+            {availableCollaborations.map((collaboration) => (
+              <button
+                className={currentCollaboration?.id === collaboration.id ? "is-active" : ""}
+                type="button"
+                key={collaboration.id}
+                onClick={() => {
+                  setSelectedCollaborationId(collaboration.id);
+                  setMode("collaboration");
+                  setSelectedId(collaboration.locations[0]?.spotId ?? "");
+                }}
+              >
+                <strong>{collaboration.name}</strong>
+                <span>{collaboration.subtitle}</span>
+              </button>
+            ))}
+          </div>
+          {currentCollaboration ? (
+            <div className="ui-trial__collaboration-summary">
+              <p>{currentCollaboration.description}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("collaboration");
+                  setSelectedId(currentCollaboration.locations[0]?.spotId ?? "");
+                }}
+              >
+                対象スポット {currentCollaboration.locations.length}件 <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <section className="ui-trial__explorer" aria-labelledby="ui-trial-explorer-title">
           <header>
             <div>
-              <small>LIVE SEARCH</small>
+              <small>SEARCH RESULT</small>
               <h2 id="ui-trial-explorer-title">{choices.find((choice) => choice.mode === mode)?.label}</h2>
             </div>
             <span>{mode === "cards" ? filteredCards.length : filteredSpots.length}件</span>
@@ -296,7 +358,11 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
                 if (!spot) return null;
                 const isPlanned = planned.some((item) => item.id === spot.id);
                 return (
-                  <article key={card.id}>
+                  <article
+                    className={selectedSpot?.id === spot.id ? "is-selected" : ""}
+                    key={card.id}
+                    onClick={() => setSelectedId(spot.id)}
+                  >
                     {card.imageUrl ? <img src={assetUrl(card.imageUrl)} alt="" loading="lazy" /> : null}
                     <div><small>{card.card}</small><strong>{card.model}</strong><span>{spot.name}</span></div>
                     <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "外す" : "追加"}</button>
@@ -309,7 +375,11 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
               {filteredSpots.slice(0, 30).map((spot) => {
                 const isPlanned = planned.some((item) => item.id === spot.id);
                 return (
-                  <article key={spot.id}>
+                  <article
+                    className={selectedSpot?.id === spot.id ? "is-selected" : ""}
+                    key={spot.id}
+                    onClick={() => setSelectedId(spot.id)}
+                  >
                     <div><small>{spot.area} · {spot.category}</small><strong>{spot.name}</strong><span>{spot.address}</span></div>
                     <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
                   </article>
@@ -322,20 +392,33 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
       </div>
 
       <div className="ui-trial__feature">
-        <img src={assetUrl("photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp")} alt="金沢の神社にある鳥居と階段" />
+        <img
+          key={selectedSpot?.id ?? "empty"}
+          src={spotPhoto(selectedSpot)}
+          alt={selectedSpot ? `${selectedSpot.name}の写真` : "金沢の風景"}
+        />
         <div className="ui-trial__feature-title">
-          <small>ISHIKAWA / KANAZAWA</small>
-          <h2>景色を、旅の予定へ。</h2>
+          <small>{selectedSpot ? `${selectedSpot.area} / ${selectedSpot.category}` : "ISHIKAWA / KANAZAWA"}</small>
+          <h2>{selectedSpot?.name ?? "景色を、旅の予定へ。"}</h2>
         </div>
-        {featured ? (
+        {selectedSpot ? (
           <article>
-            <small>FEATURED SPOT / 01</small>
-            <h2>{featured.name}</h2>
-            <p>{featured.area}　·　{featured.category}</p>
-            <p>{featured.description}</p>
-            <button type="button" onClick={() => onTogglePlanned(featured)}>
-              {featuredIsPlanned ? "予定から外す" : "予定に追加"} <span aria-hidden="true">{featuredIsPlanned ? "−" : "+"}</span>
-            </button>
+            <small>{choices.find((choice) => choice.mode === mode)?.label.toUpperCase()} / {String(selectedNumber).padStart(2, "0")}</small>
+            <h2>{selectedSpot.name}</h2>
+            <p>{selectedSpot.area}　·　{selectedSpot.category}</p>
+            {selectedCollaborationLocation ? (
+              <p className="ui-trial__feature-context">
+                {selectedCollaborationLocation.role}
+                {selectedCollaborationLocation.members?.length ? ` / ${selectedCollaborationLocation.members.join("・")}` : ""}
+              </p>
+            ) : null}
+            <p>{selectedSpot.description}</p>
+            <div className="ui-trial__feature-actions">
+              <button type="button" onClick={() => onTogglePlanned(selectedSpot)}>
+                {selectedIsPlanned ? "予定から外す" : "予定に追加"} <span aria-hidden="true">{selectedIsPlanned ? "−" : "+"}</span>
+              </button>
+              <button type="button" onClick={() => selectMode("map")}>地図で見る <span aria-hidden="true">→</span></button>
+            </div>
           </article>
         ) : null}
       </div>
@@ -693,7 +776,7 @@ function SharedPreviewPage({ sharedPlan, onImport, onBack }: {
           <p className="ui-trial__shared-route-status">{sharedPlan.travelMode === "TRANSIT" ? "公共交通の経路は取り込み後に各区間を確認します。" : routeResult.state === "success" ? `${routeResult.distance} · ${routeResult.duration}` : routeResult.state === "error" ? routeResult.message : "経路を計算しています…"}</p>
         </article>
       </div>
-      <aside><strong>この予定をテスト版へ取り込む</strong><p>実働テスト版に保存中の予定は上書きされます。本番ページの予定には影響しません。</p><button type="button" onClick={onImport}>内容を確認して取り込む</button></aside>
+      <aside><strong>この予定を取り込む</strong><p>取り込むと、現在保存されている予定はこの内容で上書きされます。</p><button type="button" onClick={onImport}>内容を確認して取り込む</button></aside>
     </section>
   );
 }
@@ -802,7 +885,7 @@ function TrialModal({ modal, onClose, onUpdateShareDates }: {
           <figure><img src={modal.src} alt={modal.alt} /></figure>
         ) : (
           <div className="ui-trial__share-dialog">
-            <p>実働テスト版の予定を、プレビューと取り込みができるURLにします。本番ページの予定は含みません。</p>
+            <p>予定をプレビューし、そのまま取り込める共有URLを作成します。</p>
             <label className="ui-trial__share-date"><input type="checkbox" checked={modal.includeDates} onChange={(event) => onUpdateShareDates(event.target.checked)} /><span>訪問日も共有する</span></label>
             <label><span>共有URL</span><input readOnly value={modal.url} onFocus={(event) => event.currentTarget.select()} /></label>
             {!modal.url ? <p role="alert">共有するスポットを1か所以上追加してください。</p> : null}
@@ -870,7 +953,7 @@ export function UiTrialApp() {
   };
   const importShared = () => {
     if (!sharedPlan) return;
-    const confirmed = window.confirm("実働テスト版に保存されている予定は、共有された予定で上書きされます。本番ページの予定には影響しません。取り込みますか？");
+    const confirmed = window.confirm("現在保存されている予定は、共有された予定で上書きされます。取り込みますか？");
     if (!confirmed || !planner.importSharedPlan(sharedPlan)) return;
     navigate("planner");
   };

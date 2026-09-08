@@ -134,6 +134,9 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /SharedPreviewPage/);
   assert.match(app, /#蓮ノ旅/);
   assert.match(app, /role="dialog"/);
+  assert.match(app, /selectedCollaborationId/);
+  assert.match(app, /ui-trial__feature-context/);
+  assert.doesNotMatch(app, /実働テスト|本番データ非干渉/);
   assert.match(planner, /hasunosora-pilgrimage\.ui-test-planner\.v1/);
   assert.match(planner, /createSharedPlanSnapshot/);
   assert.match(planner, /sanitizePlannerSnapshot/);
