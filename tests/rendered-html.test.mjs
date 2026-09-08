@@ -43,7 +43,7 @@ test("public entry renders the pilgrimage application", async () => {
   assert.match(app, /href="#\/explore\/community-contribution"/);
   assert.match(html, /lang="ja"/);
   assert.match(html, /og\.png/);
-  assert.equal(site.version, "3.0.2");
+  assert.equal(site.version, "3.0.3");
   assert.equal(packageJson.version, site.version);
   assert.doesNotMatch(entry + app + html, /codex-preview|Your site is taking shape/i);
 });
@@ -186,7 +186,7 @@ test("starter preview is fully replaced", async () => {
 
   assert.match(entry, /PilgrimageApp/);
   assert.match(index, /og\.png/);
-  assert.equal(JSON.parse(packageJson).version, "3.0.2");
+  assert.equal(JSON.parse(packageJson).version, "3.0.3");
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
   await access(new URL("../public/og.png", import.meta.url));
