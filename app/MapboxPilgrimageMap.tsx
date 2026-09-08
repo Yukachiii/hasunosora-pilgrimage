@@ -105,10 +105,10 @@ function mapboxProfile(mode: TravelMode) {
 type MarkerKind = "standard" | "collaboration" | "card" | "planned";
 
 const markerAssetByKind: Record<MarkerKind, string> = {
-  standard: "./map-markers/red.png",
-  collaboration: "./map-markers/yellow.png",
-  card: "./map-markers/blue.png",
-  planned: "./map-markers/green.png",
+  standard: `${import.meta.env.BASE_URL}map-markers/red.png`,
+  collaboration: `${import.meta.env.BASE_URL}map-markers/yellow.png`,
+  card: `${import.meta.env.BASE_URL}map-markers/blue.png`,
+  planned: `${import.meta.env.BASE_URL}map-markers/green.png`,
 };
 
 const markerAssetCache = new Map<MarkerKind, Promise<HTMLImageElement>>();

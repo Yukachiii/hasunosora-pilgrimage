@@ -110,11 +110,12 @@ test("standalone guide redesign test stays isolated from the public application"
   assert.doesNotMatch(css, /!important/);
 });
 
-test("full UI redesign trial provides four isolated interactive pages", async () => {
-  const [html, entry, app, css, viteConfig] = await Promise.all([
+test("full UI redesign trial provides four isolated live pages", async () => {
+  const [html, entry, app, planner, css, viteConfig] = await Promise.all([
     readFile(new URL("../github-pages/ui-test/index.html", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/ui-test/main.tsx", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/ui-test/UiTrialApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../github-pages/ui-test/use-live-planner.ts", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/ui-test/ui-test.css", import.meta.url), "utf8"),
     readFile(new URL("../vite.pages.config.ts", import.meta.url), "utf8"),
   ]);
@@ -126,10 +127,18 @@ test("full UI redesign trial provides four isolated interactive pages", async ()
   for (const page of ["ExplorePage", "PlannerPage", "TodayPage", "GuidePage"]) {
     assert.match(app, new RegExp(`function ${page}\\(`));
   }
-  assert.match(app, /onDragStart/);
+  assert.match(app, /MapboxPilgrimageMap/);
+  assert.match(app, /onPointerMove/);
   assert.match(app, /移動時間を計算する/);
   assert.match(app, /訪問済みにする/);
+  assert.match(app, /SharedPreviewPage/);
+  assert.match(app, /#蓮ノ旅/);
   assert.match(app, /role="dialog"/);
+  assert.match(planner, /hasunosora-pilgrimage\.ui-test-planner\.v1/);
+  assert.match(planner, /createSharedPlanSnapshot/);
+  assert.match(planner, /sanitizePlannerSnapshot/);
+  assert.doesNotMatch(planner, /PLANNER_DRAFT_COOKIE_KEY/);
+  assert.doesNotMatch(planner, /document\.cookie/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /object-fit: contain/);
   assert.doesNotMatch(css, /!important/);
@@ -316,9 +325,9 @@ test("Mapbox map and route integration stays guarded", async () => {
   assert.match(map, /optimizeWaypointOrder/);
   assert.match(map, /if \(mapState !== "ready" \|\| !routeLinesRef\.current\.length\) return/);
   assert.doesNotMatch(map, /routeServiceUrl|ServerRoutePlan|source: "server"/);
-  assert.match(map, /planned: "\.\/map-markers\/green\.png"/);
-  assert.match(map, /card: "\.\/map-markers\/blue\.png"/);
-  assert.match(map, /collaboration: "\.\/map-markers\/yellow\.png"/);
+  assert.match(map, /planned: `\$\{import\.meta\.env\.BASE_URL\}map-markers\/green\.png`/);
+  assert.match(map, /card: `\$\{import\.meta\.env\.BASE_URL\}map-markers\/blue\.png`/);
+  assert.match(map, /collaboration: `\$\{import\.meta\.env\.BASE_URL\}map-markers\/yellow\.png`/);
   assert.match(map, /createNumberedMarkerImage/);
   assert.match(map, /"icon-image": \["get", "markerImageId"\]/);
   assert.doesNotMatch(map, /"text-field": \["get", "indexLabel"\]/);

@@ -1,16 +1,50 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { spots, type PilgrimageSpot } from "../../app/spots";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
+import {
+  MapboxPilgrimageMap,
+  type RouteRequest,
+  type RouteResult,
+} from "../../app/MapboxPilgrimageMap";
+import {
+  formatDuration,
+  majorStations,
+  openingHoursStatus,
+  recommendedStayMinutes,
+  type TravelMode,
+} from "../../app/route-planner";
+import {
+  decodeSharedPlanSnapshot,
+  type SharedPlanSnapshot,
+} from "../../app/planner-share";
+import { cardModels, collaborations, spots, type PilgrimageSpot } from "../../app/spots";
+import {
+  departureIso,
+  displayClock,
+  japanDate,
+  useLivePlanner,
+  type ScheduleEntry,
+} from "./use-live-planner";
 
 type TrialPage = "explore" | "planner" | "today" | "guide";
+type TrialView = TrialPage | "shared";
+type ExploreMode = "spots" | "collaboration" | "map" | "cards";
 
 type ModalState =
   | { kind: "guide"; src: string; alt: string }
-  | { kind: "share" }
+  | { kind: "share"; url: string; includeDates: boolean }
   | null;
 
 const baseUrl = import.meta.env.BASE_URL;
-const fallbackSpotIds = ["kanazawa-station", "ohmicho-market", "oyama-shrine", "kenrokuen"];
-const fallbackDurations = [30, 55, 35, 75];
+const cardModelSpotIds = Array.from(new Set(cardModels.flatMap((card) => card.spotId ? [card.spotId] : [])));
+const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "";
+const shareMessage = "訪問予定を共有します。\n#蓮ノ旅";
 const pageLabels: Record<TrialPage, string> = {
   explore: "探す",
   planner: "予定",
@@ -53,12 +87,6 @@ function assetUrl(path: string) {
   return `${baseUrl}${path.replace(/^\//, "")}`;
 }
 
-function routeSpots() {
-  return fallbackSpotIds
-    .map((id) => spots.find((spot) => spot.id === id))
-    .filter((spot): spot is PilgrimageSpot => Boolean(spot));
-}
-
 function spotPhoto(spot?: PilgrimageSpot) {
   return spot?.imageUrl ? assetUrl(spot.imageUrl) : assetUrl("photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp");
 }
@@ -92,9 +120,12 @@ function Brand() {
   );
 }
 
-function TrialHeader({ page, itineraryCount, onNavigate, onOpenShare }: {
+function TrialHeader({ page, itineraryCount, completedCount, visitDate, sharedPreview = false, onNavigate, onOpenShare }: {
   page: TrialPage;
   itineraryCount: number;
+  completedCount: number;
+  visitDate: string;
+  sharedPreview?: boolean;
   onNavigate: (page: TrialPage) => void;
   onOpenShare: () => void;
 }) {
@@ -109,7 +140,7 @@ function TrialHeader({ page, itineraryCount, onNavigate, onOpenShare }: {
         ) : (
           <div>
             <strong>{pageLabels[page]}</strong>
-            <small>{page === "planner" ? "2026.09.12 / DAY 01" : page === "today" ? "TODAY / 09.12" : "USER GUIDE / JOURNEY 00"}</small>
+            <small>{page === "planner" ? `${visitDate.replaceAll("-", ".")} / DAY 01` : page === "today" ? `TODAY / ${visitDate.slice(5).replace("-", ".")}` : "USER GUIDE / JOURNEY 00"}</small>
           </div>
         )}
       </div>
@@ -121,10 +152,11 @@ function TrialHeader({ page, itineraryCount, onNavigate, onOpenShare }: {
           </PageLink>
         ))}
       </nav>
-      {page === "planner" ? (
+      {page === "planner" && !sharedPreview ? (
         <button className="ui-trial__mobile-share" type="button" onClick={onOpenShare}>共有する <span aria-hidden="true">↗</span></button>
       ) : null}
-      {page === "today" ? <strong className="ui-trial__mobile-progress">1 / {itineraryCount}</strong> : null}
+      {page === "today" ? <strong className="ui-trial__mobile-progress">{completedCount} / {itineraryCount}</strong> : null}
+      <span className="ui-trial__live-badge">実働テスト・本番データ非干渉</span>
       <a className="ui-trial__official" href="https://www.lovelive-anime.jp/hasunosora/" target="_blank" rel="noreferrer">
         作品公式サイト <span aria-hidden="true">↗</span>
       </a>
@@ -154,15 +186,37 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   onTogglePlanned: (spot: PilgrimageSpot) => void;
   onNavigate: (page: TrialPage) => void;
 }) {
-  const featured = spots.find((spot) => spot.id === "kanazawa-station") ?? planned[0];
+  const featured = spots.find((spot) => spot.id === "kanazawa-station") ?? spots[0];
   const featuredIsPlanned = planned.some((spot) => spot.id === featured?.id);
-  const [feedback, setFeedback] = useState("");
+  const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<ExploreMode>("spots");
+  const [selectedId, setSelectedId] = useState(featured?.id ?? spots[0]?.id ?? "");
+  const normalizedQuery = query.trim().toLocaleLowerCase("ja");
+  const currentCollaboration = collaborations.find((collaboration) => {
+    const today = japanDate();
+    return collaboration.startDate <= today && collaboration.endDate >= today;
+  }) ?? collaborations[0];
+  const collaborationSpotIds = new Set(currentCollaboration?.locations.map((location) => location.spotId) ?? []);
+  const filteredSpots = spots.filter((spot) => {
+    if (mode === "collaboration" && !collaborationSpotIds.has(spot.id)) return false;
+    if (!normalizedQuery) return true;
+    return [spot.name, spot.shortName, spot.area, spot.category, spot.address, spot.description]
+      .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
+  });
+  const filteredCards = cardModels.filter((card) => {
+    if (!card.spotId) return false;
+    if (!normalizedQuery) return true;
+    return [card.card, card.model, card.address, card.note, ...card.characters]
+      .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
+  });
+  const selectedSpot = spots.find((spot) => spot.id === selectedId) ?? filteredSpots[0] ?? featured;
   const choices = [
-    ["01", "定番", "登録スポット"],
-    ["02", "コラボ", "開催中から"],
-    ["03", "地図", "場所から"],
-    ["04", "カード", "モデル地から"],
+    { number: "01", label: "定番", note: "登録スポット", mode: "spots" as const },
+    { number: "02", label: "コラボ", note: "開催情報から", mode: "collaboration" as const },
+    { number: "03", label: "地図", note: "場所から", mode: "map" as const },
+    { number: "04", label: "カード", note: "モデル地から", mode: "cards" as const },
   ];
+  const noopRouteResult = useCallback(() => undefined, []);
 
   return (
     <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title">
@@ -172,32 +226,99 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
         <p className="ui-trial__explore-lead">蓮ノ空に関連するスポットから、行きたい場所を見つけて、そのまま予定へ追加できます。</p>
         <label className="ui-trial__search">
           <span className="ui-trial__visually-hidden">スポットを検索</span>
-          <input placeholder="場所・エリア・キーワードで探す" onChange={(event) => setFeedback(event.target.value ? `「${event.target.value}」で検索できます` : "")} />
+          <input
+            value={query}
+            placeholder="場所・エリア・キーワードで探す"
+            onChange={(event) => setQuery(event.target.value)}
+          />
           <span aria-hidden="true">⌕</span>
         </label>
         <h2>探し方を選ぶ</h2>
         <div className="ui-trial__choices">
-          {choices.map(([number, label, note], index) => (
+          {choices.map((choice) => (
             <button
-              className={index === 0 ? "is-active" : ""}
+              className={mode === choice.mode ? "is-active" : ""}
               type="button"
-              key={number}
-              onClick={() => setFeedback(`${label}の一覧を開く想定です`)}
+              key={choice.number}
+              onClick={() => setMode(choice.mode)}
             >
-              <small>{number}</small>
-              <strong>{label}</strong>
-              <span>{note}</span>
+              <small>{choice.number}</small>
+              <strong>{choice.label}</strong>
+              <span>{choice.note}</span>
               <i aria-hidden="true">→</i>
             </button>
           ))}
         </div>
         <div className="ui-trial__collaboration">
           <small>NOW IN ISHIKAWA</small>
-          <h2>石川県コラボ第5弾</h2>
-          <p>おいでよ！石川大観光Ⅱ　/　2026.08.10 → 12.06</p>
-          <button type="button" onClick={() => setFeedback("対象スポットを表示する想定です")}>対象スポットを見る <span aria-hidden="true">→</span></button>
+          <h2>{currentCollaboration?.name ?? "コラボスポット"}</h2>
+          <p>{currentCollaboration?.subtitle ?? "作品に関連する開催情報"}</p>
+          <button type="button" onClick={() => setMode("collaboration")}>対象スポットを見る <span aria-hidden="true">→</span></button>
         </div>
-        {feedback ? <p className="ui-trial__feedback" role="status">{feedback}</p> : null}
+
+        <section className="ui-trial__explorer" aria-labelledby="ui-trial-explorer-title">
+          <header>
+            <div>
+              <small>LIVE SEARCH</small>
+              <h2 id="ui-trial-explorer-title">{choices.find((choice) => choice.mode === mode)?.label}</h2>
+            </div>
+            <span>{mode === "cards" ? filteredCards.length : filteredSpots.length}件</span>
+          </header>
+          {mode === "map" ? (
+            <>
+              <div className="ui-trial__explore-map">
+                <MapboxPilgrimageMap
+                  spots={filteredSpots}
+                  selectedId={selectedSpot?.id ?? ""}
+                  plannedSpotIds={planned.map((spot) => spot.id)}
+                  cardModelSpotIds={cardModelSpotIds}
+                  onSelect={setSelectedId}
+                  routeRequest={null}
+                  onRouteResult={noopRouteResult}
+                  accessToken={mapboxAccessToken}
+                  isVisible
+                  viewMode="explore"
+                />
+              </div>
+              {selectedSpot ? (
+                <article className="ui-trial__map-selection">
+                  <div><small>{selectedSpot.area} · {selectedSpot.category}</small><strong>{selectedSpot.name}</strong></div>
+                  <button type="button" onClick={() => onTogglePlanned(selectedSpot)}>
+                    {planned.some((spot) => spot.id === selectedSpot.id) ? "予定から外す" : "予定に追加"}
+                  </button>
+                </article>
+              ) : null}
+            </>
+          ) : mode === "cards" ? (
+            <div className="ui-trial__card-results">
+              {filteredCards.slice(0, 24).map((card) => {
+                const spot = spots.find((item) => item.id === card.spotId);
+                if (!spot) return null;
+                const isPlanned = planned.some((item) => item.id === spot.id);
+                return (
+                  <article key={card.id}>
+                    {card.imageUrl ? <img src={assetUrl(card.imageUrl)} alt="" loading="lazy" /> : null}
+                    <div><small>{card.card}</small><strong>{card.model}</strong><span>{spot.name}</span></div>
+                    <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "外す" : "追加"}</button>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="ui-trial__spot-results">
+              {filteredSpots.slice(0, 30).map((spot) => {
+                const isPlanned = planned.some((item) => item.id === spot.id);
+                return (
+                  <article key={spot.id}>
+                    <div><small>{spot.area} · {spot.category}</small><strong>{spot.name}</strong><span>{spot.address}</span></div>
+                    <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+          {(mode === "cards" ? filteredCards.length : filteredSpots.length) === 0 ? <p>条件に合う場所がありません。</p> : null}
+        </section>
       </div>
 
       <div className="ui-trial__feature">
@@ -223,147 +344,356 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   );
 }
 
-function AbstractRouteMap({ stopCount }: { stopCount: number }) {
-  return (
-    <div className="ui-trial__route-map" aria-label={`${stopCount}地点のルート地図イメージ`}>
-      <small>ROUTE MAP</small>
-      <div className="ui-trial__map-grid" aria-hidden="true" />
-      <div className="ui-trial__map-river" aria-hidden="true" />
-      <svg viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
-        <polyline points="12,16 42,34 69,22 90,52" />
-      </svg>
-      {[1, 2, 3, 4].slice(0, Math.max(1, Math.min(4, stopCount))).map((number) => (
-        <span className={`ui-trial__map-pin ui-trial__map-pin--${number}`} key={number}>{number}</span>
-      ))}
-    </div>
-  );
-}
-
-function PlannerStops({ planned, onReorder }: {
+function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onStayChange, onFocus }: {
   planned: PilgrimageSpot[];
+  schedule: { entries: ScheduleEntry[] } | null;
+  stayMinutes: Record<string, number>;
   onReorder: (from: number, to: number) => void;
+  onRemove: (spotId: string) => void;
+  onStayChange: (spotId: string, minutes: number) => void;
+  onFocus: (spotId: string) => void;
 }) {
-  const draggedIndex = useRef<number | null>(null);
+  const listRef = useRef<HTMLOListElement>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    currentIndex: number;
+    offsetY: number;
+    overlay: HTMLElement;
+  } | null>(null);
+  const [draggedSpotId, setDraggedSpotId] = useState("");
+
+  const finishPointerDrag = useCallback((event?: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (event?.currentTarget.hasPointerCapture(drag.pointerId)) {
+      event.currentTarget.releasePointerCapture(drag.pointerId);
+    }
+    drag.overlay.remove();
+    dragRef.current = null;
+    setDraggedSpotId("");
+  }, []);
+
+  useEffect(() => () => {
+    dragRef.current?.overlay.remove();
+    dragRef.current = null;
+  }, []);
+
+  function startPointerDrag(event: ReactPointerEvent<HTMLButtonElement>, index: number, spotId: string) {
+    if (!event.isPrimary || event.button !== 0) return;
+    const row = event.currentTarget.closest("li");
+    if (!row) return;
+    const rect = row.getBoundingClientRect();
+    const overlay = row.cloneNode(true) as HTMLElement;
+    overlay.classList.add("ui-trial__drag-overlay");
+    Object.assign(overlay.style, {
+      position: "fixed",
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+      zIndex: "200",
+      pointerEvents: "none",
+    });
+    document.body.append(overlay);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      currentIndex: index,
+      offsetY: event.clientY - rect.top,
+      overlay,
+    };
+    setDraggedSpotId(spotId);
+  }
+
+  function movePointerDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag.overlay.style.top = `${event.clientY - drag.offsetY}px`;
+    const target = document.elementsFromPoint(event.clientX, event.clientY)
+      .map((element) => element.closest<HTMLElement>("li[data-stop-index]"))
+      .find((element) => Boolean(element));
+    const targetIndex = Number(target?.dataset.stopIndex);
+    if (!Number.isInteger(targetIndex) || targetIndex === drag.currentIndex) return;
+    onReorder(drag.currentIndex, targetIndex);
+    drag.currentIndex = targetIndex;
+  }
+
   return (
-    <ol className="ui-trial__stop-list">
+    <ol className="ui-trial__stop-list" ref={listRef}>
       {planned.map((spot, index) => (
         <li
           key={spot.id}
-          draggable
-          onDragStart={() => { draggedIndex.current = index; }}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={() => {
-            if (draggedIndex.current !== null) onReorder(draggedIndex.current, index);
-            draggedIndex.current = null;
-          }}
+          data-stop-index={index}
+          className={draggedSpotId === spot.id ? "is-dragging" : ""}
         >
           <span>{index + 1}</span>
-          <time>{["10:00", "10:42", "12:18", "14:05"][index] ?? "15:30"}</time>
-          <div>
+          <time>{schedule ? displayClock(schedule.entries.find((entry) => entry.spot.id === spot.id)?.arrival ?? 0) : "--:--"}</time>
+          <div role="button" tabIndex={0} onClick={() => onFocus(spot.id)} onKeyDown={(event) => { if (event.key === "Enter") onFocus(spot.id); }}>
             <strong>{spot.name}</strong>
-            <small>{index === 0 ? "START" : `${fallbackDurations[index] ?? 45}分`}</small>
+            <label onClick={(event) => event.stopPropagation()}>
+              滞在
+              <input
+                type="number"
+                min="0"
+                max="480"
+                step="5"
+                value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}
+                onChange={(event) => onStayChange(spot.id, Number(event.target.value))}
+              />分
+            </label>
           </div>
-          <button type="button" aria-label={`${spot.name}を並べ替え`} title="ドラッグして並べ替え">☷</button>
+          <div className="ui-trial__stop-actions">
+            <button type="button" onClick={() => onRemove(spot.id)} aria-label={`${spot.name}を予定から外す`}>×</button>
+            <button
+              type="button"
+              aria-label={`${spot.name}をドラッグして並べ替え`}
+              title="ドラッグして並べ替え"
+              onPointerDown={(event) => startPointerDrag(event, index, spot.id)}
+              onPointerMove={movePointerDrag}
+              onPointerUp={finishPointerDrag}
+              onPointerCancel={finishPointerDrag}
+            >☷</button>
+          </div>
         </li>
       ))}
     </ol>
   );
 }
 
-function PlannerPage({ planned, onReorder, onOpenShare }: {
-  planned: PilgrimageSpot[];
-  onReorder: (from: number, to: number) => void;
+function PlannerPage({ planner, onOpenShare, onNavigateExplore }: {
+  planner: ReturnType<typeof useLivePlanner>;
   onOpenShare: () => void;
+  onNavigateExplore: () => void;
 }) {
-  const [calculated, setCalculated] = useState(false);
+  const [selectedId, setSelectedId] = useState(planner.itinerarySpots[0]?.id ?? "");
+  const [focusRequest, setFocusRequest] = useState<{ spotId: string; requestId: number } | null>(null);
+  const visitLabel = planner.activeDay?.visitDate
+    ? new Intl.DateTimeFormat("ja-JP", { month: "long", day: "numeric" }).format(new Date(`${planner.activeDay.visitDate}T12:00:00+09:00`))
+    : "未設定";
+  const summaryEnd = planner.schedule ? displayClock(planner.schedule.finish) : planner.activeDay?.endTime ?? "--:--";
+  const focusSpot = (spotId: string) => {
+    setSelectedId(spotId);
+    setFocusRequest({ spotId, requestId: Date.now() });
+  };
+  const stopProps = {
+    planned: planner.itinerarySpots,
+    schedule: planner.schedule,
+    stayMinutes: planner.stayMinutes,
+    onReorder: planner.reorder,
+    onRemove: planner.toggleSpot,
+    onStayChange: planner.updateStayMinutes,
+    onFocus: focusSpot,
+  };
   return (
     <section className="ui-trial__page ui-trial__planner" aria-labelledby="ui-trial-planner-title">
       <div className="ui-trial__planner-summary">
         <p className="ui-trial__eyebrow">JOURNEY PLAN / DAY 01</p>
-        <h1 id="ui-trial-planner-title">9月12日の旅程</h1>
-        <p>{planned.length}スポット　·　10:00 → 16:20</p>
+        <h1 id="ui-trial-planner-title">{visitLabel}の旅程</h1>
+        <p>{planner.itinerarySpots.length}スポット　·　{planner.activeDay?.startTime ?? "--:--"} → {summaryEnd}</p>
         <article className="ui-trial__planner-list-card">
           <h2>訪問順</h2>
-          <PlannerStops planned={planned} onReorder={onReorder} />
-          <button type="button">＋ スポットを追加</button>
+          {planner.itinerarySpots.length ? <PlannerStops {...stopProps} /> : <p>探す画面からスポットを追加してください。</p>}
+          <button type="button" onClick={onNavigateExplore}>＋ スポットを選ぶ</button>
         </article>
       </div>
 
-      <AbstractRouteMap stopCount={planned.length} />
+      <div className="ui-trial__route-map ui-trial__live-map">
+        <MapboxPilgrimageMap
+          spots={planner.itinerarySpots}
+          selectedId={selectedId || planner.itinerarySpots[0]?.id || ""}
+          focusSpotRequest={focusRequest}
+          plannedSpotIds={planner.itineraryIds}
+          cardModelSpotIds={[]}
+          onSelect={setSelectedId}
+          routeRequest={planner.routeRequest}
+          onRouteResult={planner.handleRouteResult}
+          accessToken={mapboxAccessToken}
+          isVisible
+          viewMode="planner"
+        />
+      </div>
 
       <aside className="ui-trial__planner-controls">
         <div className="ui-trial__mobile-sheet-handle" aria-hidden="true" />
-        <small>{planned.length}スポット　·　10:00 → 16:20</small>
+        <small>{planner.itinerarySpots.length}スポット　·　{planner.activeDay?.startTime ?? "--:--"} → {summaryEnd}</small>
         <h2>予定を整える</h2>
         <p>必要なところだけ変更できます。</p>
         <div className="ui-trial__mobile-planner-stops">
-          <PlannerStops planned={planned} onReorder={onReorder} />
+          {planner.itinerarySpots.length ? <PlannerStops {...stopProps} /> : <p>探す画面からスポットを追加してください。</p>}
         </div>
         <div className="ui-trial__planner-fields">
-          <label><span>訪問日</span><input type="date" defaultValue="2026-09-12" /></label>
-          <label><span>出発時刻</span><input type="time" defaultValue="10:00" /></label>
-          <label><span>移動手段</span><select defaultValue="TRANSIT"><option value="TRANSIT">公共交通</option><option value="WALKING">徒歩</option><option value="DRIVING">車</option></select></label>
-          <label><span>出発駅</span><select defaultValue="kanazawa"><option value="kanazawa">金沢駅</option></select></label>
+          <label><span>訪問日</span><input type="date" value={planner.activeDay?.visitDate ?? japanDate()} onChange={(event) => planner.updateDayField("visitDate", event.target.value)} /></label>
+          <label><span>出発時刻</span><input type="time" value={planner.activeDay?.startTime ?? "09:00"} onChange={(event) => planner.updateDayField("startTime", event.target.value)} /></label>
+          <label><span>終了目安</span><input type="time" value={planner.activeDay?.endTime ?? "18:00"} onChange={(event) => planner.updateDayField("endTime", event.target.value)} /></label>
+          <label><span>移動手段</span><select value={planner.travelMode} onChange={(event) => planner.setTravelMode(event.target.value as TravelMode)}><option value="WALKING">徒歩</option><option value="DRIVING">車</option><option value="TRANSIT">公共交通</option><option value="BICYCLING">自転車</option></select></label>
+          {planner.travelMode === "TRANSIT" ? (
+            <label><span>出発駅</span><select value={planner.sourceStationId} onChange={(event) => planner.setSourceStationId(event.target.value)}><option value="">指定なし</option>{majorStations.map((station) => <option value={station.id} key={station.id}>{station.name}</option>)}</select></label>
+          ) : null}
         </div>
-        <button className="ui-trial__calculate" type="button" onClick={() => setCalculated(true)}>移動時間を計算する <span aria-hidden="true">→</span></button>
-        {calculated ? <p className="ui-trial__calculated" role="status"><small>予想</small><strong>移動 1時間42分</strong><span>滞在込み　6時間20分</span></p> : null}
+        <label className="ui-trial__optimize"><input type="checkbox" checked={planner.optimizeOrder} disabled={planner.travelMode === "TRANSIT"} onChange={(event) => planner.setOptimizeOrder(event.target.checked)} /><span>訪問順を最適化する</span></label>
+        <button className="ui-trial__calculate" type="button" onClick={planner.calculateRoute} disabled={planner.itinerarySpots.length < 2 || planner.routeResult.state === "loading"}>
+          {planner.routeResult.state === "loading" ? "経路を計算中…" : planner.routeIsCurrent ? "経路を再計算する" : "移動時間を計算する"} <span aria-hidden="true">→</span>
+        </button>
+        {planner.routeResult.state !== "idle" ? (
+          <p className={`ui-trial__calculated is-${planner.routeResult.state}`} role="status">
+            <small>{planner.routeResult.state === "success" ? "計算結果" : "経路案内"}</small>
+            <strong>{planner.routeResult.state === "success" ? `${planner.routeResult.distance} · 移動 ${planner.routeResult.duration}` : planner.routeResult.state === "loading" ? "Mapboxへ問い合わせています" : planner.routeResult.message}</strong>
+            {planner.schedule ? <span>滞在込み　{formatDuration(planner.schedule.finish - planner.schedule.start)}</span> : null}
+          </p>
+        ) : null}
         <button className="ui-trial__planner-share-link" type="button" onClick={onOpenShare}>この予定を共有</button>
       </aside>
     </section>
   );
 }
 
-function TodayPage({ planned }: { planned: PilgrimageSpot[] }) {
-  const [activeIndex, setActiveIndex] = useState(Math.min(2, Math.max(0, planned.length - 1)));
-  const activeSpot = planned[activeIndex];
-  const completedCount = Math.min(activeIndex, planned.length);
-  const mapsUrl = activeSpot
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeSpot.address)}`
+function TodayPage({ planner, onOpenPlanner }: {
+  planner: ReturnType<typeof useLivePlanner>;
+  onOpenPlanner: () => void;
+}) {
+  const completedCount = planner.itineraryIds.filter((id) => planner.completedSpotIds.includes(id)).length;
+  const nextEntry = planner.schedule?.entries.find((entry) => !planner.completedSpotIds.includes(entry.spot.id));
+  const nextSpot = nextEntry?.spot;
+  const mapsUrl = nextSpot
+    ? `https://www.google.com/maps/dir/?api=1&destination=${nextSpot.lat},${nextSpot.lng}&travelmode=${planner.travelMode.toLowerCase()}&dir_action=navigate`
     : "https://www.google.com/maps";
+  const status = nextEntry && planner.activeDay
+    ? openingHoursStatus(nextEntry.spot, planner.activeDay.visitDate, nextEntry.arrival + planner.todayOffsetMinutes)
+    : null;
 
   return (
     <section className="ui-trial__page ui-trial__today" aria-labelledby="ui-trial-today-title">
+      <div className="ui-trial__today-route-engine" aria-hidden="true">
+        <MapboxPilgrimageMap
+          spots={planner.itinerarySpots}
+          selectedId={planner.itinerarySpots[0]?.id ?? ""}
+          plannedSpotIds={planner.itineraryIds}
+          cardModelSpotIds={[]}
+          onSelect={() => undefined}
+          routeRequest={planner.routeRequest}
+          onRouteResult={planner.handleRouteResult}
+          accessToken={mapboxAccessToken}
+          isVisible={false}
+          viewMode="planner"
+        />
+      </div>
       <div className="ui-trial__today-main">
-        <p className="ui-trial__eyebrow">TODAY / 2026.09.12</p>
+        <p className="ui-trial__eyebrow">TODAY / {planner.activeDay?.visitDate.replaceAll("-", ".")}</p>
         <h1 id="ui-trial-today-title">今日の巡礼</h1>
-        <p>現在 11:38　·　{Math.min(completedCount, planned.length)} / {planned.length} 訪問済み</p>
-        <div className="ui-trial__progress"><span style={{ width: `${planned.length ? (completedCount / planned.length) * 100 : 0}%` }} /></div>
-        {activeSpot ? (
+        <p>{completedCount} / {planner.itinerarySpots.length} 訪問済み</p>
+        <div className="ui-trial__progress"><span style={{ width: `${planner.itinerarySpots.length ? (completedCount / planner.itinerarySpots.length) * 100 : 0}%` }} /></div>
+        {nextEntry && nextSpot ? (
           <article className="ui-trial__next-spot">
-            <small>NEXT SPOT / 12:18到着予定</small>
-            <h2>{activeSpot.name}</h2>
-            <p>{activeSpot.address}</p>
-            <span>営業時間内</span>
-            <img src={spotPhoto(activeSpot)} alt={`${activeSpot.name}の写真`} />
+            <small>NEXT SPOT / {displayClock(nextEntry.arrival + planner.todayOffsetMinutes)}到着予定</small>
+            <h2>{nextSpot.name}</h2>
+            <p>{nextSpot.address}</p>
+            {status ? <span className={`is-${status.kind}`}>{status.label}</span> : null}
+            <img src={spotPhoto(nextSpot)} alt={`${nextSpot.name}の写真`} />
             <div>
               <a href={mapsUrl} target="_blank" rel="noreferrer">Google Mapsで向かう <span aria-hidden="true">↗</span></a>
-              <button
-                type="button"
-                onClick={() => setActiveIndex((current) => Math.min(planned.length - 1, current + 1))}
-                disabled={activeIndex >= planned.length - 1}
-              >
-                {activeIndex >= planned.length - 1 ? "最後のスポットです" : "訪問済みにする ✓"}
-              </button>
-              <small>滞在 {fallbackDurations[activeIndex] ?? 45}分　/　13:03 出発</small>
+              <button type="button" onClick={() => planner.toggleCompleted(nextSpot.id)}>訪問済みにする ✓</button>
+              <small>滞在 {nextEntry.stay}分　/　{displayClock(nextEntry.departure + planner.todayOffsetMinutes)} 出発</small>
             </div>
           </article>
-        ) : <p>予定にスポットがありません。</p>}
+        ) : planner.schedule && planner.itinerarySpots.length ? (
+          <div className="ui-trial__today-empty"><strong>本日の予定はすべて訪問済みです</strong><button type="button" onClick={() => planner.completedSpotIds.forEach(planner.toggleCompleted)}>訪問済みをリセット</button></div>
+        ) : (
+          <div className="ui-trial__today-empty"><strong>{planner.routeResult.state === "loading" ? "経路を計算しています" : "計算済みの予定がありません"}</strong><p>{planner.routeResult.state === "loading" ? "Mapboxから移動時間を取得しています。" : "予定タブで2か所以上を選び、経路を計算してください。"}</p><button type="button" onClick={onOpenPlanner}>予定を開く</button></div>
+        )}
       </div>
 
       <aside className="ui-trial__today-route">
         <h2>本日のルート</h2>
         <ol>
-          {planned.map((spot, index) => (
-            <li className={index < activeIndex ? "is-complete" : index === activeIndex ? "is-current" : ""} key={spot.id}>
-              <span>{index < activeIndex ? "✓" : index + 1}</span>
-              <time>{["10:00", "10:42", "12:18", "14:05"][index] ?? "15:30"}</time>
-              <strong>{spot.name}</strong>
-              <small>{index < activeIndex ? "訪問済み" : `${fallbackDurations[index] ?? 45}分`}</small>
-            </li>
-          ))}
+          {(planner.schedule?.entries ?? planner.itinerarySpots.map((spot) => ({ spot, arrival: 0, departure: 0, stay: planner.stayMinutes[spot.id] ?? recommendedStayMinutes(spot) }))).map((entry, index) => {
+            const complete = planner.completedSpotIds.includes(entry.spot.id);
+            const current = entry.spot.id === nextSpot?.id;
+            return (
+              <li className={complete ? "is-complete" : current ? "is-current" : ""} key={entry.spot.id}>
+                <span>{complete ? "✓" : index + 1}</span>
+                <time>{planner.schedule ? displayClock(entry.arrival + planner.todayOffsetMinutes) : "--:--"}</time>
+                <strong>{entry.spot.name}</strong>
+                <small>{complete ? "訪問済み" : `${entry.stay}分`}</small>
+              </li>
+            );
+          })}
         </ol>
-        <div><strong>当日の調整</strong><p>遅れた分だけ、この予定を現在時刻に合わせられます。</p></div>
+        <div><strong>当日の調整</strong><p>遅れた分だけ、この予定を現在時刻に合わせられます。</p><button type="button" onClick={planner.alignScheduleToNow} disabled={!nextEntry}>次の到着を現在時刻に合わせる</button></div>
       </aside>
+    </section>
+  );
+}
+
+function SharedPreviewPage({ sharedPlan, onImport, onBack }: {
+  sharedPlan: SharedPlanSnapshot | null;
+  onImport: () => void;
+  onBack: () => void;
+}) {
+  const [dayIndex, setDayIndex] = useState(sharedPlan?.activeDayIndex ?? 0);
+  const [selectedId, setSelectedId] = useState(sharedPlan?.days[dayIndex]?.itineraryIds[0] ?? "");
+  const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
+  const activeDay = sharedPlan?.days[dayIndex];
+  const daySpots = useMemo(() => (activeDay?.itineraryIds ?? [])
+    .map((id) => spots.find((spot) => spot.id === id))
+    .filter((spot): spot is PilgrimageSpot => Boolean(spot)), [activeDay]);
+  const routeRequest = useMemo<RouteRequest | null>(() => {
+    if (!sharedPlan || !activeDay || sharedPlan.travelMode === "TRANSIT" || daySpots.length < 2) return null;
+    return {
+      requestId: dayIndex + 1,
+      stops: daySpots,
+      travelMode: sharedPlan.travelMode,
+      optimizeWaypointOrder: sharedPlan.optimizeOrder,
+      stayMinutes: sharedPlan.stayMinutes,
+      departureTime: departureIso(activeDay.visitDate ?? japanDate(), activeDay.startTime),
+    };
+  }, [activeDay, dayIndex, daySpots, sharedPlan]);
+
+  if (!sharedPlan || !activeDay) {
+    return (
+      <section className="ui-trial__shared ui-trial__shared--error">
+        <small>SHARED JOURNEY</small>
+        <h1>共有予定を読み込めませんでした</h1>
+        <p>URLが途中で切れているか、期限切れの形式です。</p>
+        <button type="button" onClick={onBack}>探すへ戻る</button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="ui-trial__shared" aria-labelledby="ui-trial-shared-title">
+      <header>
+        <div><small>SHARED JOURNEY</small><h1 id="ui-trial-shared-title">共有された予定</h1><p>{sharedPlan.days.length}日間 · {sharedPlan.days.reduce((total, day) => total + day.itineraryIds.length, 0)}か所</p></div>
+        <button type="button" onClick={onBack}>閉じる</button>
+      </header>
+      {sharedPlan.days.length > 1 ? (
+        <nav aria-label="共有予定の日程">
+          {sharedPlan.days.map((day, index) => <button type="button" aria-current={dayIndex === index ? "date" : undefined} onClick={() => { setDayIndex(index); setSelectedId(day.itineraryIds[0] ?? ""); }} key={`${day.startTime}-${index}`}>DAY {String(index + 1).padStart(2, "0")}</button>)}
+        </nav>
+      ) : null}
+      <div className="ui-trial__shared-grid">
+        <div className="ui-trial__shared-map">
+          <MapboxPilgrimageMap
+            spots={daySpots}
+            selectedId={selectedId || daySpots[0]?.id || ""}
+            plannedSpotIds={activeDay.itineraryIds}
+            cardModelSpotIds={[]}
+            onSelect={setSelectedId}
+            routeRequest={routeRequest}
+            onRouteResult={setRouteResult}
+            accessToken={mapboxAccessToken}
+            isVisible
+            viewMode="planner"
+          />
+        </div>
+        <article>
+          <small>DAY {String(dayIndex + 1).padStart(2, "0")}</small>
+          <h2>{activeDay.visitDate?.replaceAll("-", ".") ?? `${dayIndex + 1}日目`}</h2>
+          <p>{activeDay.startTime} → {activeDay.endTime}　·　{sharedPlan.travelMode === "TRANSIT" ? "公共交通" : sharedPlan.travelMode === "DRIVING" ? "車" : sharedPlan.travelMode === "BICYCLING" ? "自転車" : "徒歩"}</p>
+          <ol>{daySpots.map((spot, index) => <li key={spot.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{spot.name}</strong><small>{sharedPlan.stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}分滞在</small></div></li>)}</ol>
+          <p className="ui-trial__shared-route-status">{sharedPlan.travelMode === "TRANSIT" ? "公共交通の経路は取り込み後に各区間を確認します。" : routeResult.state === "success" ? `${routeResult.distance} · ${routeResult.duration}` : routeResult.state === "error" ? routeResult.message : "経路を計算しています…"}</p>
+        </article>
+      </div>
+      <aside><strong>この予定をテスト版へ取り込む</strong><p>実働テスト版に保存中の予定は上書きされます。本番ページの予定には影響しません。</p><button type="button" onClick={onImport}>内容を確認して取り込む</button></aside>
     </section>
   );
 }
@@ -407,13 +737,19 @@ function GuidePage({ onNavigate, onOpenImage }: {
   );
 }
 
-function TrialModal({ modal, onClose }: { modal: ModalState; onClose: () => void }) {
+function TrialModal({ modal, onClose, onUpdateShareDates }: {
+  modal: ModalState;
+  onClose: () => void;
+  onUpdateShareDates: (includeDates: boolean) => void;
+}) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [shareFeedback, setShareFeedback] = useState("");
   useEffect(() => {
     if (!modal) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const timer = window.setTimeout(() => closeRef.current?.focus(), 0);
+    const feedbackTimer = window.setTimeout(() => setShareFeedback(""), 0);
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
       if (event.key === "Tab") {
@@ -424,11 +760,37 @@ function TrialModal({ modal, onClose }: { modal: ModalState; onClose: () => void
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.clearTimeout(timer);
+      window.clearTimeout(feedbackTimer);
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
   }, [modal, onClose]);
   if (!modal) return null;
+
+  async function copyShareUrl() {
+    if (!modal || modal.kind !== "share" || !modal.url) return;
+    try {
+      await navigator.clipboard.writeText(modal.url);
+      setShareFeedback("共有URLをコピーしました。");
+    } catch {
+      setShareFeedback("コピーできませんでした。URL欄を選択してコピーしてください。");
+    }
+  }
+
+  async function sharePlan() {
+    if (!modal || modal.kind !== "share" || !modal.url) return;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "蓮ノ旅の予定", text: shareMessage, url: modal.url });
+        setShareFeedback("共有画面を開きました。");
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    await copyShareUrl();
+  }
+
   return (
     <div className="ui-trial__modal" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="ui-trial__modal-dialog" role="dialog" aria-modal="true" aria-labelledby="ui-trial-modal-title">
@@ -440,9 +802,12 @@ function TrialModal({ modal, onClose }: { modal: ModalState; onClose: () => void
           <figure><img src={modal.src} alt={modal.alt} /></figure>
         ) : (
           <div className="ui-trial__share-dialog">
-            <p>この画面はテスト版です。共有時は本番の予定URLが生成されます。</p>
-            <label><span>共有URL</span><input readOnly value="https://example.test/shared-plan" /></label>
-            <button type="button" onClick={onClose}>確認しました</button>
+            <p>実働テスト版の予定を、プレビューと取り込みができるURLにします。本番ページの予定は含みません。</p>
+            <label className="ui-trial__share-date"><input type="checkbox" checked={modal.includeDates} onChange={(event) => onUpdateShareDates(event.target.checked)} /><span>訪問日も共有する</span></label>
+            <label><span>共有URL</span><input readOnly value={modal.url} onFocus={(event) => event.currentTarget.select()} /></label>
+            {!modal.url ? <p role="alert">共有するスポットを1か所以上追加してください。</p> : null}
+            <div><button type="button" onClick={sharePlan} disabled={!modal.url}>{typeof navigator.share === "function" ? "共有画面を開く" : "URLをコピー"}</button><button type="button" onClick={copyShareUrl} disabled={!modal.url}>コピー</button></div>
+            <small aria-live="polite">{shareFeedback}</small>
           </div>
         )}
       </section>
@@ -451,41 +816,87 @@ function TrialModal({ modal, onClose }: { modal: ModalState; onClose: () => void
 }
 
 export function UiTrialApp() {
-  const [page, setPage] = useState<TrialPage>("explore");
-  const [planned, setPlanned] = useState(routeSpots);
+  const planner = useLivePlanner(spots);
+  const [view, setView] = useState<TrialView>("explore");
+  const [sharedPlan, setSharedPlan] = useState<SharedPlanSnapshot | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
-  const closeModal = useMemo(() => () => setModal(null), []);
+  const closeModal = useCallback(() => setModal(null), []);
+  const page = view === "shared" ? "planner" : view;
+
+  useEffect(() => {
+    const syncLocation = () => {
+      const parts = window.location.hash.replace(/^#\/?/, "").split("/");
+      if (parts[0] === "shared") {
+        setSharedPlan(decodeSharedPlanSnapshot(parts.slice(1).join("/"), new Set(spots.map((spot) => spot.id))));
+        setView("shared");
+        return;
+      }
+      const nextPage = (Object.keys(pageLabels) as TrialPage[]).includes(parts[0] as TrialPage)
+        ? parts[0] as TrialPage
+        : "explore";
+      setSharedPlan(null);
+      setView(nextPage);
+    };
+    syncLocation();
+    window.addEventListener("hashchange", syncLocation);
+    return () => window.removeEventListener("hashchange", syncLocation);
+  }, []);
+
+  useEffect(() => {
+    if (
+      (view !== "planner" && view !== "today") ||
+      !planner.restored ||
+      planner.itinerarySpots.length < 2 ||
+      planner.routeResult.state === "loading" ||
+      planner.requestedRouteSignature === planner.currentRouteSignature
+    ) return undefined;
+    const timer = window.setTimeout(planner.calculateRoute, 650);
+    return () => window.clearTimeout(timer);
+  }, [planner.calculateRoute, planner.currentRouteSignature, planner.itinerarySpots.length, planner.requestedRouteSignature, planner.restored, planner.routeResult.state, view]);
 
   const navigate = (nextPage: TrialPage) => {
-    setPage(nextPage);
+    setView(nextPage);
+    setSharedPlan(null);
+    const hash = `#/${nextPage}`;
+    if (window.location.hash !== hash) window.history.pushState(null, "", hash);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const togglePlanned = (spot: PilgrimageSpot) => {
-    setPlanned((current) => current.some((item) => item.id === spot.id)
-      ? current.filter((item) => item.id !== spot.id)
-      : [...current, spot]);
+
+  const openShare = () => {
+    setModal({ kind: "share", url: planner.createShareUrl(false), includeDates: false });
   };
-  const reorder = (from: number, to: number) => {
-    setPlanned((current) => {
-      if (from === to || !current[from] || !current[to]) return current;
-      const next = [...current];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+  const updateShareDates = (includeDates: boolean) => {
+    setModal({ kind: "share", url: planner.createShareUrl(includeDates), includeDates });
   };
+  const importShared = () => {
+    if (!sharedPlan) return;
+    const confirmed = window.confirm("実働テスト版に保存されている予定は、共有された予定で上書きされます。本番ページの予定には影響しません。取り込みますか？");
+    if (!confirmed || !planner.importSharedPlan(sharedPlan)) return;
+    navigate("planner");
+  };
+
+  const completedCount = planner.itineraryIds.filter((id) => planner.completedSpotIds.includes(id)).length;
 
   return (
     <div className={`ui-trial ui-trial--${page}`}>
-      <TrialHeader page={page} itineraryCount={planned.length} onNavigate={navigate} onOpenShare={() => setModal({ kind: "share" })} />
+      <TrialHeader
+        page={page}
+        itineraryCount={planner.itinerarySpots.length}
+        completedCount={completedCount}
+        visitDate={planner.activeDay?.visitDate ?? japanDate()}
+        sharedPreview={view === "shared"}
+        onNavigate={navigate}
+        onOpenShare={openShare}
+      />
       <main>
-        {page === "explore" ? <ExplorePage planned={planned} onTogglePlanned={togglePlanned} onNavigate={navigate} /> : null}
-        {page === "planner" ? <PlannerPage planned={planned} onReorder={reorder} onOpenShare={() => setModal({ kind: "share" })} /> : null}
-        {page === "today" ? <TodayPage planned={planned} /> : null}
-        {page === "guide" ? <GuidePage onNavigate={navigate} onOpenImage={(src, alt) => setModal({ kind: "guide", src, alt })} /> : null}
+        {view === "explore" ? <ExplorePage planned={planner.itinerarySpots} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={navigate} /> : null}
+        {view === "planner" ? <PlannerPage planner={planner} onOpenShare={openShare} onNavigateExplore={() => navigate("explore")} /> : null}
+        {view === "today" ? <TodayPage planner={planner} onOpenPlanner={() => navigate("planner")} /> : null}
+        {view === "guide" ? <GuidePage onNavigate={navigate} onOpenImage={(src, alt) => setModal({ kind: "guide", src, alt })} /> : null}
+        {view === "shared" ? <SharedPreviewPage sharedPlan={sharedPlan} onImport={importShared} onBack={() => navigate("explore")} /> : null}
       </main>
-      <TrialNavigation page={page} itineraryCount={planned.length} onNavigate={navigate} />
-      <TrialModal modal={modal} onClose={closeModal} />
+      <TrialNavigation page={page} itineraryCount={planner.itinerarySpots.length} onNavigate={navigate} />
+      <TrialModal modal={modal} onClose={closeModal} onUpdateShareDates={updateShareDates} />
     </div>
   );
 }
