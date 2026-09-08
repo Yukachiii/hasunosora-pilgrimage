@@ -136,6 +136,15 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /role="dialog"/);
   assert.match(app, /selectedCollaborationId/);
   assert.match(app, /ui-trial__feature-context/);
+  assert.match(app, /ui-trial__search-filters/);
+  assert.match(app, /ExploreSourceFilter/);
+  assert.match(app, /useLayoutEffect/);
+  assert.match(app, /label: "地図"[\s\S]*label: "定番"[\s\S]*label: "カード"[\s\S]*label: "コラボ"/);
+  assert.match(app, /className="ui-trial__modal ui-trial__spot-window"/);
+  assert.match(app, /aria-labelledby="ui-trial-spot-window-title"/);
+  assert.match(app, /if \(nextMode === "spots"\)[\s\S]*setIsSpotWindowOpen\(true\)/);
+  const todayPage = app.match(/function TodayPage[\s\S]*?function SharedPreviewPage/)?.[0] ?? "";
+  assert.doesNotMatch(todayPage, /<img/);
   assert.doesNotMatch(app, /実働テスト|本番データ非干渉/);
   assert.match(planner, /hasunosora-pilgrimage\.ui-test-planner\.v1/);
   assert.match(planner, /createSharedPlanSnapshot/);
@@ -144,6 +153,10 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.doesNotMatch(planner, /document\.cookie/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /object-fit: contain/);
+  assert.match(css, /ui-trial__route-map[\s\S]*?height: clamp/);
+  assert.match(css, /ui-trial__search-filters\.is-expanded/);
+  assert.match(css, /\.ui-trial__spot-window-dialog/);
+  assert.match(css, /@keyframes ui-trial-spot-sheet-enter/);
   assert.doesNotMatch(css, /!important/);
 });
 

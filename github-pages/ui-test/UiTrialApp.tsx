@@ -1,9 +1,11 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
@@ -35,6 +37,7 @@ import {
 type TrialPage = "explore" | "planner" | "today" | "guide";
 type TrialView = TrialPage | "shared";
 type ExploreMode = "spots" | "collaboration" | "map" | "cards";
+type ExploreSourceFilter = "all" | "activity" | "sehas" | "with-meets";
 
 type ModalState =
   | { kind: "guide"; src: string; alt: string }
@@ -43,6 +46,8 @@ type ModalState =
 
 const baseUrl = import.meta.env.BASE_URL;
 const cardModelSpotIds = Array.from(new Set(cardModels.flatMap((card) => card.spotId ? [card.spotId] : [])));
+const exploreAreas = Array.from(new Set(spots.map((spot) => spot.area))).sort((a, b) => a.localeCompare(b, "ja"));
+const exploreCategories = Array.from(new Set(spots.map((spot) => spot.category))).sort((a, b) => a.localeCompare(b, "ja"));
 const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "";
 const shareMessage = "訪問予定を共有します。\n#蓮ノ旅";
 const pageLabels: Record<TrialPage, string> = {
@@ -56,7 +61,7 @@ const guideSteps = [
   {
     number: "01",
     title: "探し方を選ぶ",
-    description: "定番・コラボ・地図・カードから入口を選ぶ。",
+    description: "地図・定番・カード・コラボから入口を選ぶ。",
     image: "guide/02-choose-method.png",
     alt: "探し方を選ぶ画面",
   },
@@ -89,6 +94,13 @@ function assetUrl(path: string) {
 
 function spotPhoto(spot?: PilgrimageSpot) {
   return spot?.imageUrl ? assetUrl(spot.imageUrl) : assetUrl("photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp");
+}
+
+function SpotName({ name }: { name: string }) {
+  const words = name.trim().split(/\s+/);
+  return <>{words.map((word, index) => (
+    <span className="ui-trial__spot-name-token" key={`${word}-${index}`}>{word}{index < words.length - 1 ? " " : ""}</span>
+  ))}</>;
 }
 
 function PageLink({ page, currentPage, onNavigate, children }: {
@@ -187,7 +199,12 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
 }) {
   const initialSpot = spots.find((spot) => spot.id === "kanazawa-station") ?? spots[0];
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<ExploreMode>("spots");
+  const [mode, setMode] = useState<ExploreMode>("map");
+  const [isSpotWindowOpen, setIsSpotWindowOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [areaFilter, setAreaFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState<ExploreSourceFilter>("all");
   const [selectedId, setSelectedId] = useState(initialSpot?.id ?? "");
   const today = japanDate();
   const activeCollaborations = collaborations.filter((collaboration) => (
@@ -195,21 +212,37 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   ));
   const availableCollaborations = activeCollaborations.length > 0 ? activeCollaborations : collaborations;
   const [selectedCollaborationId, setSelectedCollaborationId] = useState(availableCollaborations[0]?.id ?? "");
+  const spotWindowCloseRef = useRef<HTMLButtonElement>(null);
   const normalizedQuery = query.trim().toLocaleLowerCase("ja");
   const currentCollaboration = availableCollaborations.find(
     (collaboration) => collaboration.id === selectedCollaborationId,
   ) ?? availableCollaborations[0];
   const collaborationSpotIds = new Set(currentCollaboration?.locations.map((location) => location.spotId) ?? []);
-  const filteredSpots = spots.filter((spot) => {
-    if (mode === "collaboration" && !collaborationSpotIds.has(spot.id)) return false;
+  const matchesSource = (spot: PilgrimageSpot) => (
+    sourceFilter === "all" ||
+    (sourceFilter === "activity" && Boolean(spot.activityRecords?.length)) ||
+    (sourceFilter === "sehas" && Boolean(spot.sehasEpisodes?.length)) ||
+    (sourceFilter === "with-meets" && Boolean(spot.withMeetsEpisodes?.length))
+  );
+  const filteredStandardSpots = spots.filter((spot) => {
+    if (areaFilter !== "all" && spot.area !== areaFilter) return false;
+    if (categoryFilter !== "all" && spot.category !== categoryFilter) return false;
+    if (!matchesSource(spot)) return false;
     if (!normalizedQuery) return true;
     return [spot.name, spot.shortName, spot.area, spot.category, spot.address, spot.description]
       .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
   });
+  const filteredSpots = mode === "collaboration"
+    ? filteredStandardSpots.filter((spot) => collaborationSpotIds.has(spot.id))
+    : filteredStandardSpots;
   const filteredCards = cardModels.filter((card) => {
     if (!card.spotId) return false;
+    const spot = spots.find((item) => item.id === card.spotId);
+    if (!spot) return false;
+    if (areaFilter !== "all" && spot.area !== areaFilter) return false;
+    if (categoryFilter !== "all" && spot.category !== categoryFilter) return false;
     if (!normalizedQuery) return true;
-    return [card.card, card.model, card.address, card.note, ...card.characters]
+    return [card.card, card.model, card.address, card.note, spot.name, spot.area, spot.category, ...card.characters]
       .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
   });
   const selectedCandidate = spots.find((spot) => spot.id === selectedId);
@@ -226,15 +259,37 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
   const selectedNumber = Math.max(0, mode === "cards"
     ? filteredCards.findIndex((card) => card.spotId === selectedSpot?.id)
     : filteredSpots.findIndex((spot) => spot.id === selectedSpot?.id)) + 1;
+  const activeFilterCount = Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all" && mode !== "cards");
+  const standardFilterCount = Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all");
   const choices = [
-    { number: "01", label: "定番", note: "登録スポット", mode: "spots" as const },
-    { number: "02", label: "コラボ", note: "開催情報から", mode: "collaboration" as const },
-    { number: "03", label: "地図", note: "場所から", mode: "map" as const },
-    { number: "04", label: "カード", note: "モデル地から", mode: "cards" as const },
+    { number: "01", label: "地図", note: "場所から", mode: "map" as const },
+    { number: "02", label: "定番", note: "登録スポット", mode: "spots" as const },
+    { number: "03", label: "カード", note: "モデル地から", mode: "cards" as const },
+    { number: "04", label: "コラボ", note: "開催情報から", mode: "collaboration" as const },
   ];
   const noopRouteResult = useCallback(() => undefined, []);
 
+  useEffect(() => {
+    if (!isSpotWindowOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => spotWindowCloseRef.current?.focus(), 0);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsSpotWindowOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isSpotWindowOpen]);
+
   function selectMode(nextMode: ExploreMode) {
+    if (nextMode === "spots") {
+      setIsSpotWindowOpen(true);
+      return;
+    }
     setMode(nextMode);
     if (nextMode === "collaboration") {
       setSelectedId(currentCollaboration?.locations[0]?.spotId ?? "");
@@ -255,20 +310,41 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
         <p className="ui-trial__eyebrow">ISHIKAWA / KANAZAWA</p>
         <h1 id="ui-trial-explore-title">作品の景色を、<br />旅の予定へ。</h1>
         <p className="ui-trial__explore-lead">蓮ノ空に関連するスポットから、行きたい場所を見つけて、そのまま予定へ追加できます。</p>
-        <label className="ui-trial__search">
-          <span className="ui-trial__visually-hidden">スポットを検索</span>
-          <input
-            value={query}
-            placeholder="場所・エリア・キーワードで探す"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <span aria-hidden="true">⌕</span>
-        </label>
+        <div className="ui-trial__search-row">
+          <label className="ui-trial__search">
+            <span className="ui-trial__visually-hidden">スポットを検索</span>
+            <input
+              type="search"
+              value={query}
+              placeholder="場所・エリア・登場回で探す"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <span aria-hidden="true">⌕</span>
+          </label>
+          <button
+            className={`ui-trial__filter-toggle${activeFilterCount ? " is-active" : ""}`}
+            type="button"
+            aria-expanded={filtersExpanded}
+            aria-controls="ui-trial-search-filters"
+            onClick={() => setFiltersExpanded((current) => !current)}
+          >
+            <span>絞り込み</span>
+            <b>{activeFilterCount ? `${activeFilterCount}項目` : `${mode === "cards" ? filteredCards.length : filteredSpots.length}件`}</b>
+          </button>
+        </div>
+        <div className={`ui-trial__search-filters${filtersExpanded ? " is-expanded" : ""}`} id="ui-trial-search-filters">
+          <label><span>エリア</span><select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
+          <label><span>カテゴリ</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
+          {mode !== "cards" ? (
+            <label><span>出典</span><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label>
+          ) : null}
+          <button type="button" disabled={!activeFilterCount} onClick={() => { setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all"); }}>条件をクリア</button>
+        </div>
         <h2>探し方を選ぶ</h2>
         <div className="ui-trial__choices">
           {choices.map((choice) => (
             <button
-              className={mode === choice.mode ? "is-active" : ""}
+              className={choice.mode === "spots" ? (isSpotWindowOpen ? "is-active" : "") : (mode === choice.mode ? "is-active" : "")}
               type="button"
               key={choice.number}
               onClick={() => selectMode(choice.mode)}
@@ -344,7 +420,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
               </div>
               {selectedSpot ? (
                 <article className="ui-trial__map-selection">
-                  <div><small>{selectedSpot.area} · {selectedSpot.category}</small><strong>{selectedSpot.name}</strong></div>
+                  <div><small>{selectedSpot.area} · {selectedSpot.category}</small><strong><SpotName name={selectedSpot.name} /></strong></div>
                   <button type="button" onClick={() => onTogglePlanned(selectedSpot)}>
                     {planned.some((spot) => spot.id === selectedSpot.id) ? "予定から外す" : "予定に追加"}
                   </button>
@@ -364,7 +440,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
                     onClick={() => setSelectedId(spot.id)}
                   >
                     {card.imageUrl ? <img src={assetUrl(card.imageUrl)} alt="" loading="lazy" /> : null}
-                    <div><small>{card.card}</small><strong>{card.model}</strong><span>{spot.name}</span></div>
+                    <div><small>{card.card}</small><strong><SpotName name={card.model} /></strong><span><SpotName name={spot.name} /></span></div>
                     <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "外す" : "追加"}</button>
                   </article>
                 );
@@ -380,7 +456,7 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
                     key={spot.id}
                     onClick={() => setSelectedId(spot.id)}
                   >
-                    <div><small>{spot.area} · {spot.category}</small><strong>{spot.name}</strong><span>{spot.address}</span></div>
+                    <div><small>{spot.area} · {spot.category}</small><strong><SpotName name={spot.name} /></strong><span>{spot.address}</span></div>
                     <button type="button" onClick={() => onTogglePlanned(spot)}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
                   </article>
                 );
@@ -399,12 +475,12 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
         />
         <div className="ui-trial__feature-title">
           <small>{selectedSpot ? `${selectedSpot.area} / ${selectedSpot.category}` : "ISHIKAWA / KANAZAWA"}</small>
-          <h2>{selectedSpot?.name ?? "景色を、旅の予定へ。"}</h2>
+          <h2>{selectedSpot ? <SpotName name={selectedSpot.name} /> : "景色を、旅の予定へ。"}</h2>
         </div>
         {selectedSpot ? (
           <article>
             <small>{choices.find((choice) => choice.mode === mode)?.label.toUpperCase()} / {String(selectedNumber).padStart(2, "0")}</small>
-            <h2>{selectedSpot.name}</h2>
+            <h2><SpotName name={selectedSpot.name} /></h2>
             <p>{selectedSpot.area}　·　{selectedSpot.category}</p>
             {selectedCollaborationLocation ? (
               <p className="ui-trial__feature-context">
@@ -423,6 +499,65 @@ function ExplorePage({ planned, onTogglePlanned, onNavigate }: {
         ) : null}
       </div>
       <button className="ui-trial__explore-plan-link" type="button" onClick={() => onNavigate("planner")}>予定を確認する</button>
+      {isSpotWindowOpen ? (
+        <div
+          className="ui-trial__modal ui-trial__spot-window"
+          onClick={(event) => { if (event.target === event.currentTarget) setIsSpotWindowOpen(false); }}
+        >
+          <section
+            className="ui-trial__modal-dialog ui-trial__spot-window-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ui-trial-spot-window-title"
+          >
+            <div className="ui-trial__spot-window-handle" aria-hidden="true" />
+            <header>
+              <div>
+                <small>STANDARD SPOTS</small>
+                <strong id="ui-trial-spot-window-title">スポット一覧</strong>
+                <span>{filteredStandardSpots.length}件</span>
+              </div>
+              <button ref={spotWindowCloseRef} type="button" onClick={() => setIsSpotWindowOpen(false)} aria-label="スポット一覧を閉じる">×</button>
+            </header>
+            <div className="ui-trial__spot-window-filters">
+              <label className="ui-trial__search">
+                <span className="ui-trial__visually-hidden">スポットを検索</span>
+                <input
+                  type="search"
+                  value={query}
+                  placeholder="施設名・住所・登場回で検索"
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+                <span aria-hidden="true">⌕</span>
+              </label>
+              <div>
+                <label><span>エリア</span><select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
+                <label><span>カテゴリ</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
+                <label><span>出典</span><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label>
+                <button type="button" disabled={!standardFilterCount} onClick={() => { setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all"); }}>条件をクリア</button>
+              </div>
+            </div>
+            <div className="ui-trial__spot-window-body">
+              <div className="ui-trial__spot-results">
+                {filteredStandardSpots.map((spot) => {
+                  const isPlanned = planned.some((item) => item.id === spot.id);
+                  return (
+                    <article
+                      className={selectedId === spot.id ? "is-selected" : ""}
+                      key={spot.id}
+                      onClick={() => setSelectedId(spot.id)}
+                    >
+                      <div><small>{spot.area} · {spot.category}</small><strong><SpotName name={spot.name} /></strong><span>{spot.address}</span></div>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
+                    </article>
+                  );
+                })}
+              </div>
+              {filteredStandardSpots.length === 0 ? <p>条件に合うスポットがありません。</p> : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -443,7 +578,32 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     offsetY: number;
     overlay: HTMLElement;
   } | null>(null);
+  const previousPositionsRef = useRef<Map<string, number>>(new Map());
   const [draggedSpotId, setDraggedSpotId] = useState("");
+
+  const rememberPositions = useCallback(() => {
+    const rows = listRef.current?.querySelectorAll<HTMLElement>("li[data-stop-id]") ?? [];
+    previousPositionsRef.current = new Map(Array.from(rows, (row) => [
+      row.dataset.stopId ?? "",
+      row.getBoundingClientRect().top,
+    ]));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!previousPositionsRef.current.size) return;
+    const rows = listRef.current?.querySelectorAll<HTMLElement>("li[data-stop-id]") ?? [];
+    rows.forEach((row) => {
+      const previousTop = previousPositionsRef.current.get(row.dataset.stopId ?? "");
+      if (previousTop === undefined || typeof row.animate !== "function") return;
+      const delta = previousTop - row.getBoundingClientRect().top;
+      if (Math.abs(delta) < 1) return;
+      row.animate(
+        [{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }],
+        { duration: 190, easing: "cubic-bezier(.2,.8,.2,1)" },
+      );
+    });
+    previousPositionsRef.current.clear();
+  }, [planned]);
 
   const finishPointerDrag = useCallback((event?: ReactPointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current;
@@ -463,6 +623,7 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
 
   function startPointerDrag(event: ReactPointerEvent<HTMLButtonElement>, index: number, spotId: string) {
     if (!event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
     const row = event.currentTarget.closest("li");
     if (!row) return;
     const rect = row.getBoundingClientRect();
@@ -491,14 +652,29 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
   function movePointerDrag(event: ReactPointerEvent<HTMLButtonElement>) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
     drag.overlay.style.top = `${event.clientY - drag.offsetY}px`;
-    const target = document.elementsFromPoint(event.clientX, event.clientY)
-      .map((element) => element.closest<HTMLElement>("li[data-stop-index]"))
-      .find((element) => Boolean(element));
+    const viewportEdge = 72;
+    if (event.clientY < viewportEdge) window.scrollBy({ top: -12 });
+    if (event.clientY > window.innerHeight - viewportEdge) window.scrollBy({ top: 12 });
+    const rows = Array.from(listRef.current?.querySelectorAll<HTMLElement>("li[data-stop-index]") ?? []);
+    const listBounds = listRef.current?.getBoundingClientRect();
+    if (!rows.length || !listBounds || event.clientX < listBounds.left - 48 || event.clientX > listBounds.right + 48) return;
+    const target = rows.find((row) => event.clientY < row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2) ?? rows.at(-1);
     const targetIndex = Number(target?.dataset.stopIndex);
     if (!Number.isInteger(targetIndex) || targetIndex === drag.currentIndex) return;
+    rememberPositions();
     onReorder(drag.currentIndex, targetIndex);
     drag.currentIndex = targetIndex;
+  }
+
+  function moveWithKeyboard(event: ReactKeyboardEvent<HTMLButtonElement>, index: number) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const targetIndex = event.key === "ArrowUp" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= planned.length) return;
+    rememberPositions();
+    onReorder(index, targetIndex);
   }
 
   return (
@@ -507,12 +683,13 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
         <li
           key={spot.id}
           data-stop-index={index}
+          data-stop-id={spot.id}
           className={draggedSpotId === spot.id ? "is-dragging" : ""}
         >
           <span>{index + 1}</span>
           <time>{schedule ? displayClock(schedule.entries.find((entry) => entry.spot.id === spot.id)?.arrival ?? 0) : "--:--"}</time>
           <div role="button" tabIndex={0} onClick={() => onFocus(spot.id)} onKeyDown={(event) => { if (event.key === "Enter") onFocus(spot.id); }}>
-            <strong>{spot.name}</strong>
+            <strong><SpotName name={spot.name} /></strong>
             <label onClick={(event) => event.stopPropagation()}>
               滞在
               <input
@@ -530,11 +707,12 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
             <button
               type="button"
               aria-label={`${spot.name}をドラッグして並べ替え`}
-              title="ドラッグして並べ替え"
+              title="ドラッグまたは上下キーで並べ替え"
               onPointerDown={(event) => startPointerDrag(event, index, spot.id)}
               onPointerMove={movePointerDrag}
               onPointerUp={finishPointerDrag}
               onPointerCancel={finishPointerDrag}
+              onKeyDown={(event) => moveWithKeyboard(event, index)}
             >☷</button>
           </div>
         </li>
@@ -668,10 +846,9 @@ function TodayPage({ planner, onOpenPlanner }: {
         {nextEntry && nextSpot ? (
           <article className="ui-trial__next-spot">
             <small>NEXT SPOT / {displayClock(nextEntry.arrival + planner.todayOffsetMinutes)}到着予定</small>
-            <h2>{nextSpot.name}</h2>
+            <h2><SpotName name={nextSpot.name} /></h2>
             <p>{nextSpot.address}</p>
             {status ? <span className={`is-${status.kind}`}>{status.label}</span> : null}
-            <img src={spotPhoto(nextSpot)} alt={`${nextSpot.name}の写真`} />
             <div>
               <a href={mapsUrl} target="_blank" rel="noreferrer">Google Mapsで向かう <span aria-hidden="true">↗</span></a>
               <button type="button" onClick={() => planner.toggleCompleted(nextSpot.id)}>訪問済みにする ✓</button>
@@ -695,7 +872,7 @@ function TodayPage({ planner, onOpenPlanner }: {
               <li className={complete ? "is-complete" : current ? "is-current" : ""} key={entry.spot.id}>
                 <span>{complete ? "✓" : index + 1}</span>
                 <time>{planner.schedule ? displayClock(entry.arrival + planner.todayOffsetMinutes) : "--:--"}</time>
-                <strong>{entry.spot.name}</strong>
+                <strong><SpotName name={entry.spot.name} /></strong>
                 <small>{complete ? "訪問済み" : `${entry.stay}分`}</small>
               </li>
             );
@@ -772,7 +949,7 @@ function SharedPreviewPage({ sharedPlan, onImport, onBack }: {
           <small>DAY {String(dayIndex + 1).padStart(2, "0")}</small>
           <h2>{activeDay.visitDate?.replaceAll("-", ".") ?? `${dayIndex + 1}日目`}</h2>
           <p>{activeDay.startTime} → {activeDay.endTime}　·　{sharedPlan.travelMode === "TRANSIT" ? "公共交通" : sharedPlan.travelMode === "DRIVING" ? "車" : sharedPlan.travelMode === "BICYCLING" ? "自転車" : "徒歩"}</p>
-          <ol>{daySpots.map((spot, index) => <li key={spot.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong>{spot.name}</strong><small>{sharedPlan.stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}分滞在</small></div></li>)}</ol>
+          <ol>{daySpots.map((spot, index) => <li key={spot.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong><SpotName name={spot.name} /></strong><small>{sharedPlan.stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}分滞在</small></div></li>)}</ol>
           <p className="ui-trial__shared-route-status">{sharedPlan.travelMode === "TRANSIT" ? "公共交通の経路は取り込み後に各区間を確認します。" : routeResult.state === "success" ? `${routeResult.distance} · ${routeResult.duration}` : routeResult.state === "error" ? routeResult.message : "経路を計算しています…"}</p>
         </article>
       </div>
