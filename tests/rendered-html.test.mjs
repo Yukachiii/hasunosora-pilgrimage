@@ -138,8 +138,19 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /ui-trial__feature-context/);
   assert.match(app, /ui-trial__explore-window-filters/);
   assert.match(app, /modalFilterCount > 0/);
+  assert.match(app, /function ExploreModeTabs/);
+  assert.ok((app.match(/<ExploreModeTabs/g) ?? []).length >= 2);
+  assert.match(app, /openExploreModal !== "collaboration" \? <div className="ui-trial__explore-window-filters">/);
+  assert.doesNotMatch(app, /sourceFilter, setSourceFilter/);
   assert.match(app, /ExploreSourceFilter/);
   assert.match(app, /useLayoutEffect/);
+  const pointerMove = app.match(/function movePointerDrag[\s\S]*?function moveWithKeyboard/)?.[0] ?? "";
+  assert.match(pointerMove, /setPreviewOrder/);
+  assert.doesNotMatch(pointerMove, /onReorder/);
+  assert.match(app, /if \(commit && drag\.startIndex !== drag\.currentIndex\)[\s\S]*?onReorder\(drag\.startIndex, drag\.currentIndex\)/);
+  assert.match(app, /onReorderStateChange\(true\)/);
+  assert.match(app, /isReordering \|\|[\s\S]*?planner\.routeResult\.state === "loading"/);
+  assert.match(app, /if \(nextIsReordering\) cancelRouteCalculation\(\)/);
   assert.match(app, /label: "地図"[\s\S]*label: "スポット"[\s\S]*label: "カード"[\s\S]*label: "コラボ"/);
   assert.match(app, /href="#\/explore\/map"/);
   assert.doesNotMatch(app, /baseUrl\}#\/explore\/map/);
@@ -161,6 +172,7 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(planner, /hasunosora-pilgrimage\.ui-test-planner\.v1/);
   assert.match(planner, /createSharedPlanSnapshot/);
   assert.match(planner, /sanitizePlannerSnapshot/);
+  assert.match(planner, /cancelRouteCalculation: invalidateRoute/);
   assert.doesNotMatch(planner, /PLANNER_DRAFT_COOKIE_KEY/);
   assert.doesNotMatch(planner, /document\.cookie/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
@@ -168,6 +180,8 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(css, /ui-trial__route-map[\s\S]*?height: clamp/);
   assert.match(css, /ui-trial__explore-window-filters/);
   assert.match(css, /\.ui-trial__map-page-map/);
+  assert.match(css, /\.ui-trial__explore-mode-tabs/);
+  assert.match(css, /\.ui-trial__map-page-detail \{[\s\S]*?margin: 12px 0 0/);
   assert.match(css, /\.ui-trial__explore-window-dialog/);
   assert.match(css, /height: min\(92dvh, 840px\)/);
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);

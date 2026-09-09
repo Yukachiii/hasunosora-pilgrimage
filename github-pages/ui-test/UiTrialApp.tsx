@@ -57,6 +57,13 @@ const pageLabels: Record<TrialPage, string> = {
   guide: "ガイド",
 };
 
+const exploreChoices = [
+  { number: "01", label: "地図", note: "場所から", mode: "map" as const },
+  { number: "02", label: "スポット", note: "登録スポット", mode: "spots" as const },
+  { number: "03", label: "カード", note: "モデル地から", mode: "cards" as const },
+  { number: "04", label: "コラボ", note: "開催情報から", mode: "collaboration" as const },
+];
+
 const guideSteps = [
   {
     number: "01",
@@ -101,6 +108,26 @@ function SpotName({ name }: { name: string }) {
   return <>{words.map((word, index) => (
     <span className="ui-trial__spot-name-token" key={`${word}-${index}`}>{word}{index < words.length - 1 ? " " : ""}</span>
   ))}</>;
+}
+
+function ExploreModeTabs({ activeMode, onSelect }: {
+  activeMode: ExploreMode;
+  onSelect: (mode: ExploreMode) => void;
+}) {
+  return (
+    <div className="ui-trial__explore-mode-tabs" role="tablist" aria-label="探し方を切り替え">
+      {exploreChoices.map((choice) => (
+        <button
+          className={activeMode === choice.mode ? "is-active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={activeMode === choice.mode}
+          onClick={() => onSelect(choice.mode)}
+          key={choice.mode}
+        >{choice.label}</button>
+      ))}
+    </div>
+  );
 }
 
 function PageLink({ page, currentPage, onNavigate, children }: {
@@ -192,11 +219,12 @@ function TrialNavigation({ page, itineraryCount, onNavigate }: {
   );
 }
 
-function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
+function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate, onOpenMap }: {
   planned: PilgrimageSpot[];
   mapView: boolean;
   onTogglePlanned: (spot: PilgrimageSpot) => void;
   onNavigate: (page: TrialPage) => void;
+  onOpenMap: () => void;
 }) {
   const initialSpot = spots.find((spot) => spot.id === "kanazawa-station") ?? spots[0];
   const [query, setQuery] = useState("");
@@ -204,7 +232,6 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
   const [openExploreModal, setOpenExploreModal] = useState<Exclude<ExploreMode, "map"> | null>(null);
   const [areaFilter, setAreaFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState<ExploreSourceFilter>("all");
   const [spotQuery, setSpotQuery] = useState("");
   const [spotAreaFilter, setSpotAreaFilter] = useState("all");
   const [spotCategoryFilter, setSpotCategoryFilter] = useState("all");
@@ -239,12 +266,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
   });
   const filteredSpots = spots.filter((spot) => {
     if (mode === "collaboration" && !collaborationSpotIds.has(spot.id)) return false;
-    if (areaFilter !== "all" && spot.area !== areaFilter) return false;
-    if (categoryFilter !== "all" && spot.category !== categoryFilter) return false;
-    if (!matchesSource(spot, sourceFilter)) return false;
-    if (!normalizedQuery) return true;
-    return [spot.name, spot.shortName, spot.area, spot.category, spot.address, spot.description]
-      .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
+    return true;
   });
   const filteredCards = cardModels.filter((card) => {
     if (!card.spotId) return false;
@@ -271,15 +293,9 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
   const selectedNumber = Math.max(0, mode === "cards"
     ? filteredCards.findIndex((card) => card.spotId === selectedSpot?.id)
     : filteredSpots.findIndex((spot) => spot.id === selectedSpot?.id)) + 1;
-  const activeFilterCount = Number(Boolean(normalizedQuery)) + Number(areaFilter !== "all") + Number(categoryFilter !== "all") + Number(sourceFilter !== "all" && openExploreModal === "collaboration");
+  const activeFilterCount = Number(Boolean(normalizedQuery)) + Number(areaFilter !== "all") + Number(categoryFilter !== "all");
   const standardFilterCount = Number(Boolean(normalizedSpotQuery)) + Number(spotAreaFilter !== "all") + Number(spotCategoryFilter !== "all") + Number(spotSourceFilter !== "all");
   const modalFilterCount = openExploreModal === "spots" ? standardFilterCount : activeFilterCount;
-  const choices = [
-    { number: "01", label: "地図", note: "場所から", mode: "map" as const },
-    { number: "02", label: "スポット", note: "登録スポット", mode: "spots" as const },
-    { number: "03", label: "カード", note: "モデル地から", mode: "cards" as const },
-    { number: "04", label: "コラボ", note: "開催情報から", mode: "collaboration" as const },
-  ];
   const modalTitle = openExploreModal === "cards"
     ? "カードモデル地"
     : openExploreModal === "collaboration"
@@ -318,7 +334,6 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
       setQuery("");
       setAreaFilter("all");
       setCategoryFilter("all");
-      setSourceFilter("all");
     }
     setMode(nextMode);
     if (nextMode === "collaboration") {
@@ -331,10 +346,19 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
     setOpenExploreModal(nextMode);
   }
 
+  function selectExploreMode(nextMode: ExploreMode) {
+    if (nextMode === "map") {
+      setOpenExploreModal(null);
+      onOpenMap();
+      return;
+    }
+    openMode(nextMode);
+  }
+
   return (
     <>
       {mapView ? (
-        <section className="ui-trial__page ui-trial__map-page" aria-labelledby="ui-trial-map-title">
+        <section className="ui-trial__page ui-trial__map-page" aria-labelledby="ui-trial-map-title" aria-hidden={openExploreModal ? true : undefined}>
           <header className="ui-trial__map-page-heading">
             <div>
               <p className="ui-trial__eyebrow">MAP / 97 SPOTS</p>
@@ -342,6 +366,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
             </div>
             <a href="#/explore"><span aria-hidden="true">←</span> 探し方へ戻る</a>
           </header>
+          <ExploreModeTabs activeMode="map" onSelect={selectExploreMode} />
           <div className="ui-trial__map-page-layout">
             <div className="ui-trial__map-page-map">
               <MapboxPilgrimageMap
@@ -374,14 +399,14 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
           </div>
         </section>
       ) : (
-      <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title">
+      <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title" aria-hidden={openExploreModal ? true : undefined}>
       <div className="ui-trial__explore-copy">
         <p className="ui-trial__eyebrow">ISHIKAWA / KANAZAWA</p>
         <h1 id="ui-trial-explore-title">作品の景色を、<br />旅の予定へ。</h1>
         <p className="ui-trial__explore-lead">蓮ノ空に関連するスポットから、行きたい場所を見つけて、そのまま予定へ追加できます。</p>
         <h2>探し方を選ぶ</h2>
         <div className="ui-trial__choices">
-          {choices.map((choice) => choice.mode === "map" ? (
+          {exploreChoices.map((choice) => choice.mode === "map" ? (
             <a href="#/explore/map" key={choice.number}>
               <small>{choice.number}</small><strong>{choice.label}</strong><span>{choice.note}</span><i aria-hidden="true">→</i>
             </a>
@@ -410,7 +435,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
         </div>
         {selectedSpot ? (
           <article>
-            <small>{choices.find((choice) => choice.mode === mode)?.label.toUpperCase()} / {String(selectedNumber).padStart(2, "0")}</small>
+            <small>{exploreChoices.find((choice) => choice.mode === mode)?.label.toUpperCase()} / {String(selectedNumber).padStart(2, "0")}</small>
             <h2><SpotName name={selectedSpot.name} /></h2>
             <p>{selectedSpot.area}　·　{selectedSpot.category}</p>
             {selectedCollaborationLocation ? (
@@ -432,7 +457,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
         <button className="ui-trial__explore-plan-link" type="button" onClick={() => onNavigate("planner")}>予定を確認する</button>
       </section>
       )}
-      {!mapView && openExploreModal ? (
+      {openExploreModal ? (
         <div
           className="ui-trial__modal ui-trial__explore-window"
           onClick={(event) => { if (event.target === event.currentTarget) setOpenExploreModal(null); }}
@@ -452,6 +477,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
               </div>
               <button ref={exploreModalCloseRef} type="button" onClick={() => setOpenExploreModal(null)} aria-label={`${modalTitle}を閉じる`}>×</button>
             </header>
+            <ExploreModeTabs activeMode={openExploreModal} onSelect={selectExploreMode} />
             {openExploreModal === "collaboration" ? (
               <div className="ui-trial__collaboration-options" aria-label="コラボを選択">
                 {availableCollaborations.map((collaboration) => (
@@ -470,7 +496,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
                 ))}
               </div>
             ) : null}
-            <div className="ui-trial__explore-window-filters">
+            {openExploreModal !== "collaboration" ? <div className="ui-trial__explore-window-filters">
               <label className="ui-trial__search">
                 <span className="ui-trial__visually-hidden">{modalTitle}を検索</span>
                 <input
@@ -484,21 +510,21 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
               <div>
                 <label><span>エリア</span><select value={openExploreModal === "spots" ? spotAreaFilter : areaFilter} onChange={(event) => openExploreModal === "spots" ? setSpotAreaFilter(event.target.value) : setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
                 <label><span>カテゴリ</span><select value={openExploreModal === "spots" ? spotCategoryFilter : categoryFilter} onChange={(event) => openExploreModal === "spots" ? setSpotCategoryFilter(event.target.value) : setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
-                {openExploreModal !== "cards" ? <label><span>出典</span><select value={openExploreModal === "spots" ? spotSourceFilter : sourceFilter} onChange={(event) => openExploreModal === "spots" ? setSpotSourceFilter(event.target.value as ExploreSourceFilter) : setSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label> : null}
+                {openExploreModal === "spots" ? <label><span>出典</span><select value={spotSourceFilter} onChange={(event) => setSpotSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label> : null}
                 {modalFilterCount > 0 ? (
                   <button
                     type="button"
                     onClick={() => {
-                      if (openExploreModal === "spots") {
-                        setSpotQuery(""); setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all");
-                      } else {
-                        setQuery(""); setAreaFilter("all"); setCategoryFilter("all"); setSourceFilter("all");
+                    if (openExploreModal === "spots") {
+                      setSpotQuery(""); setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all");
+                    } else {
+                      setQuery(""); setAreaFilter("all"); setCategoryFilter("all");
                       }
                     }}
                   >条件をクリア</button>
                 ) : null}
               </div>
-            </div>
+            </div> : null}
             <div className="ui-trial__explore-window-body">
               {openExploreModal === "collaboration" && currentCollaboration ? (
                 <div className="ui-trial__collaboration-summary">
@@ -550,7 +576,7 @@ function ExplorePage({ planned, mapView, onTogglePlanned, onNavigate }: {
   );
 }
 
-function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onStayChange, onFocus }: {
+function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onStayChange, onFocus, onReorderStateChange }: {
   planned: PilgrimageSpot[];
   schedule: { entries: ScheduleEntry[] } | null;
   stayMinutes: Record<string, number>;
@@ -558,16 +584,20 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
   onRemove: (spotId: string) => void;
   onStayChange: (spotId: string, minutes: number) => void;
   onFocus: (spotId: string) => void;
+  onReorderStateChange: (isReordering: boolean) => void;
 }) {
   const listRef = useRef<HTMLOListElement>(null);
   const dragRef = useRef<{
     pointerId: number;
+    startIndex: number;
     currentIndex: number;
     offsetY: number;
     overlay: HTMLElement;
   } | null>(null);
   const previousPositionsRef = useRef<Map<string, number>>(new Map());
   const [draggedSpotId, setDraggedSpotId] = useState("");
+  const [previewOrder, setPreviewOrder] = useState<PilgrimageSpot[] | null>(null);
+  const displayedSpots = previewOrder ?? planned;
 
   const rememberPositions = useCallback(() => {
     const rows = listRef.current?.querySelectorAll<HTMLElement>("li[data-stop-id]") ?? [];
@@ -591,23 +621,29 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
       );
     });
     previousPositionsRef.current.clear();
-  }, [planned]);
+  }, [displayedSpots]);
 
-  const finishPointerDrag = useCallback((event?: ReactPointerEvent<HTMLButtonElement>) => {
+  function finishPointerDrag(event: ReactPointerEvent<HTMLButtonElement>, commit: boolean) {
     const drag = dragRef.current;
     if (!drag) return;
-    if (event?.currentTarget.hasPointerCapture(drag.pointerId)) {
+    if (event.currentTarget.hasPointerCapture(drag.pointerId)) {
       event.currentTarget.releasePointerCapture(drag.pointerId);
     }
     drag.overlay.remove();
     dragRef.current = null;
     setDraggedSpotId("");
-  }, []);
+    setPreviewOrder(null);
+    onReorderStateChange(false);
+    if (commit && drag.startIndex !== drag.currentIndex) {
+      onReorder(drag.startIndex, drag.currentIndex);
+    }
+  }
 
   useEffect(() => () => {
     dragRef.current?.overlay.remove();
     dragRef.current = null;
-  }, []);
+    onReorderStateChange(false);
+  }, [onReorderStateChange]);
 
   function startPointerDrag(event: ReactPointerEvent<HTMLButtonElement>, index: number, spotId: string) {
     if (!event.isPrimary || event.button !== 0) return;
@@ -628,8 +664,11 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     });
     document.body.append(overlay);
     event.currentTarget.setPointerCapture(event.pointerId);
+    onReorderStateChange(true);
+    setPreviewOrder(planned);
     dragRef.current = {
       pointerId: event.pointerId,
+      startIndex: index,
       currentIndex: index,
       offsetY: event.clientY - rect.top,
       overlay,
@@ -652,7 +691,12 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     const targetIndex = Number(target?.dataset.stopIndex);
     if (!Number.isInteger(targetIndex) || targetIndex === drag.currentIndex) return;
     rememberPositions();
-    onReorder(drag.currentIndex, targetIndex);
+    setPreviewOrder((current) => {
+      const next = [...(current ?? planned)];
+      const [moved] = next.splice(drag.currentIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
     drag.currentIndex = targetIndex;
   }
 
@@ -660,14 +704,14 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
     const targetIndex = event.key === "ArrowUp" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= planned.length) return;
+    if (targetIndex < 0 || targetIndex >= displayedSpots.length) return;
     rememberPositions();
     onReorder(index, targetIndex);
   }
 
   return (
     <ol className="ui-trial__stop-list" ref={listRef}>
-      {planned.map((spot, index) => (
+      {displayedSpots.map((spot, index) => (
         <li
           key={spot.id}
           data-stop-index={index}
@@ -698,8 +742,8 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
               title="ドラッグまたは上下キーで並べ替え"
               onPointerDown={(event) => startPointerDrag(event, index, spot.id)}
               onPointerMove={movePointerDrag}
-              onPointerUp={finishPointerDrag}
-              onPointerCancel={finishPointerDrag}
+              onPointerUp={(event) => finishPointerDrag(event, true)}
+              onPointerCancel={(event) => finishPointerDrag(event, false)}
               onKeyDown={(event) => moveWithKeyboard(event, index)}
             >☷</button>
           </div>
@@ -709,10 +753,11 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
   );
 }
 
-function PlannerPage({ planner, onOpenShare, onNavigateExplore }: {
+function PlannerPage({ planner, onOpenShare, onNavigateExplore, onReorderStateChange }: {
   planner: ReturnType<typeof useLivePlanner>;
   onOpenShare: () => void;
   onNavigateExplore: () => void;
+  onReorderStateChange: (isReordering: boolean) => void;
 }) {
   const [selectedId, setSelectedId] = useState(planner.itinerarySpots[0]?.id ?? "");
   const [focusRequest, setFocusRequest] = useState<{ spotId: string; requestId: number } | null>(null);
@@ -732,6 +777,7 @@ function PlannerPage({ planner, onOpenShare, onNavigateExplore }: {
     onRemove: planner.toggleSpot,
     onStayChange: planner.updateStayMinutes,
     onFocus: focusSpot,
+    onReorderStateChange,
   };
   return (
     <section className="ui-trial__page ui-trial__planner" aria-labelledby="ui-trial-planner-title">
@@ -1065,12 +1111,18 @@ function TrialModal({ modal, onClose, onUpdateShareDates }: {
 
 export function UiTrialApp() {
   const planner = useLivePlanner(spots);
+  const cancelRouteCalculation = planner.cancelRouteCalculation;
   const [view, setView] = useState<TrialView>("explore");
   const [exploreMapView, setExploreMapView] = useState(false);
   const [sharedPlan, setSharedPlan] = useState<SharedPlanSnapshot | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
+  const [isReordering, setIsReordering] = useState(false);
   const closeModal = useCallback(() => setModal(null), []);
   const page = view === "shared" ? "planner" : view;
+  const handleReorderStateChange = useCallback((nextIsReordering: boolean) => {
+    setIsReordering(nextIsReordering);
+    if (nextIsReordering) cancelRouteCalculation();
+  }, [cancelRouteCalculation]);
 
   useEffect(() => {
     const syncLocation = () => {
@@ -1098,18 +1150,28 @@ export function UiTrialApp() {
       (view !== "planner" && view !== "today") ||
       !planner.restored ||
       planner.itinerarySpots.length < 2 ||
+      isReordering ||
       planner.routeResult.state === "loading" ||
       planner.requestedRouteSignature === planner.currentRouteSignature
     ) return undefined;
     const timer = window.setTimeout(planner.calculateRoute, 650);
     return () => window.clearTimeout(timer);
-  }, [planner.calculateRoute, planner.currentRouteSignature, planner.itinerarySpots.length, planner.requestedRouteSignature, planner.restored, planner.routeResult.state, view]);
+  }, [isReordering, planner.calculateRoute, planner.currentRouteSignature, planner.itinerarySpots.length, planner.requestedRouteSignature, planner.restored, planner.routeResult.state, view]);
 
   const navigate = (nextPage: TrialPage) => {
     setView(nextPage);
     setExploreMapView(false);
     setSharedPlan(null);
     const hash = `#/${nextPage}`;
+    if (window.location.hash !== hash) window.history.pushState(null, "", hash);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openExploreMap = () => {
+    setView("explore");
+    setExploreMapView(true);
+    setSharedPlan(null);
+    const hash = "#/explore/map";
     if (window.location.hash !== hash) window.history.pushState(null, "", hash);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -1141,8 +1203,8 @@ export function UiTrialApp() {
         onOpenShare={openShare}
       />
       <main>
-        {view === "explore" ? <ExplorePage planned={planner.itinerarySpots} mapView={exploreMapView} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={navigate} /> : null}
-        {view === "planner" ? <PlannerPage planner={planner} onOpenShare={openShare} onNavigateExplore={() => navigate("explore")} /> : null}
+        {view === "explore" ? <ExplorePage planned={planner.itinerarySpots} mapView={exploreMapView} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={navigate} onOpenMap={openExploreMap} /> : null}
+        {view === "planner" ? <PlannerPage planner={planner} onOpenShare={openShare} onNavigateExplore={() => navigate("explore")} onReorderStateChange={handleReorderStateChange} /> : null}
         {view === "today" ? <TodayPage planner={planner} onOpenPlanner={() => navigate("planner")} /> : null}
         {view === "guide" ? <GuidePage onNavigate={navigate} onOpenImage={(src, alt) => setModal({ kind: "guide", src, alt })} /> : null}
         {view === "shared" ? <SharedPreviewPage sharedPlan={sharedPlan} onImport={importShared} onBack={() => navigate("explore")} /> : null}

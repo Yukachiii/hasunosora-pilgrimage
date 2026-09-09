@@ -365,6 +365,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     setTravelMode,
     setOptimizeOrder,
     setSourceStationId,
+    cancelRouteCalculation: invalidateRoute,
     calculateRoute,
     handleRouteResult,
     toggleCompleted,
