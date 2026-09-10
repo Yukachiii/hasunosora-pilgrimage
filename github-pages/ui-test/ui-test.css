@@ -1610,7 +1610,7 @@ a {
   height: min(82dvh, 760px);
   grid-template-rows: auto auto auto minmax(0, 1fr);
   border-radius: 30px 30px 30px 8px;
-  animation: ui-trial-spot-window-enter 220ms ease-out both;
+  animation: ui-trial-spot-window-enter 220ms ease-out;
 }
 
 .ui-trial__explore-window-dialog--collaboration {
@@ -5375,7 +5375,7 @@ a {
     max-height: min(90dvh, 820px);
     border-radius: 28px 28px 0 0;
     transition: transform 180ms ease;
-    animation: ui-trial-spot-sheet-enter 220ms ease-out both;
+    animation: ui-trial-spot-sheet-enter 220ms ease-out;
   }
 
   .ui-trial__modal-dialog.is-dragging {
@@ -5447,9 +5447,7 @@ a {
     transform: scale(0.97);
   }
 
-  .ui-trial__stop-actions button:last-child:active,
-  .ui-trial__modal-dialog.is-dragging,
-  .ui-trial__explore-window-dialog.is-dragging {
+  .ui-trial__stop-actions button:last-child:active {
     transform: none;
   }
 }

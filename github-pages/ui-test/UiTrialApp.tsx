@@ -471,6 +471,7 @@ function ExplorePage({
       startedExpanded: exploreSheetExpanded,
       dragged: false,
     };
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function moveExploreSheetDrag(event: ReactPointerEvent<HTMLElement>) {
@@ -1570,6 +1571,7 @@ function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onTogg
     const target = event.target as HTMLElement;
     if (!target.closest("header, .ui-trial__modal-handle")) return;
     dragRef.current = { pointerId: event.pointerId, startY: event.clientY, dragged: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function moveDrag(event: ReactPointerEvent<HTMLElement>) {

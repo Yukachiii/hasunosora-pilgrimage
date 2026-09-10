@@ -201,6 +201,10 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(app, /planner\.resetCompleted/);
   assert.match(app, /exploreSheetExpanded/);
   assert.match(app, /function moveExploreSheetDrag/);
+  const exploreSheetDrag = app.match(/function beginExploreSheetDrag[\s\S]*?function moveExploreSheetDrag/)?.[0] ?? "";
+  const genericModalDrag = app.match(/function beginDrag[\s\S]*?function moveDrag/)?.[0] ?? "";
+  assert.match(exploreSheetDrag, /setPointerCapture\(event\.pointerId\)/);
+  assert.match(genericModalDrag, /setPointerCapture\(event\.pointerId\)/);
   const todayPage = app.match(/function TodayPage[\s\S]*?function SharedPreviewPage/)?.[0] ?? "";
   assert.doesNotMatch(todayPage, /<img/);
   assert.doesNotMatch(app, /実働テスト|本番データ非干渉/);
@@ -237,6 +241,9 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.ui-trial__explore-window-filters select \{[\s\S]*?min-height: 44px/);
   assert.match(css, /@keyframes ui-trial-spot-sheet-enter/);
+  assert.match(css, /animation: ui-trial-spot-window-enter 220ms ease-out;/);
+  assert.match(css, /animation: ui-trial-spot-sheet-enter 220ms ease-out;/);
+  assert.doesNotMatch(css, /animation: ui-trial-(?:spot-window|spot-sheet)-enter[^;]*\bboth\b/);
   assert.match(css, /body:has\(\.ui-trial__explore-window\) \.ui-trial__mobile-nav/);
   assert.match(css, /\.ui-trial__modal:not\(\.ui-trial__explore-window\) \{[\s\S]*?z-index: 120/);
   assert.match(css, /\.community-contribution\s*\{/);
