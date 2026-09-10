@@ -2,13 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RouteRequest, RouteResult } from "../../app/MapboxPilgrimageMap";
 import {
   majorStations,
+  maximumItineraryStops,
   recommendedStayMinutes,
   type TravelMode,
 } from "../../app/route-planner";
 import {
   sanitizePlannerSnapshot,
+  type PlannerAppointment,
   type PlannerDaySnapshot,
   type PlannerSnapshot,
+  type TransitLegProgress,
 } from "../../app/planner-storage";
 import {
   createPlannerSnapshotFromSharedPlan,
@@ -17,6 +20,7 @@ import {
   type SharedPlanSnapshot,
 } from "../../app/planner-share";
 import type { PilgrimageSpot } from "../../app/spots";
+import { createYahooTransitLegs } from "../../app/yahoo-transit";
 
 const TEST_PLANNER_STORAGE_KEY = "hasunosora-pilgrimage.ui-test-planner.v1";
 
@@ -54,10 +58,21 @@ export function displayClock(totalMinutes: number) {
   return `${day > 0 ? `翌${day > 1 ? day : ""}日 ` : ""}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function createPlannerDay(): PlannerDaySnapshot {
+function dateAfter(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00+09:00`);
+  date.setDate(date.getDate() + days);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function createPlannerDay(index = 0, visitDate = japanDate()): PlannerDaySnapshot {
   return {
-    id: `ui-test-day-${Date.now()}`,
-    visitDate: japanDate(),
+    id: `ui-test-day-${Date.now()}-${index}`,
+    visitDate,
     startTime: "09:00",
     endTime: "18:00",
     itineraryIds: [],
@@ -70,6 +85,9 @@ function requestSignature(request: RouteRequest | null) {
   if (!request) return "";
   return JSON.stringify({
     stops: request.stops.map((spot) => spot.id),
+    stay: request.travelMode === "TRANSIT"
+      ? request.stops.map((spot) => request.stayMinutes[spot.id] ?? recommendedStayMinutes(spot))
+      : [],
     travelMode: request.travelMode,
     optimizeWaypointOrder: request.optimizeWaypointOrder,
     accessOriginId: request.travelMode === "TRANSIT" ? request.accessOrigin?.id ?? "" : "",
@@ -89,11 +107,17 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
   const [sourceStationId, setSourceStationIdState] = useState("");
   const [completedSpotIds, setCompletedSpotIds] = useState<string[]>([]);
   const [todayOffsetMinutes, setTodayOffsetMinutes] = useState(0);
+  const [transitLegProgress, setTransitLegProgress] = useState<TransitLegProgress>({});
   const [routeRequest, setRouteRequest] = useState<RouteRequest | null>(null);
   const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
+  const [dayRouteCache, setDayRouteCache] = useState<Record<string, {
+    request: RouteRequest;
+    result: RouteResult;
+  }>>({});
   const [restored, setRestored] = useState(false);
 
   const activeDay = plannerDays[activeDayIndex] ?? plannerDays[0];
+  const activeDayId = activeDay?.id ?? "";
   const itineraryIds = useMemo(() => activeDay?.itineraryIds ?? [], [activeDay]);
   const itinerarySpots = useMemo(
     () => itineraryIds
@@ -109,8 +133,14 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
   const invalidateRoute = useCallback(() => {
     setRouteRequest(null);
     setRouteResult({ state: "idle" });
+    setDayRouteCache((current) => {
+      if (!activeDayId || !current[activeDayId]) return current;
+      const next = { ...current };
+      delete next[activeDayId];
+      return next;
+    });
     setTodayOffsetMinutes(0);
-  }, []);
+  }, [activeDayId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -130,6 +160,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
         setSourceStationIdState(draft.sourceStationId);
         setCompletedSpotIds(draft.completedSpotIds);
         setTodayOffsetMinutes(draft.todayOffsetMinutes);
+        setTransitLegProgress(draft.transitLegProgress);
       }
       setRestored(true);
     }, 0);
@@ -149,7 +180,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
       itineraryCollaborationId: "",
       completedSpotIds,
       todayOffsetMinutes,
-      transitLegProgress: {},
+      transitLegProgress,
       plannerDays,
       activeDayIndex,
     };
@@ -158,17 +189,21 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     } catch {
       // Keep the in-memory test session usable when storage is unavailable.
     }
-  }, [activeDay, activeDayIndex, completedSpotIds, itineraryIds, optimizeOrder, plannerDays, restored, sourceStationId, stayMinutes, todayOffsetMinutes, travelMode]);
+  }, [activeDay, activeDayIndex, completedSpotIds, itineraryIds, optimizeOrder, plannerDays, restored, sourceStationId, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode]);
 
   const currentRouteSignature = useMemo(() => JSON.stringify({
     stops: itineraryIds,
+    stay: travelMode === "TRANSIT" ? itineraryIds.map((id) => {
+      const spot = allSpots.find((item) => item.id === id);
+      return stayMinutes[id] ?? (spot ? recommendedStayMinutes(spot) : 0);
+    }) : [],
     travelMode,
     optimizeWaypointOrder: travelMode !== "TRANSIT" && optimizeOrder,
     accessOriginId: travelMode === "TRANSIT" ? sourceStationId : "",
     departureTime: travelMode === "TRANSIT" && activeDay
       ? departureIso(activeDay.visitDate, activeDay.startTime)
       : "",
-  }), [activeDay, itineraryIds, optimizeOrder, sourceStationId, travelMode]);
+  }), [activeDay, allSpots, itineraryIds, optimizeOrder, sourceStationId, stayMinutes, travelMode]);
   const requestedRouteSignature = useMemo(() => requestSignature(routeRequest), [routeRequest]);
   const routeIsCurrent = requestedRouteSignature === currentRouteSignature && (
     routeResult.state === "success" || routeResult.state === "external"
@@ -211,11 +246,15 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     invalidateRoute();
   }, [invalidateRoute, updateActiveDay]);
 
+  const replaceActiveItinerary = useCallback((ids: string[]) => {
+    replaceItineraryIds(Array.from(new Set(ids.filter((id) => validSpotIds.has(id)))).slice(0, maximumItineraryStops));
+  }, [replaceItineraryIds, validSpotIds]);
+
   const toggleSpot = useCallback((spotId: string) => {
     if (!validSpotIds.has(spotId)) return;
     const next = itineraryIds.includes(spotId)
       ? itineraryIds.filter((id) => id !== spotId)
-      : [...itineraryIds, spotId].slice(0, 25);
+      : [...itineraryIds, spotId].slice(0, maximumItineraryStops);
     replaceItineraryIds(next);
   }, [itineraryIds, replaceItineraryIds, validSpotIds]);
 
@@ -234,7 +273,80 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
 
   const updateStayMinutes = useCallback((spotId: string, value: number) => {
     setStayMinutes((current) => ({ ...current, [spotId]: Math.max(0, Math.min(480, Math.round(value))) }));
-  }, []);
+    if (travelMode === "TRANSIT") invalidateRoute();
+  }, [invalidateRoute, travelMode]);
+
+  const selectDay = useCallback((index: number) => {
+    if (index < 0 || index >= plannerDays.length || index === activeDayIndex) return;
+    const cachedRoute = dayRouteCache[plannerDays[index].id];
+    setActiveDayIndex(index);
+    setRouteRequest(cachedRoute?.request ?? null);
+    setRouteResult(cachedRoute?.result ?? { state: "idle" });
+    setTodayOffsetMinutes(0);
+    setTransitLegProgress({});
+  }, [activeDayIndex, dayRouteCache, plannerDays]);
+
+  const addDay = useCallback(() => {
+    if (plannerDays.length >= 7) return;
+    const previousDate = plannerDays.at(-1)?.visitDate ?? japanDate();
+    setPlannerDays((current) => [...current, createPlannerDay(current.length, dateAfter(previousDate, 1))]);
+    setActiveDayIndex(plannerDays.length);
+    setRouteRequest(null);
+    setRouteResult({ state: "idle" });
+    setTodayOffsetMinutes(0);
+    setTransitLegProgress({});
+  }, [plannerDays]);
+
+  const removeActiveDay = useCallback(() => {
+    if (plannerDays.length <= 1) return;
+    const removedDayId = plannerDays[activeDayIndex]?.id;
+    const removedIds = new Set(plannerDays[activeDayIndex]?.itineraryIds ?? []);
+    const next = plannerDays.filter((_, index) => index !== activeDayIndex);
+    setPlannerDays(next);
+    setDayRouteCache((current) => {
+      if (!removedDayId || !current[removedDayId]) return current;
+      const remaining = { ...current };
+      delete remaining[removedDayId];
+      return remaining;
+    });
+    setActiveDayIndex(Math.max(0, Math.min(activeDayIndex, next.length - 1)));
+    const remainingIds = new Set(next.flatMap((day) => day.itineraryIds));
+    setCompletedSpotIds((current) => current.filter((id) => !removedIds.has(id) || remainingIds.has(id)));
+    invalidateRoute();
+  }, [activeDayIndex, invalidateRoute, plannerDays]);
+
+  const updateDayDetails = useCallback((update: Partial<Pick<PlannerDaySnapshot, "hotelName" | "endTime">>) => {
+    updateActiveDay((day) => ({ ...day, ...update }));
+  }, [updateActiveDay]);
+
+  const addAppointment = useCallback(() => {
+    updateActiveDay((day) => {
+      if (day.appointments.length >= 12) return day;
+      const appointment: PlannerAppointment = {
+        id: `appointment-${Date.now()}-${day.appointments.length}`,
+        title: "予定を入力",
+        time: "12:00",
+        durationMinutes: 60,
+      };
+      return { ...day, appointments: [...day.appointments, appointment] };
+    });
+  }, [updateActiveDay]);
+
+  const updateAppointment = useCallback((id: string, update: Partial<PlannerAppointment>) => {
+    updateActiveDay((day) => ({
+      ...day,
+      appointments: day.appointments.map((appointment) => appointment.id === id
+        ? { ...appointment, ...update }
+        : appointment),
+    }));
+  }, [updateActiveDay]);
+
+  const removeAppointment = useCallback((id: string) => {
+    updateActiveDay((day) => ({
+      ...day,
+      appointments: day.appointments.filter((appointment) => appointment.id !== id),
+    }));
+  }, [updateActiveDay]);
 
   const setTravelMode = useCallback((value: TravelMode) => {
     setTravelModeState(value);
@@ -271,9 +383,57 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     setRouteResult(travelMode === "TRANSIT"
       ? { state: "external", message: "公共交通は各区間を外部の乗換案内で確認してください。" }
       : { state: "loading" });
+    if (travelMode === "TRANSIT") {
+      const externalResult: RouteResult = {
+        state: "external",
+        message: "公共交通は各区間を外部の乗換案内で確認してください。",
+      };
+      setDayRouteCache((current) => ({
+        ...current,
+        [activeDay.id]: { request, result: externalResult },
+      }));
+    }
   }, [activeDay, itinerarySpots, optimizeOrder, sourceStationId, stayMinutes, travelMode]);
 
-  const handleRouteResult = useCallback((result: RouteResult) => setRouteResult(result), []);
+  const handleRouteResult = useCallback((result: RouteResult) => {
+    setRouteResult(result);
+    if (activeDayId && routeRequest && result.state === "success") {
+      setDayRouteCache((current) => ({
+        ...current,
+        [activeDayId]: { request: routeRequest, result },
+      }));
+    }
+  }, [activeDayId, routeRequest]);
+
+  const transitLegs = useMemo(() => {
+    if (!activeDay || routeRequest?.travelMode !== "TRANSIT" || !routeIsCurrent) return [];
+    return createYahooTransitLegs(
+      routeRequest.stops,
+      routeRequest.accessOrigin,
+      activeDay.visitDate,
+      activeDay.startTime,
+      routeRequest.stayMinutes,
+    ).map((leg) => {
+      const progress = transitLegProgress[leg.id];
+      return {
+        ...leg,
+        date: progress?.date ?? leg.date,
+        time: progress?.time ?? leg.time,
+        confirmed: progress?.confirmed ?? false,
+      };
+    });
+  }, [activeDay, routeIsCurrent, routeRequest, transitLegProgress]);
+
+  const updateTransitLeg = useCallback((id: string, update: Partial<TransitLegProgress[string]>) => {
+    setTransitLegProgress((current) => ({
+      ...current,
+      [id]: {
+        date: update.date ?? current[id]?.date ?? japanDate(),
+        time: update.time ?? current[id]?.time ?? "09:00",
+        confirmed: update.confirmed ?? current[id]?.confirmed ?? false,
+      },
+    }));
+  }, []);
 
   const toggleCompleted = useCallback((spotId: string) => {
     setCompletedSpotIds((current) => current.includes(spotId)
@@ -295,6 +455,9 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     setTodayOffsetMinutes(hours * 60 + minutes - next.arrival);
   }, [completedSpotIds, schedule]);
 
+  const resetTodayOffset = useCallback(() => setTodayOffsetMinutes(0), []);
+  const resetCompleted = useCallback(() => setCompletedSpotIds([]), []);
+
   const createShareUrl = useCallback((includeDates: boolean) => {
     if (!activeDay) return "";
     const snapshot: PlannerSnapshot = {
@@ -308,7 +471,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
       itineraryCollaborationId: "",
       completedSpotIds,
       todayOffsetMinutes,
-      transitLegProgress: {},
+      transitLegProgress,
       plannerDays,
       activeDayIndex,
     };
@@ -319,7 +482,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     const url = new URL(window.location.href);
     url.hash = `#/shared/${token}`;
     return url.toString();
-  }, [activeDay, activeDayIndex, completedSpotIds, itineraryIds, optimizeOrder, plannerDays, sourceStationId, stayMinutes, todayOffsetMinutes, travelMode, validSpotIds]);
+  }, [activeDay, activeDayIndex, completedSpotIds, itineraryIds, optimizeOrder, plannerDays, sourceStationId, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode, validSpotIds]);
 
   const importSharedPlan = useCallback((shared: SharedPlanSnapshot) => {
     const imported = createPlannerSnapshotFromSharedPlan(shared, validSpotIds, japanDate());
@@ -332,8 +495,10 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     setSourceStationIdState(imported.sourceStationId);
     setCompletedSpotIds([]);
     setTodayOffsetMinutes(0);
+    setTransitLegProgress({});
     setRouteRequest(null);
     setRouteResult({ state: "idle" });
+    setDayRouteCache({});
     return true;
   }, [validSpotIds]);
 
@@ -342,7 +507,9 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     activeDay,
     plannerDays,
     activeDayIndex,
-    setActiveDayIndex,
+    selectDay,
+    addDay,
+    removeActiveDay,
     itineraryIds,
     itinerarySpots,
     plannedSpots,
@@ -358,9 +525,16 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     currentRouteSignature,
     requestedRouteSignature,
     schedule,
+    transitLegs,
+    transitLegProgress,
     toggleSpot,
+    replaceActiveItinerary,
     reorder,
     updateDayField,
+    updateDayDetails,
+    addAppointment,
+    updateAppointment,
+    removeAppointment,
     updateStayMinutes,
     setTravelMode,
     setOptimizeOrder,
@@ -369,7 +543,10 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     calculateRoute,
     handleRouteResult,
     toggleCompleted,
+    updateTransitLeg,
     alignScheduleToNow,
+    resetTodayOffset,
+    resetCompleted,
     createShareUrl,
     importSharedPlan,
   };

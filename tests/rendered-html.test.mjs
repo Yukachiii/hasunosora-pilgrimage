@@ -110,7 +110,7 @@ test("standalone guide redesign test stays isolated from the public application"
   assert.doesNotMatch(css, /!important/);
 });
 
-test("full UI redesign trial provides four isolated live pages", async () => {
+test("full UI redesign trial mirrors the public features while keeping test state isolated", async () => {
   const [html, entry, app, planner, css, viteConfig] = await Promise.all([
     readFile(new URL("../github-pages/ui-test/index.html", import.meta.url), "utf8"),
     readFile(new URL("../github-pages/ui-test/main.tsx", import.meta.url), "utf8"),
@@ -122,6 +122,12 @@ test("full UI redesign trial provides four isolated live pages", async () => {
 
   assert.match(html, /noindex, nofollow/);
   assert.match(entry, /UiTrialApp/);
+  assert.match(entry, /import\.meta\.glob/);
+  assert.match(entry, /spotPhotoGroups/);
+  assert.match(entry, /photoCredits/);
+  assert.match(entry, /chooseHeroIndex/);
+  assert.match(entry, /ui-test-hero-image\.v1/);
+  assert.match(entry, /TrialAppErrorBoundary/);
   assert.doesNotMatch(entry, /globals\.css/);
   assert.match(viteConfig, /uiTest: resolve\("github-pages\/ui-test\/index\.html"\)/);
   for (const page of ["ExplorePage", "PlannerPage", "TodayPage", "GuidePage"]) {
@@ -166,6 +172,23 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(app, /spotQuery, setSpotQuery/);
   assert.match(app, /spotAreaFilter, setSpotAreaFilter/);
   assert.match(app, /spotSourceFilter, setSpotSourceFilter/);
+  assert.match(app, /cardCharacterFilter, setCardCharacterFilter/);
+  assert.match(app, /kind: "card" as const/);
+  assert.match(app, /ui-trial__map-related-cards/);
+  assert.match(app, /ui-trial__spot-photo-strip/);
+  assert.match(app, /CARD_ILLUSTRATION_COPYRIGHT/);
+  assert.match(app, /CommunityContributionPanel/);
+  assert.match(app, /submissionPath="\/api\/ui-test-submissions"/);
+  assert.match(app, /共有しない情報/);
+  assert.match(app, /宿泊地・自由予定・訪問済みの進捗・出発駅/);
+  assert.match(app, /planner\.addDay/);
+  assert.match(app, /planner\.removeActiveDay/);
+  assert.match(app, /planner\.addAppointment/);
+  assert.match(app, /planner\.transitLegs/);
+  assert.match(app, /planner\.resetTodayOffset/);
+  assert.match(app, /planner\.resetCompleted/);
+  assert.match(app, /exploreSheetExpanded/);
+  assert.match(app, /function moveExploreSheetDrag/);
   const todayPage = app.match(/function TodayPage[\s\S]*?function SharedPreviewPage/)?.[0] ?? "";
   assert.doesNotMatch(todayPage, /<img/);
   assert.doesNotMatch(app, /実働テスト|本番データ非干渉/);
@@ -173,6 +196,13 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(planner, /createSharedPlanSnapshot/);
   assert.match(planner, /sanitizePlannerSnapshot/);
   assert.match(planner, /cancelRouteCalculation: invalidateRoute/);
+  assert.match(planner, /createYahooTransitLegs/);
+  assert.match(planner, /const addDay = useCallback/);
+  assert.match(planner, /const addAppointment = useCallback/);
+  assert.match(planner, /const resetTodayOffset = useCallback/);
+  assert.match(planner, /const \[dayRouteCache, setDayRouteCache\]/);
+  assert.match(planner, /const cachedRoute = dayRouteCache\[plannerDays\[index\]\.id\]/);
+  assert.doesNotMatch(app, />探す画面を開く</);
   assert.doesNotMatch(planner, /PLANNER_DRAFT_COOKIE_KEY/);
   assert.doesNotMatch(planner, /document\.cookie/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
@@ -183,11 +213,16 @@ test("full UI redesign trial provides four isolated live pages", async () => {
   assert.match(css, /\.ui-trial__explore-mode-tabs/);
   assert.match(css, /\.ui-trial__map-page-detail \{[\s\S]*?margin: 12px 0 0/);
   assert.match(css, /\.ui-trial__explore-window-dialog/);
-  assert.match(css, /height: min\(92dvh, 840px\)/);
+  assert.match(css, /height: min\(78dvh, 720px\)/);
+  assert.match(css, /\.ui-trial__explore-window-dialog\.is-expanded/);
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.ui-trial__explore-window-filters select \{[\s\S]*?min-height: 44px/);
   assert.match(css, /@keyframes ui-trial-spot-sheet-enter/);
   assert.match(css, /body:has\(\.ui-trial__explore-window\) \.ui-trial__mobile-nav/);
+  assert.match(css, /\.ui-trial__modal:not\(\.ui-trial__explore-window\) \{[\s\S]*?z-index: 120/);
+  assert.match(css, /\.community-contribution\s*\{/);
+  assert.match(css, /\.ui-trial__planner-days\s*\{/);
+  assert.match(css, /\.ui-trial__transit-legs/);
   assert.doesNotMatch(css, /!important/);
 });
 

@@ -53,15 +53,16 @@ declare global {
 type Props = {
   spots: PilgrimageSpot[];
   apiBaseUrl?: string;
+  submissionPath?: "/api/submissions" | "/api/ui-test-submissions";
   turnstileSiteKey?: string;
   enabled?: boolean;
   hidden?: boolean;
 };
 
-function submissionEndpoint(apiBaseUrl: string) {
+function submissionEndpoint(apiBaseUrl: string, submissionPath: Props["submissionPath"] = "/api/submissions") {
   const base = apiBaseUrl.trim();
-  if (!base) return "/api/submissions";
-  return `${base.replace(/\/+$/, "")}/api/submissions`;
+  if (!base) return submissionPath;
+  return `${base.replace(/\/+$/, "")}${submissionPath}`;
 }
 
 function optionalNumber(value: FormDataEntryValue | null) {
@@ -110,6 +111,7 @@ function formatDistance(distanceM: number) {
 export function CommunityContributionPanel({
   spots,
   apiBaseUrl = "",
+  submissionPath = "/api/submissions",
   turnstileSiteKey = "",
   enabled = true,
   hidden = false,
@@ -304,7 +306,7 @@ export function CommunityContributionPanel({
 
       setSubmitting(true);
       requestStarted = true;
-      const response = await fetch(submissionEndpoint(apiBaseUrl), {
+      const response = await fetch(submissionEndpoint(apiBaseUrl, submissionPath), {
         method: "POST",
         body,
         credentials: "omit",

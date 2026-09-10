@@ -1506,7 +1506,8 @@ export async function handleCommunityRequest(
     return;
   }
 
-  if (url.pathname !== "/api/submissions") {
+  const isUiTestSubmission = url.pathname === "/api/ui-test-submissions";
+  if (url.pathname !== "/api/submissions" && !isUiTestSubmission) {
     sendJson(response, 404, { error: "Not found" });
     return;
   }
@@ -1524,8 +1525,12 @@ export async function handleCommunityRequest(
   }
 
   const requestNow = options.now?.() ?? new Date();
-  const recordApiUsage = options.recordApiUsage ??
-    ((delta) => recordCommunityApiUsage(config, delta, { now: requestNow }));
+  const requestConfig = isUiTestSubmission
+    ? { ...config, submissionsDirectory: path.join(config.submissionsDirectory, "ui-test") }
+    : config;
+  const recordApiUsage = isUiTestSubmission
+    ? async () => undefined
+    : options.recordApiUsage ?? ((delta) => recordCommunityApiUsage(config, delta, { now: requestNow }));
   await tryRecordCommunityApiUsage(recordApiUsage, { submissionRequests: 1 });
 
   if (activeSubmissionRequests >= maximumConcurrentSubmissions) {
@@ -1546,14 +1551,14 @@ export async function handleCommunityRequest(
   try {
     const form = await parseMultipartForm(request);
     const submission = await acceptCommunitySubmission(form, {
-      config,
+      config: requestConfig,
       origin,
       ipAddress: clientAddress(request),
       now: requestNow,
       fetchImplementation: options.fetchImplementation ?? fetch,
       imageProcessor: options.imageProcessor ?? reencodeCommunityImage,
       recordTurnstileFailure: options.recordTurnstileFailure ??
-        ((diagnostic) => appendTurnstileFailureDiagnostic(config, diagnostic)),
+        ((diagnostic) => appendTurnstileFailureDiagnostic(requestConfig, diagnostic)),
       recordApiUsage,
     });
     await tryRecordCommunityApiUsage(recordApiUsage, { submissionAccepted: 1 });

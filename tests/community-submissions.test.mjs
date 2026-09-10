@@ -1147,6 +1147,62 @@ test("submission HTTP usage records accepted, validation, and Turnstile activity
   }
 });
 
+test("UI test submissions use a separate queue and do not change public usage totals", async () => {
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-ui-test-"));
+  const allowedOrigin = "https://guide.example.test";
+  const config = {
+    allowedOrigins: new Set([allowedOrigin]),
+    submissionsDirectory: temporaryDirectory,
+    turnstileSecret: "turnstile-secret",
+    rateLimitSecret: "test-rate-secret",
+    consentVersion: "2026-09-04",
+    allowLocalTurnstileBypass: false,
+  };
+  const server = createCommunitySubmissionServer({
+    config,
+    now: () => new Date("2026-09-04T12:00:00.000Z"),
+    fetchImplementation: async () => new Response(JSON.stringify({
+      success: true,
+      action: "community_submission",
+      hostname: "guide.example.test",
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+    imageProcessor: async () => Buffer.from("unused"),
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.equal(typeof address, "object");
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/ui-test-submissions`, {
+      method: "POST",
+      headers: { origin: allowedOrigin },
+      body: submissionForm({
+        kind: "spot",
+        payload: {
+          name: "テスト候補地",
+          address: "石川県金沢市",
+          sourceUrl: "https://example.com/source",
+        },
+        creditName: null,
+        turnstileToken: "verified-token",
+      }),
+    });
+    assert.equal(response.status, 201);
+    const testQueue = JSON.parse(await readFile(path.join(temporaryDirectory, "ui-test", "index.json"), "utf8"));
+    assert.equal(testQueue.length, 1);
+    assert.equal(testQueue[0].payload.name, "テスト候補地");
+    await assert.rejects(readFile(path.join(temporaryDirectory, "index.json"), "utf8"), { code: "ENOENT" });
+    const usage = await readCommunityApiUsage(config);
+    assert.equal(usage.allTime.submissionRequests, 0);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
 test("API usage write failures never replace a successful submission response", async () => {
   const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-http-usage-fail-"));
   const allowedOrigin = "https://guide.example.test";
