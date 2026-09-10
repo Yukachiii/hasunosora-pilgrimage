@@ -142,8 +142,14 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(app, /role="dialog"/);
   assert.match(app, /selectedCollaborationId/);
   assert.match(app, /ui-trial__feature-context/);
+  assert.match(app, /ui-trial__feature-brand/);
+  assert.doesNotMatch(app, /金沢の風景/);
   assert.match(app, /ui-trial__explore-window-filters/);
   assert.match(app, /modalFilterCount > 0/);
+  assert.match(app, /modalFiltersExpanded/);
+  assert.match(app, /aria-controls="ui-trial-modal-filters"/);
+  assert.match(app, /ui-trial__search-filters/);
+  assert.match(app, /translateY\(calc\(100% \+ 24px\)\)/);
   assert.match(app, /function ExploreModeTabs/);
   assert.equal((app.match(/<ExploreModeTabs/g) ?? []).length, 1);
   assert.match(app, /exploreChoices\.filter\(\(choice\) => choice\.mode !== "map"\)/);
@@ -216,6 +222,10 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(css, /object-fit: contain/);
   assert.match(css, /ui-trial__route-map[\s\S]*?height: clamp/);
   assert.match(css, /ui-trial__explore-window-filters/);
+  assert.match(css, /\.ui-trial__explore-window-filters > \.ui-trial__search-filters:not\(\.is-expanded\)/);
+  assert.match(css, /\.ui-trial__filter-toggle/);
+  assert.match(css, /\.ui-trial__feature-brand/);
+  assert.match(css, /\.ui-trial__modal-dialog\.is-closing/);
   assert.match(css, /\.ui-trial__map-page-map/);
   assert.match(css, /\.ui-trial__explore-mode-tabs/);
   assert.match(css, /\.ui-trial__home-map/);

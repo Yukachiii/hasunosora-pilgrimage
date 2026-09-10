@@ -301,6 +301,7 @@ function ExplorePage({
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<Exclude<ExploreMode, "map">>("spots");
   const [openExploreModal, setOpenExploreModal] = useState<Exclude<ExploreMode, "map"> | null>(null);
+  const [modalFiltersExpanded, setModalFiltersExpanded] = useState(false);
   const [areaFilter, setAreaFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [spotQuery, setSpotQuery] = useState("");
@@ -502,18 +503,22 @@ function ExplorePage({
     const deltaY = event.clientY - drag.startY;
     exploreSheetDragRef.current = null;
     dialog.classList.remove("is-dragging");
+    if (drag.dragged && deltaY >= 90) {
+      dialog.classList.add("is-closing");
+      dialog.style.removeProperty("height");
+      dialog.style.transform = "translateY(calc(100% + 24px))";
+      window.setTimeout(() => setOpenExploreModal(null), 190);
+      return;
+    }
     dialog.style.removeProperty("height");
     dialog.style.removeProperty("transform");
     if (cancelled || !drag.dragged) return;
-    if (deltaY >= 90) {
-      setOpenExploreModal(null);
-      return;
-    }
     setExploreSheetExpanded(drag.startedExpanded ? deltaY < 55 : deltaY <= -42);
   }
 
   function openMode(nextMode: Exclude<ExploreMode, "map">) {
     setExploreSheetExpanded(false);
+    setModalFiltersExpanded(false);
     exploreSheetDragRef.current = null;
     if (mode !== nextMode) {
       setQuery("");
@@ -724,13 +729,19 @@ function ExplorePage({
         <img
           key={selectedId && selectedSpot ? selectedSpot.id : "empty"}
           src={selectedId && selectedSpot ? spotPhoto(selectedSpot, spotPhotoGroups, fallbackPhoto) : fallbackPhoto}
-          alt={selectedId && selectedSpot ? `${selectedSpot.name}の写真` : "金沢の風景"}
+          alt={selectedId && selectedSpot ? `${selectedSpot.name}の写真` : "金沢市内のメインビジュアル"}
         />
-        <div className="ui-trial__feature-title">
-          <small>{selectedId && selectedSpot ? `${selectedSpot.area} / ${selectedSpot.category}` : "ISHIKAWA / KANAZAWA"}</small>
-          <h2>{selectedId && selectedSpot ? <SpotName name={selectedSpot.name} /> : "金沢の風景"}</h2>
+        <div className="ui-trial__feature-brand" aria-label="蓮ノ旅">
+          <span aria-hidden="true">蓮</span>
+          <span><strong>蓮ノ旅</strong><small>HASUNOSORA PILGRIMAGE GUIDE</small></span>
         </div>
-        {selectedSpot ? (
+        {selectedId && selectedSpot ? (
+          <div className="ui-trial__feature-title">
+            <small>{selectedSpot.area} / {selectedSpot.category}</small>
+            <h2><SpotName name={selectedSpot.name} /></h2>
+          </div>
+        ) : null}
+        {selectedId && selectedSpot ? (
           <article>
             <small>{exploreChoices.find((choice) => choice.mode === mode)?.label.toUpperCase()} / {String(selectedNumber).padStart(2, "0")}</small>
             <h2><SpotName name={selectedSpot.name} /></h2>
@@ -799,33 +810,41 @@ function ExplorePage({
               </div>
             ) : null}
             {openExploreModal !== "collaboration" ? <div className="ui-trial__explore-window-filters">
-              <label className="ui-trial__search">
-                <span className="ui-trial__visually-hidden">{modalTitle}を検索</span>
-                <input
-                  type="search"
-                  value={openExploreModal === "spots" ? spotQuery : query}
-                  placeholder={openExploreModal === "cards" ? "カード名・モデル地・キャラクターで検索" : "施設名・住所・登場回で検索"}
-                  onChange={(event) => openExploreModal === "spots" ? setSpotQuery(event.target.value) : setQuery(event.target.value)}
-                />
-                <span aria-hidden="true">⌕</span>
-              </label>
-              <div>
+              <div className="ui-trial__search-row">
+                <label className="ui-trial__search">
+                  <span className="ui-trial__visually-hidden">{modalTitle}を検索</span>
+                  <input
+                    type="search"
+                    value={openExploreModal === "spots" ? spotQuery : query}
+                    placeholder={openExploreModal === "cards" ? "カード名・モデル地・キャラクターで検索" : "施設名・住所・登場回で検索"}
+                    onChange={(event) => openExploreModal === "spots" ? setSpotQuery(event.target.value) : setQuery(event.target.value)}
+                  />
+                  <span aria-hidden="true">⌕</span>
+                </label>
+                <button
+                  className={`ui-trial__filter-toggle${modalFiltersExpanded || modalFilterCount > 0 ? " is-active" : ""}`}
+                  type="button"
+                  aria-expanded={modalFiltersExpanded}
+                  aria-controls="ui-trial-modal-filters"
+                  onClick={() => setModalFiltersExpanded((current) => !current)}
+                ><span>{modalFiltersExpanded ? "閉じる" : "絞り込み"}</span><b>{modalResultCount}件</b></button>
+              </div>
+              <div className={`ui-trial__search-filters${modalFiltersExpanded ? " is-expanded" : ""}`} id="ui-trial-modal-filters">
                 <label><span>エリア</span><select value={openExploreModal === "spots" ? spotAreaFilter : areaFilter} onChange={(event) => openExploreModal === "spots" ? setSpotAreaFilter(event.target.value) : setAreaFilter(event.target.value)}><option value="all">すべて</option>{exploreAreas.map((area) => <option value={area} key={area}>{area}</option>)}</select></label>
                 <label><span>カテゴリ</span><select value={openExploreModal === "spots" ? spotCategoryFilter : categoryFilter} onChange={(event) => openExploreModal === "spots" ? setSpotCategoryFilter(event.target.value) : setCategoryFilter(event.target.value)}><option value="all">すべて</option>{exploreCategories.map((category) => <option value={category} key={category}>{category}</option>)}</select></label>
                 {openExploreModal === "spots" ? <label><span>出典</span><select value={spotSourceFilter} onChange={(event) => setSpotSourceFilter(event.target.value as ExploreSourceFilter)}><option value="all">すべて</option><option value="activity">活動記録</option><option value="sehas">せーはす！</option><option value="with-meets">With×MEETS</option></select></label> : null}
                 {openExploreModal === "cards" ? <label><span>キャラクター</span><select value={cardCharacterFilter} onChange={(event) => setCardCharacterFilter(event.target.value as CardCharacter | "all")}><option value="all">すべて</option>{cardCharacters.map((character) => <option value={character} key={character}>{character}</option>)}</select></label> : null}
-                {modalFilterCount > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => {
+                <button
+                  type="button"
+                  disabled={modalFilterCount === 0}
+                  onClick={() => {
                     if (openExploreModal === "spots") {
                       setSpotQuery(""); setSpotAreaFilter("all"); setSpotCategoryFilter("all"); setSpotSourceFilter("all");
                     } else {
                       setQuery(""); setAreaFilter("all"); setCategoryFilter("all"); setCardCharacterFilter("all");
-                      }
-                    }}
-                  >条件をクリア</button>
-                ) : null}
+                    }
+                  }}
+                >条件をクリア</button>
               </div>
             </div> : null}
             <div className="ui-trial__explore-window-body" ref={exploreModalBodyRef}>
@@ -1574,8 +1593,14 @@ function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onTogg
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     dragRef.current = null;
     dialog.classList.remove("is-dragging");
+    if (drag.dragged && deltaY >= 90) {
+      dialog.classList.add("is-closing");
+      dialog.style.transform = "translateY(calc(100% + 24px))";
+      window.setTimeout(onClose, 190);
+      return;
+    }
     dialog.style.removeProperty("transform");
-    if (!cancelled && drag.dragged && deltaY >= 90) onClose();
+    if (cancelled) return;
   }
 
   async function copyShareUrl() {
