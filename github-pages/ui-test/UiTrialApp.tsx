@@ -132,9 +132,9 @@ function displayAssetUrl(path: string) {
   return /^(?:https?:|data:|blob:)/.test(path) || path.startsWith(baseUrl) ? path : assetUrl(path);
 }
 
-function spotPhoto(spot: PilgrimageSpot | undefined, spotPhotoGroups: Record<string, string[]>, fallback: string) {
+function spotPhoto(spot: PilgrimageSpot | undefined, spotPhotoGroups: Record<string, string[]>) {
   const source = spot ? spotPhotoGroups[spot.id]?.[0] ?? spot.imageUrl : undefined;
-  return source ? displayAssetUrl(source) : fallback;
+  return source ? displayAssetUrl(source) : undefined;
 }
 
 function publicSpotDescription(description: string) {
@@ -412,6 +412,8 @@ function ExplorePage({
       ? selectedCandidate
       : spots.find((spot) => spot.id === filteredCards[0]?.spotId))
     : (filteredSpots.find((spot) => spot.id === selectedCandidate?.id) ?? filteredSpots[0]);
+  const mapSelectedPhoto = spotPhoto(mapSelectedSpot, spotPhotoGroups);
+  const selectedSpotPhoto = spotPhoto(selectedSpot, spotPhotoGroups);
   const selectedIsPlanned = Boolean(selectedSpot && planned.some((spot) => spot.id === selectedSpot.id));
   const selectedCollaborationLocation = mode === "collaboration"
     ? currentCollaboration?.locations.find((location) => location.spotId === selectedSpot?.id)
@@ -618,17 +620,17 @@ function ExplorePage({
             </div>
             {mapSelectedSpot ? (
               <aside className="ui-trial__map-page-detail">
-                <button
+                {mapSelectedPhoto ? <button
                   className="ui-trial__map-page-photo"
                   type="button"
                   onClick={() => onOpenImage(
-                    spotPhoto(mapSelectedSpot, spotPhotoGroups, fallbackPhoto),
+                    mapSelectedPhoto,
                     `${mapSelectedSpot.name}の写真`,
-                    photoCredits[spotPhotoGroups[mapSelectedSpot.id]?.[0] ?? mapSelectedSpot.imageUrl ?? ""],
+                    photoCredits[mapSelectedPhoto],
                   )}
                 >
-                  <img src={spotPhoto(mapSelectedSpot, spotPhotoGroups, fallbackPhoto)} alt={`${mapSelectedSpot.name}の写真`} />
-                </button>
+                  <img src={mapSelectedPhoto} alt={`${mapSelectedSpot.name}の写真`} />
+                </button> : <span className="ui-trial__map-page-photo is-empty" aria-hidden="true" />}
                 <div>
                   <small>{mapSelectedSpot.area} · {mapSelectedSpot.category}</small>
                   <h2><SpotName name={mapSelectedSpot.name} /></h2>
@@ -732,11 +734,13 @@ function ExplorePage({
       </section>
 
       <div className="ui-trial__feature">
-        <img
+        {selectedId && selectedSpot && !selectedSpotPhoto ? (
+          <span className="ui-trial__feature-photo-empty" aria-hidden="true" />
+        ) : <img
           key={selectedId && selectedSpot ? selectedSpot.id : "empty"}
-          src={selectedId && selectedSpot ? spotPhoto(selectedSpot, spotPhotoGroups, fallbackPhoto) : fallbackPhoto}
+          src={selectedSpotPhoto ?? fallbackPhoto}
           alt={selectedId && selectedSpot ? `${selectedSpot.name}の写真` : "金沢市内のメインビジュアル"}
-        />
+        />}
         <div className="ui-trial__feature-brand" aria-label="蓮ノ旅">
           <span aria-hidden="true">蓮</span>
           <span><strong>蓮ノ旅</strong><small>HASUNOSORA PILGRIMAGE GUIDE</small></span>
@@ -907,6 +911,7 @@ function ExplorePage({
                 <div className={`ui-trial__spot-results${openExploreModal === "collaboration" ? " is-collaboration" : ""}`}>
                 {(openExploreModal === "spots" ? filteredStandardSpots : filteredSpots).map((spot) => {
                   const isPlanned = planned.some((item) => item.id === spot.id);
+                  const source = spotPhoto(spot, spotPhotoGroups);
                   const collaborationLocation = openExploreModal === "collaboration"
                     ? currentCollaboration?.locations.find((location) => location.spotId === spot.id)
                     : undefined;
@@ -919,16 +924,16 @@ function ExplorePage({
                         if (window.matchMedia("(max-width: 760px)").matches) onOpenSpot(spot);
                       }}
                     >
-                      {openExploreModal !== "collaboration" ? <button
-                        className="ui-trial__spot-result-photo"
-                        type="button"
-                        aria-label={`${spot.name}の写真を拡大表示`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          const source = spotPhoto(spot, spotPhotoGroups, fallbackPhoto);
-                          onOpenImage(source, `${spot.name}の写真`, photoCredits[spotPhotoGroups[spot.id]?.[0] ?? spot.imageUrl ?? ""]);
-                        }}
-                      ><img src={spotPhoto(spot, spotPhotoGroups, fallbackPhoto)} alt="" loading="lazy" /></button> : null}
+                      {openExploreModal !== "collaboration" ? source ? <button
+                          className="ui-trial__spot-result-photo"
+                          type="button"
+                          aria-label={`${spot.name}の写真を拡大表示`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenImage(source, `${spot.name}の写真`, photoCredits[source]);
+                          }}
+                        ><img src={source} alt="" loading="lazy" /></button>
+                        : <span className="ui-trial__spot-result-photo is-empty" aria-hidden="true" /> : null}
                       <div>
                         <small>{spot.area} · {spot.category}</small>
                         <strong><SpotName name={spot.name} /></strong>

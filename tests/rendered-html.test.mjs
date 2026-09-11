@@ -186,6 +186,9 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(app, /kind: "card" as const/);
   assert.match(app, /ui-trial__map-related-cards/);
   assert.match(app, /ui-trial__spot-photo-strip/);
+  assert.match(app, /return source \? displayAssetUrl\(source\) : undefined/);
+  assert.match(app, /className="ui-trial__spot-result-photo is-empty"/);
+  assert.doesNotMatch(app, /spotPhoto\(spot, spotPhotoGroups, fallbackPhoto\)/);
   assert.match(app, /kind: "spot-map"/);
   assert.match(app, /地図で開く/);
   assert.match(app, /CARD_ILLUSTRATION_COPYRIGHT/);
@@ -243,6 +246,7 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(css, /\.ui-trial__map-page-detail \{[\s\S]*?margin: 12px 0 0/);
   assert.match(css, /\.ui-trial__explore-window-dialog/);
   assert.match(css, /height: min\(78dvh, 720px\)/);
+  assert.match(css, /\.ui-trial__modal-dialog \.ui-trial__spot-detail-photos \{[\s\S]*?grid-auto-columns: 100%/);
   assert.match(css, /\.ui-trial__explore-window-dialog\.is-expanded/);
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.ui-trial__explore-window-filters select \{[\s\S]*?min-height: 44px/);

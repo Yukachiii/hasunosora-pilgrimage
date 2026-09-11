@@ -580,7 +580,7 @@ a {
   padding-bottom: 102px;
 }
 
-.ui-trial__feature > img {
+.ui-trial__feature > :is(img, .ui-trial__feature-photo-empty) {
   display: block;
   width: 100%;
   height: min(57vw, 520px);
@@ -589,6 +589,13 @@ a {
   border-radius: 32px 32px 32px 8px;
   box-shadow: 0 24px 58px rgba(33, 51, 72, 0.12);
   animation: ui-trial-feature-in 220ms ease-out;
+}
+
+.ui-trial__feature-photo-empty,
+.ui-trial__map-page-photo.is-empty,
+.ui-trial__spot-result-photo.is-empty {
+  background: #e5ebe7;
+  cursor: default;
 }
 
 .ui-trial__feature-brand {
@@ -4039,7 +4046,7 @@ a {
     padding: 0 0 32px;
   }
 
-  .ui-trial__feature > img {
+  .ui-trial__feature > :is(img, .ui-trial__feature-photo-empty) {
     height: 218px;
     border-radius: 24px 24px 24px 7px;
   }
@@ -5008,12 +5015,12 @@ a {
     padding-bottom: 18px;
   }
 
-  .ui-trial__feature > img {
+  .ui-trial__feature > :is(img, .ui-trial__feature-photo-empty) {
     height: 210px;
     border-radius: 23px 23px 0 0;
   }
 
-  .ui-trial__feature:not(:has(.ui-trial__feature-title)) > img {
+  .ui-trial__feature:not(:has(.ui-trial__feature-title)) > :is(img, .ui-trial__feature-photo-empty) {
     border-radius: 23px 23px 23px 6px;
   }
 
@@ -5414,7 +5421,7 @@ a {
   }
 
   .ui-trial__modal-dialog .ui-trial__spot-detail-photos {
-    grid-auto-columns: 86%;
+    grid-auto-columns: 100%;
   }
 
   .ui-trial__modal-dialog .ui-trial__spot-detail-photos img {
