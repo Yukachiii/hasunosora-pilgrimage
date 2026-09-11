@@ -485,9 +485,11 @@ function ExplorePage({
     drag.dragged = true;
     dialog.classList.add("is-dragging");
     if (drag.startedExpanded) {
-      const nextHeight = Math.max(drag.collapsedHeight, drag.startHeight - Math.max(0, deltaY));
+      const downwardY = Math.max(0, deltaY);
+      const collapseTravel = Math.max(0, drag.startHeight - drag.collapsedHeight);
+      const nextHeight = Math.max(drag.collapsedHeight, drag.startHeight - downwardY);
       dialog.style.height = `${nextHeight}px`;
-      dialog.style.transform = "translateY(0)";
+      dialog.style.transform = `translateY(${Math.max(0, downwardY - collapseTravel)}px)`;
     } else if (deltaY < 0) {
       dialog.style.height = `${Math.min(drag.maximumHeight, drag.startHeight - deltaY)}px`;
       dialog.style.transform = "translateY(0)";
@@ -502,11 +504,14 @@ function ExplorePage({
     if (!drag || !dialog || drag.pointerId !== event.pointerId) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     const deltaY = event.clientY - drag.startY;
+    const collapseTravel = drag.startedExpanded
+      ? Math.max(0, drag.startHeight - drag.collapsedHeight)
+      : 0;
+    const closeDistance = collapseTravel + 90;
     exploreSheetDragRef.current = null;
     dialog.classList.remove("is-dragging");
-    if (drag.dragged && deltaY >= 90) {
+    if (drag.dragged && deltaY >= closeDistance) {
       dialog.classList.add("is-closing");
-      dialog.style.removeProperty("height");
       dialog.style.transform = "translateY(calc(100% + 24px))";
       window.setTimeout(() => setOpenExploreModal(null), 190);
       return;

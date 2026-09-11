@@ -202,8 +202,14 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(app, /exploreSheetExpanded/);
   assert.match(app, /function moveExploreSheetDrag/);
   const exploreSheetDrag = app.match(/function beginExploreSheetDrag[\s\S]*?function moveExploreSheetDrag/)?.[0] ?? "";
+  const exploreSheetMove = app.match(/function moveExploreSheetDrag[\s\S]*?function finishExploreSheetDrag/)?.[0] ?? "";
+  const exploreSheetFinish = app.match(/function finishExploreSheetDrag[\s\S]*?function openMode/)?.[0] ?? "";
+  const exploreSheetClose = exploreSheetFinish.match(/if \(drag\.dragged && deltaY >= closeDistance\) \{[\s\S]*?return;\s*\}/)?.[0] ?? "";
   const genericModalDrag = app.match(/function beginDrag[\s\S]*?function moveDrag/)?.[0] ?? "";
   assert.match(exploreSheetDrag, /setPointerCapture\(event\.pointerId\)/);
+  assert.match(exploreSheetMove, /downwardY - collapseTravel/);
+  assert.match(exploreSheetFinish, /const closeDistance = collapseTravel \+ 90/);
+  assert.doesNotMatch(exploreSheetClose, /removeProperty\("height"\)/);
   assert.match(genericModalDrag, /setPointerCapture\(event\.pointerId\)/);
   const todayPage = app.match(/function TodayPage[\s\S]*?function SharedPreviewPage/)?.[0] ?? "";
   assert.doesNotMatch(todayPage, /<img/);
