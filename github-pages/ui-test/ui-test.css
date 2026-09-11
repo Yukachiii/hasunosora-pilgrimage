@@ -591,13 +591,6 @@ a {
   animation: ui-trial-feature-in 220ms ease-out;
 }
 
-.ui-trial__feature-photo-empty,
-.ui-trial__map-page-photo.is-empty,
-.ui-trial__spot-result-photo.is-empty {
-  background: #e5ebe7;
-  cursor: default;
-}
-
 .ui-trial__feature-brand {
   position: absolute;
   z-index: 2;
@@ -2682,6 +2675,84 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.ui-trial__feature-photo-empty,
+.ui-trial__map-page-photo.is-empty,
+.ui-trial__spot-result-photo.is-empty,
+.ui-trial__spot-detail-photo-empty {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  place-content: center;
+  place-items: center;
+  gap: 8px;
+  background: #e5ebe7;
+  color: #596873;
+  cursor: default;
+  text-align: center;
+  animation: none;
+}
+
+.ui-trial__feature-photo-empty svg,
+.ui-trial__map-page-photo.is-empty svg,
+.ui-trial__spot-result-photo.is-empty svg,
+.ui-trial__spot-detail-photo-empty svg {
+  width: 32px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.ui-trial__photo-empty-slash {
+  stroke-width: 2;
+}
+
+.ui-trial__feature-photo-empty small,
+.ui-trial__map-page-photo.is-empty small,
+.ui-trial__spot-result-photo.is-empty small,
+.ui-trial__spot-detail-photo-empty small {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+}
+
+.ui-trial__photo-empty-short {
+  display: none;
+}
+
+.ui-trial__spot-result-photo.is-empty {
+  gap: 4px;
+}
+
+.ui-trial__spot-result-photo.is-empty svg {
+  width: 23px;
+}
+
+.ui-trial__spot-result-photo.is-empty .ui-trial__photo-empty-short {
+  display: block;
+  font-size: 9px;
+}
+
+.ui-trial__spot-result-photo.is-empty .ui-trial__photo-empty-long {
+  display: none;
+}
+
+.ui-trial__spot-detail-photo-empty {
+  width: 100%;
+  height: 280px;
+}
+
+.ui-trial__feature > .ui-trial__feature-photo-empty,
+.ui-trial__map-page-detail > .ui-trial__map-page-photo.is-empty,
+.ui-trial__spot-results article > .ui-trial__spot-result-photo.is-empty {
+  display: grid;
+  animation: none;
+  cursor: default;
 }
 
 .ui-trial__card-image-button {
@@ -5426,6 +5497,27 @@ a {
 
   .ui-trial__modal-dialog .ui-trial__spot-detail-photos img {
     height: 220px;
+  }
+
+  .ui-trial__spot-detail-photo-empty {
+    height: 220px;
+  }
+
+  .ui-trial__map-page-photo.is-empty {
+    gap: 4px;
+  }
+
+  .ui-trial__map-page-photo.is-empty svg {
+    width: 23px;
+  }
+
+  .ui-trial__map-page-photo.is-empty .ui-trial__photo-empty-short {
+    display: block;
+    font-size: 9px;
+  }
+
+  .ui-trial__map-page-photo.is-empty .ui-trial__photo-empty-long {
+    display: none;
   }
 
   .ui-trial__spot-detail-copy {

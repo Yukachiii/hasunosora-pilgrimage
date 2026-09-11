@@ -159,6 +159,20 @@ function SpotName({ name }: { name: string }) {
   ))}</>;
 }
 
+function EmptySpotPhoto({ className, spotName }: { className: string; spotName: string }) {
+  return (
+    <span className={`${className} is-empty`} role="img" aria-label={`${spotName}の写真はまだ登録されていません`}>
+      <svg viewBox="0 0 32 26" aria-hidden="true">
+        <path d="M4.5 8.5h4l2-3h11l2 3h4v14h-23z" />
+        <circle cx="16" cy="15.5" r="4.5" />
+        <path className="ui-trial__photo-empty-slash" d="M3 3l26 21" />
+      </svg>
+      <small className="ui-trial__photo-empty-short" aria-hidden="true">写真未登録</small>
+      <small className="ui-trial__photo-empty-long" aria-hidden="true">写真はまだ登録されていません</small>
+    </span>
+  );
+}
+
 function ExploreModeTabs({ activeMode, onSelect }: {
   activeMode: ExploreMode;
   onSelect: (mode: ExploreMode) => void;
@@ -630,7 +644,7 @@ function ExplorePage({
                   )}
                 >
                   <img src={mapSelectedPhoto} alt={`${mapSelectedSpot.name}の写真`} />
-                </button> : <span className="ui-trial__map-page-photo is-empty" aria-hidden="true" />}
+                </button> : <EmptySpotPhoto className="ui-trial__map-page-photo" spotName={mapSelectedSpot.name} />}
                 <div>
                   <small>{mapSelectedSpot.area} · {mapSelectedSpot.category}</small>
                   <h2><SpotName name={mapSelectedSpot.name} /></h2>
@@ -735,7 +749,7 @@ function ExplorePage({
 
       <div className="ui-trial__feature">
         {selectedId && selectedSpot && !selectedSpotPhoto ? (
-          <span className="ui-trial__feature-photo-empty" aria-hidden="true" />
+          <EmptySpotPhoto className="ui-trial__feature-photo-empty" spotName={selectedSpot.name} />
         ) : <img
           key={selectedId && selectedSpot ? selectedSpot.id : "empty"}
           src={selectedSpotPhoto ?? fallbackPhoto}
@@ -933,7 +947,7 @@ function ExplorePage({
                             onOpenImage(source, `${spot.name}の写真`, photoCredits[source]);
                           }}
                         ><img src={source} alt="" loading="lazy" /></button>
-                        : <span className="ui-trial__spot-result-photo is-empty" aria-hidden="true" /> : null}
+                        : <EmptySpotPhoto className="ui-trial__spot-result-photo" spotName={spot.name} /> : null}
                       <div>
                         <small>{spot.area} · {spot.category}</small>
                         <strong><SpotName name={spot.name} /></strong>
@@ -1689,7 +1703,7 @@ function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onTogg
               <div className="ui-trial__spot-detail-photos">
                 {modal.photos.map((photo, index) => <figure key={photo}><img src={displayAssetUrl(photo)} alt={`${modal.spot.name}の写真 ${index + 1}`} /><figcaption>{modal.credits[photo] ? `写真：${modal.credits[photo]}` : `${index + 1} / ${modal.photos.length}`}</figcaption></figure>)}
               </div>
-            ) : null}
+            ) : <EmptySpotPhoto className="ui-trial__spot-detail-photo-empty" spotName={modal.spot.name} />}
             <div className="ui-trial__spot-detail-copy">
               <small>{modal.spot.area} · {modal.spot.category}</small>
               <h2><SpotName name={modal.spot.name} /></h2>

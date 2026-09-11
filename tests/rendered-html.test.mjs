@@ -187,7 +187,11 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(app, /ui-trial__map-related-cards/);
   assert.match(app, /ui-trial__spot-photo-strip/);
   assert.match(app, /return source \? displayAssetUrl\(source\) : undefined/);
-  assert.match(app, /className="ui-trial__spot-result-photo is-empty"/);
+  assert.match(app, /function EmptySpotPhoto/);
+  assert.match(app, /写真未登録/);
+  assert.match(app, /写真はまだ登録されていません/);
+  assert.match(app, /<EmptySpotPhoto className="ui-trial__spot-result-photo"/);
+  assert.match(app, /<EmptySpotPhoto className="ui-trial__spot-detail-photo-empty"/);
   assert.doesNotMatch(app, /spotPhoto\(spot, spotPhotoGroups, fallbackPhoto\)/);
   assert.match(app, /kind: "spot-map"/);
   assert.match(app, /地図で開く/);
@@ -247,6 +251,9 @@ test("full UI redesign trial mirrors the public features while keeping test stat
   assert.match(css, /\.ui-trial__explore-window-dialog/);
   assert.match(css, /height: min\(78dvh, 720px\)/);
   assert.match(css, /\.ui-trial__modal-dialog \.ui-trial__spot-detail-photos \{[\s\S]*?grid-auto-columns: 100%/);
+  assert.match(css, /\.ui-trial__spot-result-photo\.is-empty \.ui-trial__photo-empty-short/);
+  assert.match(css, /\.ui-trial__spot-detail-photo-empty \{[\s\S]*?height: 280px/);
+  assert.match(css, /\.ui-trial__feature-photo-empty,[\s\S]*?animation: none/);
   assert.match(css, /\.ui-trial__explore-window-dialog\.is-expanded/);
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.ui-trial__explore-window-filters select \{[\s\S]*?min-height: 44px/);
