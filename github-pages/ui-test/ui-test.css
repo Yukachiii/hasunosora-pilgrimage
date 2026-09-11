@@ -5087,7 +5087,7 @@ a {
   }
 
   .ui-trial__feature > :is(img, .ui-trial__feature-photo-empty) {
-    height: 210px;
+    height: clamp(380px, 62svh, 560px);
     border-radius: 23px 23px 0 0;
   }
 
