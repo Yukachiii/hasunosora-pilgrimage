@@ -1887,6 +1887,10 @@ a {
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
+.ui-trial__card-results article.is-unlinked {
+  cursor: default;
+}
+
 .ui-trial__spot-results article:hover,
 .ui-trial__card-results article:hover,
 .ui-trial__spot-results article.is-selected,
@@ -3783,6 +3787,16 @@ a {
   margin: 0;
   padding: 0;
   scroll-snap-align: start;
+}
+
+.ui-trial__spot-detail-photo-button {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
 }
 
 .ui-trial__modal-dialog .ui-trial__spot-detail-photos img {

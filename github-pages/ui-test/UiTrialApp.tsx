@@ -45,6 +45,12 @@ import {
   useLivePlanner,
   type ScheduleEntry,
 } from "./use-live-planner";
+import {
+  filterTrialCards,
+  hasValidTimeWindow,
+  hasValidVisitDate,
+  orderItemsByIds,
+} from "./trial-utils";
 
 type TrialPage = "explore" | "planner" | "today" | "guide";
 type TrialView = TrialPage | "shared";
@@ -380,16 +386,11 @@ function ExplorePage({
     if (mode === "collaboration" && !collaborationSpotIds.has(spot.id)) return false;
     return true;
   });
-  const filteredCards = cardModels.filter((card) => {
-    if (!card.spotId) return false;
-    const spot = spots.find((item) => item.id === card.spotId);
-    if (!spot) return false;
-    if (cardCharacterFilter !== "all" && !card.characters.includes(cardCharacterFilter)) return false;
-    if (areaFilter !== "all" && spot.area !== areaFilter) return false;
-    if (categoryFilter !== "all" && spot.category !== categoryFilter) return false;
-    if (!normalizedQuery) return true;
-    return [card.card, card.model, card.address, card.note, spot.name, spot.area, spot.category, ...card.characters]
-      .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
+  const filteredCards = filterTrialCards(cardModels, spots, {
+    query,
+    area: areaFilter,
+    category: categoryFilter,
+    character: cardCharacterFilter,
   });
   const normalizedMapQuery = mapQuery.trim().toLocaleLowerCase("ja");
   const mapSearchResults = normalizedMapQuery
@@ -473,6 +474,8 @@ function ExplorePage({
 
   function beginExploreSheetDrag(event: ReactPointerEvent<HTMLElement>) {
     if (window.innerWidth > 760 || !event.isPrimary || event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a, input, select, textarea, label")) return;
     const dialog = exploreModalDialogRef.current;
     const body = exploreModalBodyRef.current;
     if (!dialog || !body || event.clientY >= body.getBoundingClientRect().top) return;
@@ -526,6 +529,11 @@ function ExplorePage({
     const closeDistance = collapseTravel + 90;
     exploreSheetDragRef.current = null;
     dialog.classList.remove("is-dragging");
+    if (cancelled) {
+      dialog.style.removeProperty("height");
+      dialog.style.removeProperty("transform");
+      return;
+    }
     if (drag.dragged && deltaY >= closeDistance) {
       dialog.classList.add("is-closing");
       dialog.style.transform = "translateY(calc(100% + 24px))";
@@ -534,7 +542,7 @@ function ExplorePage({
     }
     dialog.style.removeProperty("height");
     dialog.style.removeProperty("transform");
-    if (cancelled || !drag.dragged) return;
+    if (!drag.dragged) return;
     setExploreSheetExpanded(drag.startedExpanded ? deltaY < 55 : deltaY <= -42);
   }
 
@@ -889,10 +897,13 @@ function ExplorePage({
                 <div className="ui-trial__card-results">
                   {filteredCards.map((card) => {
                     const spot = spots.find((item) => item.id === card.spotId);
-                    if (!spot) return null;
-                    const isPlanned = planned.some((item) => item.id === spot.id);
+                    const isPlanned = Boolean(spot && planned.some((item) => item.id === spot.id));
                     return (
-                      <article className={selectedId === spot.id ? "is-selected" : ""} key={card.id} onClick={() => setSelectedId(spot.id)}>
+                      <article
+                        className={spot ? (selectedId === spot.id ? "is-selected" : "") : "is-unlinked"}
+                        key={card.id}
+                        onClick={spot ? () => setSelectedId(spot.id) : undefined}
+                      >
                         {card.imageUrl ? (
                           <button
                             className="ui-trial__card-image-button"
@@ -910,13 +921,13 @@ function ExplorePage({
                         <div>
                           <small>{card.card}</small>
                           <strong><SpotName name={card.model} /></strong>
-                          <span><SpotName name={spot.name} /></span>
+                          <span>{spot ? <SpotName name={spot.name} /> : "スポット未登録"}</span>
                           <em>{card.characters.join("・")}</em>
                           <p>{card.address}</p>
                           {card.note ? <p>{card.note}</p> : null}
                           <a href={card.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>出典を開く <span aria-hidden="true">↗</span></a>
                         </div>
-                        <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && planned.length >= maximumItineraryStops} onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
+                        {spot ? <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && planned.length >= maximumItineraryStops} onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button> : null}
                       </article>
                     );
                   })}
@@ -986,7 +997,7 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
   planned: PilgrimageSpot[];
   schedule: { entries: ScheduleEntry[] } | null;
   stayMinutes: Record<string, number>;
-  onReorder: (from: number, to: number) => void;
+  onReorder: (orderedIds: string[]) => void;
   onRemove: (spotId: string) => void;
   onStayChange: (spotId: string, minutes: number) => void;
   onFocus: (spotId: string) => void;
@@ -999,6 +1010,7 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     currentIndex: number;
     offsetY: number;
     overlay: HTMLElement;
+    order: PilgrimageSpot[];
   } | null>(null);
   const previousPositionsRef = useRef<Map<string, number>>(new Map());
   const [draggedSpotId, setDraggedSpotId] = useState("");
@@ -1041,7 +1053,7 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     setPreviewOrder(null);
     onReorderStateChange(false);
     if (commit && drag.startIndex !== drag.currentIndex) {
-      onReorder(drag.startIndex, drag.currentIndex);
+      onReorder(drag.order.map((spot) => spot.id));
     }
   }
 
@@ -1078,6 +1090,7 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
       currentIndex: index,
       offsetY: event.clientY - rect.top,
       overlay,
+      order: [...planned],
     };
     setDraggedSpotId(spotId);
   }
@@ -1098,12 +1111,11 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     if (!Number.isInteger(targetIndex) || targetIndex === drag.currentIndex) return;
     const fromIndex = drag.currentIndex;
     rememberPositions();
-    setPreviewOrder((current) => {
-      const next = [...(current ?? planned)];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(targetIndex, 0, moved);
-      return next;
-    });
+    const next = [...drag.order];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    drag.order = next;
+    setPreviewOrder(next);
     drag.currentIndex = targetIndex;
   }
 
@@ -1113,7 +1125,10 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
     const targetIndex = event.key === "ArrowUp" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= displayedSpots.length) return;
     rememberPositions();
-    onReorder(index, targetIndex);
+    const next = [...displayedSpots];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    onReorder(next.map((spot) => spot.id));
   }
 
   return (
@@ -1150,7 +1165,7 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
               onPointerDown={(event) => startPointerDrag(event, index, spot.id)}
               onPointerMove={movePointerDrag}
               onPointerUp={(event) => finishPointerDrag(event, true)}
-              onPointerCancel={(event) => finishPointerDrag(event, true)}
+              onPointerCancel={(event) => finishPointerDrag(event, false)}
               onKeyDown={(event) => moveWithKeyboard(event, index)}
             >☷</button>
           </div>
@@ -1181,22 +1196,24 @@ function PlannerPage({ planner, onOpenShare, onReorderStateChange }: {
       return start < planner.schedule!.finish && end > planner.schedule!.start;
     }).map((appointment) => appointment.id)
     : []);
-  const dayTimeWindowInvalid = Boolean(planner.activeDay && timeToMinutes(planner.activeDay.endTime) <= timeToMinutes(planner.activeDay.startTime));
+  const dayTimeWindowInvalid = Boolean(planner.activeDay && !hasValidTimeWindow(planner.activeDay.startTime, planner.activeDay.endTime));
+  const visitDateInvalid = Boolean(planner.activeDay && !hasValidVisitDate(planner.activeDay.visitDate));
   const scheduleOverrunMinutes = planner.schedule && planner.activeDay
     ? Math.max(0, planner.schedule.finish - timeToMinutes(planner.activeDay.endTime))
     : 0;
   const previousHotelName = planner.activeDayIndex > 0
     ? planner.plannerDays[planner.activeDayIndex - 1]?.hotelName ?? ""
     : "";
+  const displayedPlannerSpots = planner.routeIsCurrent ? planner.plannedSpots : planner.itinerarySpots;
   const focusSpot = (spotId: string) => {
     setSelectedId(spotId);
     setFocusRequest({ spotId, requestId: Date.now() });
   };
   const stopProps = {
-    planned: planner.itinerarySpots,
+    planned: displayedPlannerSpots,
     schedule: planner.schedule,
     stayMinutes: planner.stayMinutes,
-    onReorder: planner.reorder,
+    onReorder: planner.replaceActiveItinerary,
     onRemove: planner.toggleSpot,
     onStayChange: planner.updateStayMinutes,
     onFocus: focusSpot,
@@ -1242,8 +1259,8 @@ function PlannerPage({ planner, onOpenShare, onReorderStateChange }: {
 
       <div className="ui-trial__route-map ui-trial__live-map">
         <MapboxPilgrimageMap
-          spots={planner.itinerarySpots}
-          selectedId={selectedId || planner.itinerarySpots[0]?.id || ""}
+          spots={displayedPlannerSpots}
+          selectedId={selectedId || displayedPlannerSpots[0]?.id || ""}
           focusSpotRequest={focusRequest}
           plannedSpotIds={planner.itineraryIds}
           cardModelSpotIds={[]}
@@ -1265,9 +1282,9 @@ function PlannerPage({ planner, onOpenShare, onReorderStateChange }: {
           {planner.itinerarySpots.length ? <PlannerStops {...stopProps} /> : <p>探す画面からスポットを追加してください。</p>}
         </div>
         <div className="ui-trial__planner-fields">
-          <label><span>訪問日</span><input type="date" value={planner.activeDay?.visitDate ?? japanDate()} onChange={(event) => planner.updateDayField("visitDate", event.target.value)} /></label>
-          <label><span>出発時刻</span><input type="time" value={planner.activeDay?.startTime ?? "09:00"} onChange={(event) => planner.updateDayField("startTime", event.target.value)} /></label>
-          <label><span>終了目安</span><input type="time" value={planner.activeDay?.endTime ?? "18:00"} onChange={(event) => planner.updateDayField("endTime", event.target.value)} /></label>
+          <label><span>訪問日</span><input type="date" value={planner.activeDay?.visitDate ?? japanDate()} onChange={(event) => planner.updateDayField("visitDate", event.target.value || planner.activeDay?.visitDate || japanDate())} /></label>
+          <label><span>出発時刻</span><input type="time" value={planner.activeDay?.startTime ?? "09:00"} onChange={(event) => planner.updateDayField("startTime", event.target.value || planner.activeDay?.startTime || "09:00")} /></label>
+          <label><span>終了目安</span><input type="time" value={planner.activeDay?.endTime ?? "18:00"} onChange={(event) => planner.updateDayField("endTime", event.target.value || planner.activeDay?.endTime || "18:00")} /></label>
           <label><span>移動手段</span><select value={planner.travelMode} onChange={(event) => planner.setTravelMode(event.target.value as TravelMode)}><option value="WALKING">徒歩</option><option value="DRIVING">車</option><option value="TRANSIT">公共交通</option><option value="BICYCLING">自転車</option></select></label>
           {planner.travelMode === "TRANSIT" ? (
             <label><span>出発駅</span><select value={planner.sourceStationId} onChange={(event) => planner.setSourceStationId(event.target.value)}><option value="">指定なし</option>{majorStations.map((station) => <option value={station.id} key={station.id}>{station.name}</option>)}</select></label>
@@ -1299,9 +1316,10 @@ function PlannerPage({ planner, onOpenShare, onReorderStateChange }: {
         {fixedAppointments.length ? (
           <section className="ui-trial__fixed-appointments"><strong>時間を固定した予定</strong><ol>{fixedAppointments.map((appointment) => <li className={appointmentConflictIds.has(appointment.id) ? "has-conflict" : ""} key={appointment.id}><time>{appointment.time}</time><span>{appointment.title || "名称未入力"}</span><small>{appointment.durationMinutes}分</small>{appointmentConflictIds.has(appointment.id) ? <em>訪問予定と時間が重なります</em> : null}</li>)}</ol></section>
         ) : null}
+        {visitDateInvalid ? <p className="ui-trial__planner-warning">訪問日を設定してください。</p> : null}
         {dayTimeWindowInvalid ? <p className="ui-trial__planner-warning">終了目安は出発時刻より後に設定してください。</p> : null}
         {scheduleOverrunMinutes > 0 ? <p className="ui-trial__planner-warning">終了目安を{formatDuration(scheduleOverrunMinutes)}超える予定です。</p> : null}
-        <button className="ui-trial__calculate" type="button" onClick={planner.calculateRoute} disabled={planner.itinerarySpots.length < 2 || dayTimeWindowInvalid || planner.routeResult.state === "loading"}>
+        <button className="ui-trial__calculate" type="button" onClick={planner.calculateRoute} disabled={planner.itinerarySpots.length < 2 || visitDateInvalid || dayTimeWindowInvalid || planner.routeResult.state === "loading"}>
           {planner.routeResult.state === "loading" ? "経路を計算中…" : planner.routeIsCurrent ? "経路を再計算する" : "移動時間を計算する"} <span aria-hidden="true">→</span>
         </button>
         {planner.routeResult.state !== "idle" ? (
@@ -1328,9 +1346,10 @@ function TodayPage({ planner, onOpenPlanner, onOpenSpotMap }: {
   onOpenPlanner: () => void;
   onOpenSpotMap: (spot: PilgrimageSpot) => void;
 }) {
+  const todaySpots = planner.routeIsCurrent ? planner.plannedSpots : planner.itinerarySpots;
   const completedCount = planner.itineraryIds.filter((id) => planner.completedSpotIds.includes(id)).length;
   const nextEntry = planner.schedule?.entries.find((entry) => !planner.completedSpotIds.includes(entry.spot.id));
-  const nextSpot = nextEntry?.spot ?? planner.itinerarySpots.find((spot) => !planner.completedSpotIds.includes(spot.id));
+  const nextSpot = nextEntry?.spot ?? todaySpots.find((spot) => !planner.completedSpotIds.includes(spot.id));
   const mapsUrl = nextSpot
     ? `https://www.google.com/maps/dir/?api=1&destination=${nextSpot.lat},${nextSpot.lng}&travelmode=${planner.travelMode.toLowerCase()}&dir_action=navigate`
     : "https://www.google.com/maps";
@@ -1342,8 +1361,8 @@ function TodayPage({ planner, onOpenPlanner, onOpenSpotMap }: {
     <section className="ui-trial__page ui-trial__today" aria-labelledby="ui-trial-today-title">
       <div className="ui-trial__today-route-engine" aria-hidden="true">
         <MapboxPilgrimageMap
-          spots={planner.itinerarySpots}
-          selectedId={planner.itinerarySpots[0]?.id ?? ""}
+          spots={todaySpots}
+          selectedId={todaySpots[0]?.id ?? ""}
           plannedSpotIds={planner.itineraryIds}
           cardModelSpotIds={[]}
           onSelect={() => undefined}
@@ -1396,7 +1415,7 @@ function TodayPage({ planner, onOpenPlanner, onOpenSpotMap }: {
         {planner.activeDay?.hotelName ? <p className="ui-trial__today-hotel">宿泊：{planner.activeDay.hotelName}</p> : null}
         {planner.activeDay?.appointments.length ? <div className="ui-trial__today-appointments"><strong>時間が決まっている予定</strong>{[...planner.activeDay.appointments].sort((left, right) => left.time.localeCompare(right.time)).map((appointment) => <span key={appointment.id}><time>{appointment.time}</time>{appointment.title || "名称未入力"}（{appointment.durationMinutes}分）</span>)}</div> : null}
         <ol>
-          {(planner.schedule?.entries ?? planner.itinerarySpots.map((spot) => ({ spot, arrival: 0, departure: 0, stay: planner.stayMinutes[spot.id] ?? recommendedStayMinutes(spot) }))).map((entry, index) => {
+          {(planner.schedule?.entries ?? todaySpots.map((spot) => ({ spot, arrival: 0, departure: 0, stay: planner.stayMinutes[spot.id] ?? recommendedStayMinutes(spot) }))).map((entry, index) => {
             const complete = planner.completedSpotIds.includes(entry.spot.id);
             const current = entry.spot.id === nextSpot?.id;
             return (
@@ -1436,11 +1455,13 @@ function SharedPreviewPage({ spots, sharedPlan, onImport, onBack }: {
   const [selectedId, setSelectedId] = useState(sharedPlan?.days[dayIndex]?.itineraryIds[0] ?? "");
   const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
   const activeDay = sharedPlan?.days[dayIndex];
+  const sharedTimeWindowValid = Boolean(activeDay && hasValidTimeWindow(activeDay.startTime, activeDay.endTime));
+  const sharedVisitDateValid = Boolean(activeDay && hasValidVisitDate(activeDay.visitDate ?? japanDate()));
   const daySpots = useMemo(() => (activeDay?.itineraryIds ?? [])
     .map((id) => spots.find((spot) => spot.id === id))
     .filter((spot): spot is PilgrimageSpot => Boolean(spot)), [activeDay, spots]);
   const routeRequest = useMemo<RouteRequest | null>(() => {
-    if (!sharedPlan || !activeDay || sharedPlan.travelMode === "TRANSIT" || daySpots.length < 2) return null;
+    if (!sharedPlan || !activeDay || !sharedVisitDateValid || !sharedTimeWindowValid || sharedPlan.travelMode === "TRANSIT" || daySpots.length < 2) return null;
     return {
       requestId: dayIndex + 1,
       stops: daySpots,
@@ -1449,7 +1470,12 @@ function SharedPreviewPage({ spots, sharedPlan, onImport, onBack }: {
       stayMinutes: sharedPlan.stayMinutes,
       departureTime: departureIso(activeDay.visitDate ?? japanDate(), activeDay.startTime),
     };
-  }, [activeDay, dayIndex, daySpots, sharedPlan]);
+  }, [activeDay, dayIndex, daySpots, sharedPlan, sharedTimeWindowValid, sharedVisitDateValid]);
+  const displayedDaySpots = useMemo(() => (
+    routeResult.state === "success"
+      ? orderItemsByIds(daySpots, routeResult.orderedStopIds)
+      : daySpots
+  ), [daySpots, routeResult]);
 
   if (!sharedPlan || !activeDay) {
     return (
@@ -1470,14 +1496,19 @@ function SharedPreviewPage({ spots, sharedPlan, onImport, onBack }: {
       </header>
       {sharedPlan.days.length > 1 ? (
         <nav aria-label="共有予定の日程">
-          {sharedPlan.days.map((day, index) => <button type="button" aria-current={dayIndex === index ? "date" : undefined} onClick={() => { setDayIndex(index); setSelectedId(day.itineraryIds[0] ?? ""); }} key={`${day.startTime}-${index}`}>DAY {String(index + 1).padStart(2, "0")}</button>)}
+          {sharedPlan.days.map((day, index) => <button type="button" aria-current={dayIndex === index ? "date" : undefined} onClick={() => {
+            if (index === dayIndex) return;
+            setDayIndex(index);
+            setSelectedId(day.itineraryIds[0] ?? "");
+            setRouteResult({ state: "idle" });
+          }} key={`${day.startTime}-${index}`}>DAY {String(index + 1).padStart(2, "0")}</button>)}
         </nav>
       ) : null}
       <div className="ui-trial__shared-grid">
         <div className="ui-trial__shared-map">
           <MapboxPilgrimageMap
-            spots={daySpots}
-            selectedId={selectedId || daySpots[0]?.id || ""}
+            spots={displayedDaySpots}
+            selectedId={selectedId || displayedDaySpots[0]?.id || ""}
             plannedSpotIds={activeDay.itineraryIds}
             cardModelSpotIds={[]}
             onSelect={setSelectedId}
@@ -1492,8 +1523,18 @@ function SharedPreviewPage({ spots, sharedPlan, onImport, onBack }: {
           <small>DAY {String(dayIndex + 1).padStart(2, "0")}</small>
           <h2>{activeDay.visitDate?.replaceAll("-", ".") ?? `${dayIndex + 1}日目`}</h2>
           <p>{activeDay.startTime} → {activeDay.endTime}　·　{sharedPlan.travelMode === "TRANSIT" ? "公共交通" : sharedPlan.travelMode === "DRIVING" ? "車" : sharedPlan.travelMode === "BICYCLING" ? "自転車" : "徒歩"}</p>
-          <ol>{daySpots.map((spot, index) => <li key={spot.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong><SpotName name={spot.name} /></strong><small>{sharedPlan.stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}分滞在</small></div></li>)}</ol>
-          <p className="ui-trial__shared-route-status">{sharedPlan.travelMode === "TRANSIT" ? "公共交通の経路は取り込み後に各区間を確認します。" : routeResult.state === "success" ? `${routeResult.distance} · ${routeResult.duration}` : routeResult.state === "error" ? routeResult.message : "経路を計算しています…"}</p>
+          <ol>{displayedDaySpots.map((spot, index) => <li key={spot.id}><span>{String(index + 1).padStart(2, "0")}</span><div><strong><SpotName name={spot.name} /></strong><small>{sharedPlan.stayMinutes[spot.id] ?? recommendedStayMinutes(spot)}分滞在</small></div></li>)}</ol>
+          <p className="ui-trial__shared-route-status">{!sharedVisitDateValid
+            ? "訪問日を確認できません。"
+            : !sharedTimeWindowValid
+            ? "終了目安は出発時刻より後に設定してください。"
+            : sharedPlan.travelMode === "TRANSIT"
+              ? "公共交通の経路は取り込み後に各区間を確認します。"
+              : daySpots.length < 2
+                ? daySpots.length === 1 ? "1か所の予定です。地図で場所を確認できます。" : "表示できるスポットがありません。"
+                : routeResult.state === "success"
+                  ? `${routeResult.distance} · ${routeResult.duration}`
+                  : routeResult.state === "error" ? routeResult.message : "経路を計算しています…"}</p>
         </article>
       </div>
       <aside><strong>この予定を取り込む</strong><p>取り込むと、現在保存されている予定はこの内容で上書きされます。</p><button type="button" onClick={onImport}>内容を確認して取り込む</button></aside>
@@ -1559,9 +1600,10 @@ function GuidePage({ onNavigate, onOpenImage, communitySubmissionsEnabled }: {
   );
 }
 
-function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onToggleSpot }: {
+function TrialModal({ modal, onClose, onOpenImage, onUpdateShareDates, plannedSpotIds, onToggleSpot }: {
   modal: ModalState;
   onClose: () => void;
+  onOpenImage: (src: string, alt: string, credit?: string) => void;
   onUpdateShareDates: (includeDates: boolean) => void;
   plannedSpotIds: string[];
   onToggleSpot: (spotId: string) => void;
@@ -1593,6 +1635,7 @@ function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onTogg
   function beginDrag(event: ReactPointerEvent<HTMLElement>) {
     if (window.innerWidth > 760 || !event.isPrimary || event.button !== 0) return;
     const target = event.target as HTMLElement;
+    if (target.closest("button, a, input, select, textarea, label")) return;
     if (!target.closest("header, .ui-trial__modal-handle")) return;
     dragRef.current = { pointerId: event.pointerId, startY: event.clientY, dragged: false };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1619,6 +1662,10 @@ function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onTogg
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     dragRef.current = null;
     dialog.classList.remove("is-dragging");
+    if (cancelled) {
+      dialog.style.removeProperty("transform");
+      return;
+    }
     if (drag.dragged && deltaY >= 90) {
       dialog.classList.add("is-closing");
       dialog.style.transform = "translateY(calc(100% + 24px))";
@@ -1626,7 +1673,6 @@ function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onTogg
       return;
     }
     dialog.style.removeProperty("transform");
-    if (cancelled) return;
   }
 
   async function copyShareUrl() {
@@ -1701,7 +1747,19 @@ function TrialModal({ modal, onClose, onUpdateShareDates, plannedSpotIds, onTogg
           <div className="ui-trial__spot-detail-dialog">
             {modal.photos.length ? (
               <div className="ui-trial__spot-detail-photos">
-                {modal.photos.map((photo, index) => <figure key={photo}><img src={displayAssetUrl(photo)} alt={`${modal.spot.name}の写真 ${index + 1}`} /><figcaption>{modal.credits[photo] ? `写真：${modal.credits[photo]}` : `${index + 1} / ${modal.photos.length}`}</figcaption></figure>)}
+                {modal.photos.map((photo, index) => (
+                  <figure key={photo}>
+                    <button
+                      className="ui-trial__spot-detail-photo-button"
+                      type="button"
+                      aria-label={`${modal.spot.name}の写真 ${index + 1}を拡大表示`}
+                      onClick={() => onOpenImage(displayAssetUrl(photo), `${modal.spot.name}の写真 ${index + 1}`, modal.credits[photo])}
+                    >
+                      <img src={displayAssetUrl(photo)} alt="" />
+                    </button>
+                    <figcaption>{modal.credits[photo] ? `写真：${modal.credits[photo]}` : `${index + 1} / ${modal.photos.length}`}</figcaption>
+                  </figure>
+                ))}
               </div>
             ) : <EmptySpotPhoto className="ui-trial__spot-detail-photo-empty" spotName={modal.spot.name} />}
             <div className="ui-trial__spot-detail-copy">
@@ -1757,25 +1815,26 @@ export function UiTrialApp({
 }: UiTrialAppProps) {
   const planner = useLivePlanner(spots);
   const heroImage = heroImages[initialHeroIndex] ?? assetUrl("photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp");
-  const cancelRouteCalculation = planner.cancelRouteCalculation;
   const [view, setView] = useState<TrialView>("explore");
   const [exploreMapView, setExploreMapView] = useState(false);
   const [sharedPlan, setSharedPlan] = useState<SharedPlanSnapshot | null>(null);
+  const [sharedPlanKey, setSharedPlanKey] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
   const [isReordering, setIsReordering] = useState(false);
   const closeModal = useCallback(() => setModal(null), []);
   const page = view === "shared" ? "planner" : view;
   const handleReorderStateChange = useCallback((nextIsReordering: boolean) => {
     setIsReordering(nextIsReordering);
-    if (nextIsReordering) cancelRouteCalculation();
-  }, [cancelRouteCalculation]);
+  }, []);
 
   useEffect(() => {
     const syncLocation = () => {
       setModal(null);
       const parts = window.location.hash.replace(/^#\/?/, "").split("/");
       if (parts[0] === "shared") {
-        setSharedPlan(decodeSharedPlanSnapshot(parts.slice(1).join("/"), new Set(spots.map((spot) => spot.id))));
+        const token = parts.slice(1).join("/");
+        setSharedPlanKey(token);
+        setSharedPlan(decodeSharedPlanSnapshot(token, new Set(spots.map((spot) => spot.id))));
         setExploreMapView(false);
         setView("shared");
         return;
@@ -1784,6 +1843,7 @@ export function UiTrialApp({
         ? parts[0] as TrialPage
         : "explore";
       setSharedPlan(null);
+      setSharedPlanKey("");
       setExploreMapView(nextPage === "explore" && parts[1] === "map");
       setView(nextPage);
     };
@@ -1797,19 +1857,23 @@ export function UiTrialApp({
       (view !== "planner" && view !== "today") ||
       !planner.restored ||
       planner.itinerarySpots.length < 2 ||
+      !planner.activeDay ||
+      !hasValidVisitDate(planner.activeDay.visitDate) ||
+      !hasValidTimeWindow(planner.activeDay.startTime, planner.activeDay.endTime) ||
       isReordering ||
       planner.routeResult.state === "loading" ||
       planner.requestedRouteSignature === planner.currentRouteSignature
     ) return undefined;
     const timer = window.setTimeout(planner.calculateRoute, 650);
     return () => window.clearTimeout(timer);
-  }, [isReordering, planner.calculateRoute, planner.currentRouteSignature, planner.itinerarySpots.length, planner.requestedRouteSignature, planner.restored, planner.routeResult.state, view]);
+  }, [isReordering, planner.activeDay, planner.calculateRoute, planner.currentRouteSignature, planner.itinerarySpots.length, planner.requestedRouteSignature, planner.restored, planner.routeResult.state, view]);
 
   const navigate = (nextPage: TrialPage) => {
     setModal(null);
     setView(nextPage);
     setExploreMapView(false);
     setSharedPlan(null);
+    setSharedPlanKey("");
     const hash = `#/${nextPage}`;
     if (window.location.hash !== hash) window.history.pushState(null, "", hash);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1820,6 +1884,7 @@ export function UiTrialApp({
     setView("explore");
     setExploreMapView(true);
     setSharedPlan(null);
+    setSharedPlanKey("");
     const hash = "#/explore/map";
     if (window.location.hash !== hash) window.history.pushState(null, "", hash);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1872,14 +1937,14 @@ export function UiTrialApp({
           })}
           onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })}
           onFillCollaboration={(collaboration) => {
-            planner.replaceActiveItinerary(collaboration.locations.map((location) => location.spotId));
+            planner.addToActiveItinerary(collaboration.locations.map((location) => location.spotId));
             navigate("planner");
           }}
         /> : null}
         {view === "planner" ? <PlannerPage planner={planner} onOpenShare={openShare} onReorderStateChange={handleReorderStateChange} /> : null}
         {view === "today" ? <TodayPage planner={planner} onOpenPlanner={() => navigate("planner")} onOpenSpotMap={(spot) => setModal({ kind: "spot-map", spot })} /> : null}
         {view === "guide" ? <GuidePage onNavigate={navigate} onOpenImage={(src, alt) => setModal({ kind: "image", src, alt })} communitySubmissionsEnabled={communitySubmissionsEnabled} /> : null}
-        {view === "shared" ? <SharedPreviewPage spots={spots} sharedPlan={sharedPlan} onImport={importShared} onBack={() => navigate("explore")} /> : null}
+        {view === "shared" ? <SharedPreviewPage key={sharedPlanKey} spots={spots} sharedPlan={sharedPlan} onImport={importShared} onBack={() => navigate("explore")} /> : null}
         <CommunityContributionPanel
           spots={spots}
           apiBaseUrl={communityApiUrl}
@@ -1891,7 +1956,14 @@ export function UiTrialApp({
       </main>
       <footer className="ui-trial__site-footer"><span>蓮ノ旅 Ver.{siteVersion}</span><small>非公式の聖地巡礼ガイドです。</small></footer>
       <TrialNavigation page={page} itineraryCount={allPlannedSpotCount} onNavigate={navigate} />
-      <TrialModal modal={modal} onClose={closeModal} onUpdateShareDates={updateShareDates} plannedSpotIds={planner.itineraryIds} onToggleSpot={planner.toggleSpot} />
+      <TrialModal
+        modal={modal}
+        onClose={closeModal}
+        onOpenImage={(src, alt, credit) => setModal({ kind: "image", src, alt, credit })}
+        onUpdateShareDates={updateShareDates}
+        plannedSpotIds={planner.itineraryIds}
+        onToggleSpot={planner.toggleSpot}
+      />
     </div>
   );
 }

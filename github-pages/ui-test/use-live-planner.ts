@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RouteRequest, RouteResult } from "../../app/MapboxPilgrimageMap";
+import { sameIdOrder } from "../../app/itinerary-order";
 import {
   majorStations,
   maximumItineraryStops,
@@ -21,6 +22,13 @@ import {
 } from "../../app/planner-share";
 import type { PilgrimageSpot } from "../../app/spots";
 import { createYahooTransitLegs } from "../../app/yahoo-transit";
+import {
+  hasValidTimeWindow,
+  hasValidVisitDate,
+  mergeItineraryIds,
+  orderItemsByIds,
+  retainCompletedSpotIds,
+} from "./trial-utils";
 
 const TEST_PLANNER_STORAGE_KEY = "hasunosora-pilgrimage.ui-test-planner.v1";
 const TEST_ROUTE_STORAGE_KEY = "hasunosora-pilgrimage.ui-test-route-cache.v1";
@@ -101,11 +109,16 @@ function requestSignature(request: RouteRequest | null) {
   });
 }
 
-function restoreRouteCache(value: unknown, allSpots: PilgrimageSpot[]): DayRouteCache {
+function restoreRouteCache(
+  value: unknown,
+  allSpots: PilgrimageSpot[],
+  validDayIds?: ReadonlySet<string>,
+): DayRouteCache {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const byId = new Map(allSpots.map((spot) => [spot.id, spot]));
   const restored: DayRouteCache = {};
   Object.entries(value).forEach(([dayId, entry]) => {
+    if (validDayIds && !validDayIds.has(dayId)) return;
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return;
     const candidate = entry as { request?: Partial<RouteRequest>; result?: RouteResult };
     const stopIds = Array.isArray(candidate.request?.stops)
@@ -202,7 +215,14 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
         setTransitLegProgress(draft.transitLegProgress);
         try {
           const storedRoutes = window.localStorage.getItem(TEST_ROUTE_STORAGE_KEY);
-          const restoredRoutes = restoreRouteCache(storedRoutes ? JSON.parse(storedRoutes) : null, allSpots);
+          const validRouteDayIds = new Set(draft.plannerDays
+            .filter((day) => hasValidVisitDate(day.visitDate) && hasValidTimeWindow(day.startTime, day.endTime))
+            .map((day) => day.id));
+          const restoredRoutes = restoreRouteCache(
+            storedRoutes ? JSON.parse(storedRoutes) : null,
+            allSpots,
+            validRouteDayIds,
+          );
           const activeRoute = restoredRoutes[draft.plannerDays[draft.activeDayIndex]?.id ?? ""];
           setDayRouteCache(restoredRoutes);
           setRouteRequest(activeRoute?.request ?? null);
@@ -269,10 +289,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
 
   const plannedSpots = useMemo(() => {
     if (routeResult.state !== "success" || !routeResult.orderedStopIds?.length) return itinerarySpots;
-    const byId = new Map(itinerarySpots.map((spot) => [spot.id, spot]));
-    return routeResult.orderedStopIds
-      .map((id) => byId.get(id))
-      .filter((spot): spot is PilgrimageSpot => Boolean(spot));
+    return orderItemsByIds(itinerarySpots, routeResult.orderedStopIds);
   }, [itinerarySpots, routeResult]);
 
   const schedule = useMemo(() => {
@@ -300,13 +317,21 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
 
   const replaceItineraryIds = useCallback((ids: string[]) => {
     updateActiveDay((day) => ({ ...day, itineraryIds: ids }));
-    setCompletedSpotIds((current) => current.filter((id) => ids.includes(id)));
+    const otherDayIds = plannerDays.flatMap((day, index) => index === activeDayIndex ? [] : day.itineraryIds);
+    setCompletedSpotIds((current) => retainCompletedSpotIds(current, ids, otherDayIds));
     invalidateRoute();
-  }, [invalidateRoute, updateActiveDay]);
+  }, [activeDayIndex, invalidateRoute, plannerDays, updateActiveDay]);
 
   const replaceActiveItinerary = useCallback((ids: string[]) => {
     replaceItineraryIds(Array.from(new Set(ids.filter((id) => validSpotIds.has(id)))).slice(0, maximumItineraryStops));
   }, [replaceItineraryIds, validSpotIds]);
+
+  const addToActiveItinerary = useCallback((ids: string[]) => {
+    const nextIds = mergeItineraryIds(itineraryIds, ids, validSpotIds, maximumItineraryStops);
+    if (sameIdOrder(nextIds, itineraryIds)) return;
+    updateActiveDay((day) => ({ ...day, itineraryIds: nextIds }));
+    invalidateRoute();
+  }, [invalidateRoute, itineraryIds, updateActiveDay, validSpotIds]);
 
   const toggleSpot = useCallback((spotId: string) => {
     if (!validSpotIds.has(spotId)) return;
@@ -316,18 +341,15 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     replaceItineraryIds(next);
   }, [itineraryIds, replaceItineraryIds, validSpotIds]);
 
-  const reorder = useCallback((from: number, to: number) => {
-    if (from === to || !itineraryIds[from] || !itineraryIds[to]) return;
-    const next = [...itineraryIds];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    replaceItineraryIds(next);
-  }, [itineraryIds, replaceItineraryIds]);
-
   const updateDayField = useCallback((field: "visitDate" | "startTime" | "endTime", value: string) => {
+    const currentTimeWindowValid = Boolean(activeDay && hasValidTimeWindow(activeDay.startTime, activeDay.endTime));
+    const nextTimeWindowValid = Boolean(activeDay && hasValidTimeWindow(
+      field === "startTime" ? value : activeDay.startTime,
+      field === "endTime" ? value : activeDay.endTime,
+    ));
     updateActiveDay((day) => ({ ...day, [field]: value }));
-    if (field !== "endTime") invalidateRoute();
-  }, [invalidateRoute, updateActiveDay]);
+    if (field !== "endTime" || currentTimeWindowValid !== nextTimeWindowValid) invalidateRoute();
+  }, [activeDay, invalidateRoute, updateActiveDay]);
 
   const updateStayMinutes = useCallback((spotId: string, value: number) => {
     setStayMinutes((current) => ({ ...current, [spotId]: Math.max(0, Math.min(480, Math.round(value))) }));
@@ -346,7 +368,8 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
 
   const addDay = useCallback(() => {
     if (plannerDays.length >= 7) return;
-    const previousDate = plannerDays.at(-1)?.visitDate ?? japanDate();
+    const storedPreviousDate = plannerDays.at(-1)?.visitDate ?? "";
+    const previousDate = hasValidVisitDate(storedPreviousDate) ? storedPreviousDate : japanDate();
     setPlannerDays((current) => [...current, createPlannerDay(current.length, dateAfter(previousDate, 1))]);
     setActiveDayIndex(plannerDays.length);
     setRouteRequest(null);
@@ -424,6 +447,14 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
   const calculateRoute = useCallback(() => {
     if (!activeDay || itinerarySpots.length < 2) {
       setRouteResult({ state: "error", message: "予定には2か所以上のスポットを追加してください。" });
+      return;
+    }
+    if (!hasValidTimeWindow(activeDay.startTime, activeDay.endTime)) {
+      setRouteResult({ state: "error", message: "終了目安は出発時刻より後に設定してください。" });
+      return;
+    }
+    if (!hasValidVisitDate(activeDay.visitDate)) {
+      setRouteResult({ state: "error", message: "訪問日を設定してください。" });
       return;
     }
     const request: RouteRequest = {
@@ -587,7 +618,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     transitLegProgress,
     toggleSpot,
     replaceActiveItinerary,
-    reorder,
+    addToActiveItinerary,
     updateDayField,
     updateDayDetails,
     addAppointment,
@@ -597,7 +628,6 @@ export function useLivePlanner(allSpots: PilgrimageSpot[]) {
     setTravelMode,
     setOptimizeOrder,
     setSourceStationId,
-    cancelRouteCalculation: invalidateRoute,
     calculateRoute,
     handleRouteResult,
     toggleCompleted,
