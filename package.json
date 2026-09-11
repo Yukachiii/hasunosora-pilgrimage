@@ -10,7 +10,7 @@
     "community": "node community-server.mjs",
     "build:admin": "vite build --config vite.admin.config.ts --mode admin",
     "build:pages": "vite build --config vite.pages.config.ts --mode pages",
-    "test": "npm run build:pages && npm run build:admin && node --test tests/rendered-html.test.mjs tests/planner-share.test.mjs tests/community-submissions.test.mjs tests/community-admin.test.mjs",
+    "test": "npm run build:pages && npm run build:admin && node --test tests/itinerary-order.test.mjs tests/content-integrity.test.mjs tests/public-metadata.test.mjs tests/deployment-policy.test.mjs tests/mapbox-contract.test.mjs tests/planner-share.test.mjs tests/community-submissions.test.mjs tests/community-admin.test.mjs",
     "test:unit": "node --test tests/planner-share.test.mjs tests/community-submissions.test.mjs",
     "lint": "eslint ."
   },

@@ -918,6 +918,7 @@ async function verifyTurnstile(
   fetchImplementation,
   recordFailure,
   recordUsage,
+  waitImplementation = wait,
 ) {
   if (!config.turnstileSecret) {
     throw new CommunityRequestError(
@@ -969,7 +970,7 @@ async function verifyTurnstile(
       );
     } catch (error) {
       if (attempt < turnstileVerificationMaximumAttempts) {
-        await wait(turnstileVerificationRetryDelayMs);
+        await waitImplementation(turnstileVerificationRetryDelayMs);
         continue;
       }
       await tryRecordTurnstileFailure(recordFailure, {
@@ -991,7 +992,7 @@ async function verifyTurnstile(
         isRetryableTurnstileStatus(response.status)
       ) {
         await response.body?.cancel().catch(() => undefined);
-        await wait(turnstileVerificationRetryDelayMs);
+        await waitImplementation(turnstileVerificationRetryDelayMs);
         continue;
       }
       const failureResult = await response.json().catch(() => null);
@@ -1015,7 +1016,7 @@ async function verifyTurnstile(
       result = await response.json();
     } catch {
       if (attempt < turnstileVerificationMaximumAttempts) {
-        await wait(turnstileVerificationRetryDelayMs);
+        await waitImplementation(turnstileVerificationRetryDelayMs);
         continue;
       }
       await tryRecordTurnstileFailure(recordFailure, {
@@ -1038,7 +1039,7 @@ async function verifyTurnstile(
       typeof result.success !== "boolean"
     ) {
       if (attempt < turnstileVerificationMaximumAttempts) {
-        await wait(turnstileVerificationRetryDelayMs);
+        await waitImplementation(turnstileVerificationRetryDelayMs);
         continue;
       }
       await tryRecordTurnstileFailure(recordFailure, {
@@ -1070,7 +1071,7 @@ async function verifyTurnstile(
       : [];
     const isInternalServiceError = !successCheck && serviceErrorCodes.includes("internal-error");
     if (isInternalServiceError && attempt < turnstileVerificationMaximumAttempts) {
-      await wait(turnstileVerificationRetryDelayMs);
+      await waitImplementation(turnstileVerificationRetryDelayMs);
       continue;
     }
     await tryRecordTurnstileFailure(recordFailure, {
@@ -1415,6 +1416,7 @@ export async function acceptCommunitySubmission(form, context) {
       context.fetchImplementation,
       context.recordTurnstileFailure,
       context.recordApiUsage,
+      context.turnstileWaitImplementation,
     );
   }
 
@@ -1560,6 +1562,7 @@ export async function handleCommunityRequest(
       recordTurnstileFailure: options.recordTurnstileFailure ??
         ((diagnostic) => appendTurnstileFailureDiagnostic(requestConfig, diagnostic)),
       recordApiUsage,
+      turnstileWaitImplementation: options.turnstileWaitImplementation,
     });
     await tryRecordCommunityApiUsage(recordApiUsage, { submissionAccepted: 1 });
     sendJson(response, 201, { submission }, origin);

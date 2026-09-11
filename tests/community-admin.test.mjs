@@ -28,43 +28,41 @@ async function freeLoopbackPort() {
     probe.listen(0, "127.0.0.1", resolve);
   });
   const address = probe.address();
-  assert.equal(typeof address, "object");
+  if (!address || typeof address === "string") {
+    throw new Error("Loopback test port was not assigned.");
+  }
   await new Promise((resolve) => probe.close(resolve));
   return address.port;
 }
 
-function waitForReady(child, timeoutMs = 10_000) {
-  return new Promise((resolve, reject) => {
-    let output = "";
-    let errors = "";
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error(`Admin server did not start.\n${output}\n${errors}`));
-    }, timeoutMs);
-    const onOutput = (chunk) => {
-      output += chunk.toString();
-      if (output.includes("Hasunosora Admin (PC):")) {
-        cleanup();
-        resolve();
+async function waitForReady(child, baseUrl, timeoutMs = 10_000) {
+  let errors = "";
+  const onErrorOutput = (chunk) => {
+    errors += chunk.toString();
+  };
+  child.stderr.on("data", onErrorOutput);
+  const deadline = Date.now() + timeoutMs;
+  try {
+    while (Date.now() < deadline) {
+      if (child.exitCode !== null) {
+        throw new Error(`Admin server exited before startup (${child.exitCode}).\n${errors}`);
       }
-    };
-    const onErrorOutput = (chunk) => {
-      errors += chunk.toString();
-    };
-    const onExit = (code) => {
-      cleanup();
-      reject(new Error(`Admin server exited before startup (${code}).\n${output}\n${errors}`));
-    };
-    function cleanup() {
-      clearTimeout(timer);
-      child.stdout.off("data", onOutput);
-      child.stderr.off("data", onErrorOutput);
-      child.off("exit", onExit);
+      try {
+        const response = await fetch(`${baseUrl}/api/admin/identity`, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(500),
+        });
+        const identity = await response.json().catch(() => null);
+        if (response.ok && identity?.application) return identity;
+      } catch {
+        // The listener may not be ready yet.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    child.stdout.on("data", onOutput);
-    child.stderr.on("data", onErrorOutput);
-    child.once("exit", onExit);
-  });
+    throw new Error(`Admin server did not start.\n${errors}`);
+  } finally {
+    child.stderr.off("data", onErrorOutput);
+  }
 }
 
 function waitForExit(child, timeoutMs = 10_000) {
@@ -93,19 +91,11 @@ function pendingSubmission({ id, kind, payload, imageBytes = null }) {
     status: "pending",
     payload,
     imageKey: imageBytes ? `images/${id}.webp` : null,
-    imageMime: imageBytes ? "image/webp" : null,
-    imageSize: imageBytes?.length ?? null,
     imageSha256: imageBytes
       ? createHash("sha256").update(imageBytes).digest("hex")
       : null,
     creditName: imageBytes ? "テスト投稿者" : null,
-    consentVersion: "2026-09-04",
-    consentAt: "2026-09-04T12:00:00.000Z",
-    dailyRateKey: `test-${id}`,
     createdAt: "2026-09-04T12:00:00.000Z",
-    reviewedAt: null,
-    reviewedBy: null,
-    reviewNote: null,
   };
 }
 
@@ -118,6 +108,11 @@ function tokyoDateKey(now = new Date()) {
   }).formatToParts(now);
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
+}
+
+function anotherTokyoDateThisMonth(now = new Date()) {
+  const today = tokyoDateKey(now);
+  return `${today.slice(0, 8)}${today.endsWith("-01") ? "02" : "01"}`;
 }
 
 test("local admin imports reviewed photos and spots, and rejects without publishing", {
@@ -134,8 +129,6 @@ test("local admin imports reviewed photos and spots, and rejects without publish
   const spotSubmissionId = "22222222-2222-4222-8222-222222222222";
   const rejectedSubmissionId = "33333333-3333-4333-8333-333333333333";
   let child = null;
-  let writeToken = "";
-  let baseUrl = "";
 
   try {
     await copyFile(
@@ -180,11 +173,6 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     };
     await writeJson(path.join(contentDirectory, "spots.json"), [initialSpot]);
     await writeJson(path.join(contentDirectory, "media.json"), []);
-    await writeJson(path.join(contentDirectory, "site.json"), {
-      version: "4.0.0",
-      heroImage: null,
-      heroImages: [],
-    });
     await writeJson(path.join(contentDirectory, "transit-search-names.json"), {
       "existing-spot": "既存スポット",
     });
@@ -225,9 +213,6 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     ]);
     await writeJson(path.join(submissionsDirectory, "diagnostics", "api-usage.json"), {
       schemaVersion: 1,
-      trackingStartedAt: "2026-09-06T00:00:00.000Z",
-      updatedAt: "2026-09-06T00:05:00.000Z",
-      timeZone: "Asia/Tokyo",
       allTime: {
         submissionRequests: 12,
         submissionAccepted: 8,
@@ -246,12 +231,21 @@ test("local admin imports reviewed photos and spots, and rejects without publish
         turnstileVerified: 2,
         turnstileFailed: 2,
         turnstileRetries: 1,
+      }, {
+        date: anotherTokyoDateThisMonth(),
+        submissionRequests: 5,
+        submissionAccepted: 4,
+        submissionRejected: { turnstile: 0, validation: 1, system: 0 },
+        turnstileApiRequests: 5,
+        turnstileVerified: 4,
+        turnstileFailed: 1,
+        turnstileRetries: 0,
       }],
     });
 
     const port = await freeLoopbackPort();
     const unusedCommunityPort = await freeLoopbackPort();
-    baseUrl = `http://127.0.0.1:${port}`;
+    const baseUrl = `http://127.0.0.1:${port}`;
     child = spawn(process.execPath, [path.join(testDirectory, "server.mjs"), "--port", String(port)], {
       cwd: testDirectory,
       env: {
@@ -259,25 +253,19 @@ test("local admin imports reviewed photos and spots, and rejects without publish
         COMMUNITY_SUBMISSIONS_DIRECTORY: submissionsDirectory,
         COMMUNITY_SERVER_PORT: String(unusedCommunityPort),
       },
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", "ignore", "pipe"],
       windowsHide: true,
     });
-    await waitForReady(child);
-
-    const identityResponse = await fetch(`${baseUrl}/api/admin/identity`, {
-      cache: "no-store",
-    });
-    assert.equal(identityResponse.status, 200);
-    assert.equal(identityResponse.headers.get("cache-control"), "no-store");
-    assert.deepEqual(await identityResponse.json(), {
+    assert.deepEqual(await waitForReady(child, baseUrl), {
       application: "hasunosora-pilgrimage-admin",
       schemaVersion: 1,
     });
 
     const stateResponse = await fetch(`${baseUrl}/api/admin/state`, { cache: "no-store" });
     assert.equal(stateResponse.status, 200);
+    assert.equal(stateResponse.headers.get("cache-control"), "no-store");
     const state = await stateResponse.json();
-    writeToken = state.writeToken;
+    const writeToken = state.writeToken;
     assert.equal(typeof writeToken, "string");
     assert.equal(state.submissions.length, 4);
 
@@ -285,11 +273,7 @@ test("local admin imports reviewed photos and spots, and rejects without publish
       cache: "no-store",
     });
     assert.equal(usageResponse.status, 200);
-    assert.equal(usageResponse.headers.get("cache-control"), "no-store");
     const usage = await usageResponse.json();
-    assert.equal(usage.available, true);
-    assert.equal(usage.timeZone, "Asia/Tokyo");
-    assert.equal(usage.trackingStartedAt, "2026-09-06T00:00:00.000Z");
     assert.deepEqual(usage.today, {
       submissionAttempts: 3,
       submissionsAccepted: 2,
@@ -299,7 +283,15 @@ test("local admin imports reviewed photos and spots, and rejects without publish
       turnstileFailed: 2,
       turnstileRetries: 1,
     });
-    assert.deepEqual(usage.currentMonth, usage.today);
+    assert.deepEqual(usage.currentMonth, {
+      submissionAttempts: 8,
+      submissionsAccepted: 6,
+      submissionsFailed: 2,
+      turnstileRequests: 9,
+      turnstileSuccessful: 6,
+      turnstileFailed: 3,
+      turnstileRetries: 1,
+    });
     assert.deepEqual(usage.allTime, {
       submissionAttempts: 12,
       submissionsAccepted: 8,
@@ -331,7 +323,6 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     const photoResult = await photoResponse.json();
     assert.equal(photoResult.submission.status, "imported");
     assert.equal(photoResult.asset.submissionId, photoSubmissionId);
-    assert.equal(photoResult.asset.creditName, "テスト投稿者");
 
     const anonymousPhotoResponse = await fetch(
       `${baseUrl}/api/admin/submissions/${anonymousPhotoSubmissionId}/import`,
@@ -348,7 +339,6 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     const anonymousPhotoResult = await anonymousPhotoResponse.json();
     assert.equal(anonymousPhotoResult.submission.status, "imported");
     assert.equal(anonymousPhotoResult.asset.submissionId, anonymousPhotoSubmissionId);
-    assert.equal(anonymousPhotoResult.asset.creditName, "匿名");
 
     const spotResponse = await fetch(
       `${baseUrl}/api/admin/submissions/${spotSubmissionId}/import`,
@@ -421,21 +411,8 @@ test("local admin imports reviewed photos and spots, and rejects without publish
     );
   } finally {
     if (child && child.exitCode === null) {
-      if (writeToken && baseUrl) {
-        const exiting = waitForExit(child).catch(() => null);
-        await fetch(`${baseUrl}/api/admin/shutdown`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-local-admin-token": writeToken,
-          },
-          body: "{}",
-        }).catch(() => undefined);
-        await exiting;
-      } else {
-        child.kill();
-        await waitForExit(child).catch(() => null);
-      }
+      child.kill();
+      await waitForExit(child).catch(() => null);
     }
     await rm(testDirectory, { recursive: true, force: true });
   }

@@ -6,6 +6,7 @@ import {
   createPlannerSnapshotFromSharedPlan,
   decodeSharedPlanSnapshot,
   encodeSharedPlanSnapshot,
+  sanitizeSharedPlanSnapshot,
   SHARED_PLAN_MAX_TOKEN_LENGTH,
 } from "../app/planner-share.ts";
 
@@ -65,34 +66,24 @@ function plannerSnapshot() {
   };
 }
 
-test("shared plan round-trips UTF-8 data and omits dates by default", () => {
+test("shared plan round-trips UTF-8 data and shares dates only when requested", () => {
   const shared = createSharedPlanSnapshot(plannerSnapshot(), validSpotIds);
-  assert.ok(shared);
-  assert.deepEqual(shared.days.map((day) => day.itineraryIds), [
-    ["kanazawa-station", "ohmicho-market"],
-    ["兼六園"],
-  ]);
-  assert.equal(shared.days[0].visitDate, undefined);
-  assert.equal(shared.days[1].visitDate, undefined);
-
-  const token = encodeSharedPlanSnapshot(shared, validSpotIds);
-  assert.ok(token);
-  assert.ok(token.length <= SHARED_PLAN_MAX_TOKEN_LENGTH);
-  assert.deepEqual(decodeSharedPlanSnapshot(token, validSpotIds), shared);
-});
-
-test("shared plan includes dates only when explicitly requested", () => {
-  const withoutDates = createSharedPlanSnapshot(plannerSnapshot(), validSpotIds);
-  const withDates = createSharedPlanSnapshot(plannerSnapshot(), validSpotIds, {
+  const sharedWithDates = createSharedPlanSnapshot(plannerSnapshot(), validSpotIds, {
     includeDates: true,
   });
-  assert.ok(withoutDates);
-  assert.ok(withDates);
-  assert.equal("visitDate" in withoutDates.days[0], false);
-  assert.deepEqual(withDates.days.map((day) => day.visitDate), [
+  assert.ok(shared);
+  assert.ok(sharedWithDates);
+  assert.equal("visitDate" in shared.days[0], false);
+  assert.deepEqual(sharedWithDates.days.map((day) => day.visitDate), [
     "2026-09-12",
     "2026-09-13",
   ]);
+
+  const token = encodeSharedPlanSnapshot(shared, validSpotIds);
+  assert.ok(token);
+  const decoded = decodeSharedPlanSnapshot(token, validSpotIds);
+  assert.deepEqual(decoded, shared);
+  assert.deepEqual(decoded?.days[1].itineraryIds, ["兼六園"]);
 });
 
 test("shared plan imports as a fresh local draft without private planner data", () => {
@@ -164,7 +155,7 @@ test("shared plan filters unknown spots during creation and decoding", () => {
   assert.deepEqual(decodedWithChangedCatalog.stayMinutes, { "kanazawa-station": 20 });
 });
 
-test("shared plan rejects corrupted, oversized, and unknown-version tokens", () => {
+test("shared plan rejects corrupted or oversized tokens and unknown versions", () => {
   const shared = createSharedPlanSnapshot(plannerSnapshot(), validSpotIds);
   assert.ok(shared);
   const token = encodeSharedPlanSnapshot(shared, validSpotIds);
@@ -179,28 +170,34 @@ test("shared plan rejects corrupted, oversized, and unknown-version tokens", () 
     null,
   );
 
-  const enormousSpotId = `spot-${"x".repeat(7_000)}`;
-  const enormousSnapshot = plannerSnapshot();
-  enormousSnapshot.plannerDays = [{
-    ...enormousSnapshot.plannerDays[0],
-    itineraryIds: [enormousSpotId],
-  }];
-  enormousSnapshot.itineraryIds = [enormousSpotId];
-  enormousSnapshot.stayMinutes = { [enormousSpotId]: 30 };
-  const enormousShared = createSharedPlanSnapshot(
-    enormousSnapshot,
-    new Set([enormousSpotId]),
+  const maximumPlanSpotIds = Array.from({ length: 7 }, (_, dayIndex) =>
+    Array.from({ length: 25 }, (_, spotIndex) =>
+      `spot-${dayIndex}-${String(spotIndex).padStart(2, "0")}-${"x".repeat(70)}`),
   );
-  assert.ok(enormousShared);
-  assert.equal(encodeSharedPlanSnapshot(enormousShared, new Set([enormousSpotId])), null);
+  const maximumPlanSnapshot = plannerSnapshot();
+  maximumPlanSnapshot.plannerDays = maximumPlanSpotIds.map((itineraryIds, dayIndex) => ({
+    id: `day-${dayIndex + 1}`,
+    visitDate: `2026-09-${String(dayIndex + 12).padStart(2, "0")}`,
+    startTime: "09:00",
+    endTime: "18:00",
+    itineraryIds,
+    hotelName: "",
+    appointments: [],
+  }));
+  maximumPlanSnapshot.itineraryIds = [...maximumPlanSpotIds[0]];
+  maximumPlanSnapshot.stayMinutes = Object.fromEntries(
+    maximumPlanSpotIds.flat().map((spotId) => [spotId, 30]),
+  );
+  const maximumPlanValidSpotIds = new Set(maximumPlanSpotIds.flat());
+  const maximumShared = createSharedPlanSnapshot(
+    maximumPlanSnapshot,
+    maximumPlanValidSpotIds,
+  );
+  assert.ok(maximumShared);
+  assert.equal(encodeSharedPlanSnapshot(maximumShared, maximumPlanValidSpotIds), null);
 
-  const unknownVersionPayload = Buffer.from(JSON.stringify({
-    v: 2,
-    d: [["09:00", "18:00", ["kanazawa-station"]]],
-    s: [],
-    m: "WALKING",
-    o: 0,
-    a: 0,
-  }), "utf8").toString("base64url");
-  assert.equal(decodeSharedPlanSnapshot(unknownVersionPayload, validSpotIds), null);
+  assert.equal(
+    sanitizeSharedPlanSnapshot({ ...shared, version: 2 }, validSpotIds),
+    null,
+  );
 });

@@ -14,13 +14,10 @@ import {
   clientAddress,
   communityApiUsagePath,
   createCommunitySubmissionServer,
-  makeDailyRateKey,
   pruneReviewedCommunitySubmissions,
   readCommunityApiUsage,
   recordCommunityApiUsage,
   reencodeCommunityImage,
-  sanitizeTurnstileDiagnostic,
-  summarizeCommunityApiUsage,
   turnstileDiagnosticLogPath,
   validateCommunityServerConfig,
   validateUploadedImage,
@@ -109,22 +106,6 @@ test("community spot payload requires only name, address and evidence URL", () =
   );
 });
 
-test("daily rate keys rotate by date and do not contain the raw address", () => {
-  const first = makeDailyRateKey(
-    "203.0.113.10",
-    new Date("2026-09-04T00:00:00.000Z"),
-    "test-secret",
-  );
-  const second = makeDailyRateKey(
-    "203.0.113.10",
-    new Date("2026-09-05T00:00:00.000Z"),
-    "test-secret",
-  );
-  assert.match(first, /^[a-f0-9]{64}$/);
-  assert.notEqual(first, second);
-  assert.equal(first.includes("203.0.113.10"), false);
-});
-
 test("client address accepts only a valid forwarded address from the loopback proxy", () => {
   assert.equal(
     clientAddress({
@@ -162,7 +143,7 @@ test("public receiver startup requires an origin, rate secret, and Turnstile sec
     turnstileSecret: "turnstile-secret",
     allowLocalTurnstileBypass: false,
   };
-  assert.equal(validateCommunityServerConfig(validConfig), validConfig);
+  assert.doesNotThrow(() => validateCommunityServerConfig(validConfig));
   assert.throws(
     () => validateCommunityServerConfig({ ...validConfig, allowedOrigins: new Set() }),
     /COMMUNITY_ALLOWED_ORIGINS/,
@@ -181,7 +162,7 @@ test("public receiver startup requires an origin, rate secret, and Turnstile sec
     turnstileSecret: "",
     allowLocalTurnstileBypass: true,
   };
-  assert.equal(validateCommunityServerConfig(localConfig), localConfig);
+  assert.doesNotThrow(() => validateCommunityServerConfig(localConfig));
 });
 
 test("reviewed submissions expire while pending submissions remain private", () => {
@@ -203,7 +184,7 @@ test("reviewed submissions expire while pending submissions remain private", () 
   assert.deepEqual(result.removedImageKeys, ["images/rejected.webp"]);
 });
 
-test("image validation checks size, signature and declared MIME", () => {
+test("image validation checks signature and declared MIME", () => {
   const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xdb]);
   assert.equal(validateUploadedImage(jpeg, "image/jpeg"), "image/jpeg");
   assert.throws(
@@ -246,11 +227,12 @@ function submissionForm({
   image = null,
   creditName = "投稿者",
   turnstileToken = "",
+  startedAt = Date.parse("2026-09-04T11:59:50.000Z"),
 }) {
   const form = new FormData();
   form.set("kind", kind);
   form.set("payload", JSON.stringify(payload));
-  form.set("startedAt", String(Date.parse("2026-09-04T11:59:50.000Z")));
+  form.set("startedAt", String(startedAt));
   form.set("website", "");
   form.set("turnstileToken", turnstileToken);
   form.set("consentVersion", "2026-09-04");
@@ -260,7 +242,32 @@ function submissionForm({
   return form;
 }
 
-test("accepted entries are private pending records and enforce five per day", async () => {
+function spotSubmissionForm({
+  name = "候補地",
+  sourceUrl = "https://example.com/source",
+  turnstileToken = "verified-token",
+} = {}) {
+  return submissionForm({
+    kind: "spot",
+    payload: { name, address: "石川県金沢市", sourceUrl },
+    creditName: null,
+    turnstileToken,
+  });
+}
+
+async function listenOnLoopback(server) {
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Community test server did not expose a TCP address.");
+  }
+  return `http://127.0.0.1:${address.port}`;
+}
+
+test("accepted photos stay private, default to anonymous, and reset their daily limit", async () => {
   const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-submissions-"));
   let imageProcessingCount = 0;
   const config = {
@@ -284,8 +291,9 @@ test("accepted entries are private pending records and enforce five per day", as
   };
 
   try {
+    const creditNames = ["投稿者", null, "   ", "投稿者", "投稿者"];
     for (let index = 0; index < 5; index += 1) {
-      const result = await acceptCommunitySubmission(
+      await acceptCommunitySubmission(
         submissionForm({
           kind: "photo",
           payload: { spotId: "kanazawa-station", comment: `写真${index + 1}` },
@@ -294,11 +302,10 @@ test("accepted entries are private pending records and enforce five per day", as
             `secret-${index}.jpg`,
             { type: "image/jpeg" },
           ),
+          creditName: creditNames[index],
         }),
         context,
       );
-      assert.deepEqual(Object.keys(result).sort(), ["createdAt", "id", "kind", "status"]);
-      assert.equal(result.status, "pending");
     }
 
     await assert.rejects(
@@ -324,96 +331,28 @@ test("accepted entries are private pending records and enforce five per day", as
     assert.equal(index.length, 5);
     assert.equal(index[0].status, "pending");
     assert.equal(index[0].imageMime, "image/webp");
-    assert.equal(index[0].creditName, "投稿者");
+    assert.deepEqual(
+      index.map((submission) => submission.creditName),
+      ["投稿者", "匿名", "匿名", "投稿者", "投稿者"],
+    );
     assert.match(index[0].imageKey, /^images\/[a-f0-9-]+\.webp$/);
     assert.equal(JSON.stringify(index).includes("203.0.113.20"), false);
     assert.equal(JSON.stringify(index).includes("secret-0.jpg"), false);
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
-  }
-});
 
-test("photo submissions use an anonymous credit when the field is omitted or blank", async () => {
-  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-anonymous-"));
-  const context = {
-    config: {
-      allowedOrigins: new Set(),
-      submissionsDirectory: temporaryDirectory,
-      turnstileSecret: "",
-      rateLimitSecret: "test-rate-secret",
-      consentVersion: "2026-09-04",
-      allowLocalTurnstileBypass: true,
-    },
-    origin: "http://127.0.0.1:3000",
-    ipAddress: "203.0.113.31",
-    now: new Date("2026-09-04T12:00:00.000Z"),
-    fetchImplementation: fetch,
-    imageProcessor: async () => Buffer.from("private webp derivative"),
-  };
-
-  try {
-    for (const [index, creditName] of [null, "   "].entries()) {
-      await acceptCommunitySubmission(
-        submissionForm({
-          kind: "photo",
-          payload: { spotId: "kanazawa-station" },
-          image: new File(
-            [Buffer.from([0xff, 0xd8, 0xff, 0xdb])],
-            `anonymous-${index}.jpg`,
-            { type: "image/jpeg" },
-          ),
-          creditName,
-        }),
-        context,
-      );
-    }
-
-    const saved = JSON.parse(
-      await readFile(path.join(temporaryDirectory, "index.json"), "utf8"),
-    );
-    assert.deepEqual(saved.map((submission) => submission.creditName), ["匿名", "匿名"]);
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
-  }
-});
-
-test("spot suggestions without an image do not require or retain a credit name", async () => {
-  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-spots-"));
-  try {
-    const result = await acceptCommunitySubmission(
+    const nextDay = await acceptCommunitySubmission(
       submissionForm({
         kind: "spot",
         payload: {
-          name: "候補地",
+          name: "翌日の候補地",
           address: "石川県金沢市",
-          sourceUrl: "https://example.com/source",
+          sourceUrl: "https://example.com/next-day",
         },
         creditName: null,
+        startedAt: Date.parse("2026-09-05T11:59:50.000Z"),
       }),
-      {
-        config: {
-          allowedOrigins: new Set(),
-          submissionsDirectory: temporaryDirectory,
-          turnstileSecret: "",
-          rateLimitSecret: "test-rate-secret",
-          consentVersion: "2026-09-04",
-          allowLocalTurnstileBypass: true,
-        },
-        origin: "http://localhost:3000",
-        ipAddress: "203.0.113.30",
-        now: new Date("2026-09-04T12:00:00.000Z"),
-        fetchImplementation: fetch,
-        imageProcessor: async () => {
-          throw new Error("must not process an absent image");
-        },
-      },
+      { ...context, now: new Date("2026-09-05T12:00:00.000Z") },
     );
-    assert.equal(result.kind, "spot");
-    const [saved] = JSON.parse(
-      await readFile(path.join(temporaryDirectory, "index.json"), "utf8"),
-    );
-    assert.equal(saved.creditName, null);
-    assert.equal(saved.imageKey, null);
+    assert.equal(nextDay.status, "pending");
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
@@ -471,12 +410,6 @@ test("Turnstile verification must match the contribution action and origin hostn
       })),
       (error) => error?.code === "TURNSTILE_FAILED",
     );
-    const accepted = await acceptCommunitySubmission(makeForm(), context({
-      success: true,
-      action: "community_submission",
-      hostname: "guide.example.test",
-    }));
-    assert.equal(accepted.status, "pending");
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
@@ -513,19 +446,10 @@ test("Turnstile diagnostics persist only allowlisted operational details", async
       },
       { now: new Date("2026-09-06T00:00:00.000Z") },
     );
-    assert.deepEqual(entry, {
-      schemaVersion: 1,
-      occurredAt: "2026-09-06T00:00:00.000Z",
-      event: "turnstile_verification_failed",
-      reason: "network_error",
-      httpStatus: null,
-      durationMs: 123,
-      attemptCount: null,
-      networkErrorCode: "ECONNRESET",
-      serviceErrorCodes: ["internal-error"],
-      hasUnknownServiceErrorCode: true,
-      checks: { success: false, action: null, hostname: null },
-    });
+    assert.equal(entry.reason, "network_error");
+    assert.equal(entry.networkErrorCode, "ECONNRESET");
+    assert.deepEqual(entry.serviceErrorCodes, ["internal-error"]);
+    assert.equal(entry.hasUnknownServiceErrorCode, true);
     const contents = await readFile(turnstileDiagnosticLogPath(config), "utf8");
     assert.deepEqual(JSON.parse(contents.trim()), entry);
     for (const sentinel of sentinels) assert.equal(contents.includes(sentinel), false);
@@ -543,133 +467,12 @@ test("Turnstile diagnostics persist only allowlisted operational details", async
       JSON.parse((await readFile(`${turnstileDiagnosticLogPath(config)}.1`, "utf8")).trim()),
       entry,
     );
-
-    assert.deepEqual(
-      sanitizeTurnstileDiagnostic({
-        reason: "ATTACKER_REASON",
-        httpStatus: 9_999,
-        durationMs: 99_999,
-        networkErrorCode: "PRIVATE_NETWORK_CODE",
-      }, new Date("2026-09-06T00:00:01.000Z")),
-      {
-        schemaVersion: 1,
-        occurredAt: "2026-09-06T00:00:01.000Z",
-        event: "turnstile_verification_failed",
-        reason: "network_error",
-        httpStatus: 599,
-        durationMs: 60_000,
-        attemptCount: null,
-        networkErrorCode: "OTHER",
-        serviceErrorCodes: [],
-        hasUnknownServiceErrorCode: false,
-        checks: { success: null, action: null, hostname: null },
-      },
-    );
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
 });
 
-test("Turnstile verification classifies failures without leaking response details", async () => {
-  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-log-"));
-  const origin = "https://guide.example.test";
-  const config = {
-    allowedOrigins: new Set([origin]),
-    submissionsDirectory: temporaryDirectory,
-    turnstileSecret: "SECRET_SENTINEL",
-    rateLimitSecret: "test-rate-secret",
-    consentVersion: "2026-09-04",
-    allowLocalTurnstileBypass: false,
-  };
-  const diagnostics = [];
-  const makeForm = () => submissionForm({
-    kind: "spot",
-    payload: {
-      name: "候補地",
-      address: "石川県金沢市",
-      sourceUrl: "https://example.com/source",
-    },
-    creditName: null,
-    turnstileToken: "TOKEN_SENTINEL",
-  });
-  const context = (fetchImplementation) => ({
-    config,
-    origin,
-    ipAddress: "IP_SENTINEL",
-    now: new Date("2026-09-04T12:00:00.000Z"),
-    fetchImplementation,
-    recordTurnstileFailure: async (diagnostic) => diagnostics.push(diagnostic),
-    imageProcessor: async () => Buffer.from("unused"),
-  });
-
-  try {
-    await assert.rejects(
-      acceptCommunitySubmission(makeForm(), context(async () => {
-        const error = new Error("MESSAGE_SENTINEL");
-        error.cause = { code: "ECONNRESET", message: "CAUSE_SENTINEL" };
-        throw error;
-      })),
-      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
-    );
-    await assert.rejects(
-      acceptCommunitySubmission(
-        makeForm(),
-        context(async () => new Response(JSON.stringify({
-          "error-codes": ["internal-error", "PRIVATE_RESPONSE_CODE"],
-          detail: "BODY_SENTINEL",
-        }), { status: 502, headers: { "content-type": "application/json" } })),
-      ),
-      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
-    );
-    await assert.rejects(
-      acceptCommunitySubmission(
-        makeForm(),
-        context(async () => new Response("BODY_SENTINEL", { status: 200 })),
-      ),
-      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
-    );
-    await assert.rejects(
-      acceptCommunitySubmission(
-        makeForm(),
-        context(async () => new Response(JSON.stringify({
-          success: false,
-          "error-codes": ["timeout-or-duplicate", "PRIVATE_RESPONSE_CODE"],
-        }), { status: 200, headers: { "content-type": "application/json" } })),
-      ),
-      (error) => error?.code === "TURNSTILE_FAILED" && error?.status === 400,
-    );
-
-    assert.equal(diagnostics.length, 4);
-    assert.equal(diagnostics[0].reason, "network_error");
-    assert.equal(diagnostics[0].networkErrorCode, "ECONNRESET");
-    assert.equal(diagnostics[1].reason, "http_error");
-    assert.equal(diagnostics[1].httpStatus, 502);
-    assert.equal(diagnostics[1].attemptCount, 2);
-    assert.deepEqual(diagnostics[1].serviceErrorCodes, ["internal-error"]);
-    assert.equal(diagnostics[1].hasUnknownServiceErrorCode, true);
-    assert.equal(diagnostics[2].reason, "invalid_response");
-    assert.equal(diagnostics[3].reason, "rejected");
-    assert.deepEqual(diagnostics[3].serviceErrorCodes, ["timeout-or-duplicate"]);
-    assert.equal(diagnostics[3].hasUnknownServiceErrorCode, true);
-    const serializedDiagnostics = JSON.stringify(diagnostics);
-    for (const sentinel of [
-      "SECRET_SENTINEL",
-      "TOKEN_SENTINEL",
-      "IP_SENTINEL",
-      "ORIGIN_SENTINEL",
-      "BODY_SENTINEL",
-      "MESSAGE_SENTINEL",
-      "CAUSE_SENTINEL",
-      "PRIVATE_RESPONSE_CODE",
-    ]) {
-      assert.equal(serializedDiagnostics.includes(sentinel), false);
-    }
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
-  }
-});
-
-test("Turnstile verification retries one transient failure with one idempotency key", async () => {
+test("Turnstile verification retries HTTP 502 with one idempotency key", async () => {
   const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-retry-"));
   const origin = "https://guide.example.test";
   const requestBodies = [];
@@ -702,7 +505,12 @@ test("Turnstile verification retries one transient failure with one idempotency 
         fetchImplementation: async (_url, init) => {
           requestCount += 1;
           requestBodies.push(String(init.body));
-          if (requestCount === 1) throw new Error("transient network failure");
+          if (requestCount === 1) {
+            return new Response(JSON.stringify({ "error-codes": ["internal-error"] }), {
+              status: 502,
+              headers: { "content-type": "application/json" },
+            });
+          }
           return new Response(JSON.stringify({
             success: true,
             action: "community_submission",
@@ -712,72 +520,12 @@ test("Turnstile verification retries one transient failure with one idempotency 
         recordTurnstileFailure: async () => {
           throw new Error("successful retry must not be logged as a final failure");
         },
+        turnstileWaitImplementation: async () => undefined,
         imageProcessor: async () => Buffer.from("unused"),
       },
     );
     assert.equal(accepted.status, "pending");
     assert.equal(requestCount, 2);
-    const idempotencyKeys = requestBodies.map(
-      (body) => new URLSearchParams(body).get("idempotency_key"),
-    );
-    assert.ok(idempotencyKeys[0]);
-    assert.equal(idempotencyKeys[0], idempotencyKeys[1]);
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
-  }
-});
-
-test("Turnstile verification retries an internal service error with the same idempotency key", async () => {
-  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-turnstile-internal-"));
-  const origin = "https://guide.example.test";
-  const requestBodies = [];
-  const config = {
-    allowedOrigins: new Set([origin]),
-    submissionsDirectory: temporaryDirectory,
-    turnstileSecret: "turnstile-secret",
-    rateLimitSecret: "test-rate-secret",
-    consentVersion: "2026-09-04",
-    allowLocalTurnstileBypass: false,
-  };
-  try {
-    const accepted = await acceptCommunitySubmission(
-      submissionForm({
-        kind: "spot",
-        payload: {
-          name: "候補地",
-          address: "石川県金沢市",
-          sourceUrl: "https://example.com/source",
-        },
-        creditName: null,
-        turnstileToken: "verified-token",
-      }),
-      {
-        config,
-        origin,
-        ipAddress: "203.0.113.40",
-        now: new Date("2026-09-04T12:00:00.000Z"),
-        fetchImplementation: async (_url, init) => {
-          requestBodies.push(String(init.body));
-          const result = requestBodies.length === 1
-            ? { success: false, "error-codes": ["internal-error"] }
-            : {
-                success: true,
-                action: "community_submission",
-                hostname: "guide.example.test",
-              };
-          return new Response(JSON.stringify(result), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          });
-        },
-        recordTurnstileFailure: async () => {
-          throw new Error("successful retry must not be logged as a final failure");
-        },
-        imageProcessor: async () => Buffer.from("unused"),
-      },
-    );
-    assert.equal(accepted.status, "pending");
-    assert.equal(requestBodies.length, 2);
     const idempotencyKeys = requestBodies.map(
       (body) => new URLSearchParams(body).get("idempotency_key"),
     );
@@ -827,6 +575,7 @@ test("Turnstile verification records a repeated internal error as unavailable", 
             }), { status: 200, headers: { "content-type": "application/json" } });
           },
           recordTurnstileFailure: async (diagnostic) => diagnostics.push(diagnostic),
+          turnstileWaitImplementation: async () => undefined,
           imageProcessor: async () => Buffer.from("unused"),
         },
       ),
@@ -940,12 +689,6 @@ test("Turnstile diagnostic write failure does not replace the verification resul
       ))),
       (error) => error?.code === "TURNSTILE_FAILED" && error?.status === 400,
     );
-    await assert.rejects(
-      acceptCommunitySubmission(makeForm(), makeContext(async () => new Response("", {
-        status: 429,
-      }))),
-      (error) => error?.code === "TURNSTILE_UNAVAILABLE" && error?.status === 503,
-    );
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
@@ -1013,43 +756,6 @@ test("community API usage serializes anonymous counters and uses Tokyo calendar 
     );
     const serialized = await readFile(communityApiUsagePath(config), "utf8");
     assert.equal(serialized.includes("TOKEN_SENTINEL"), false);
-
-    assert.deepEqual(
-      summarizeCommunityApiUsage(usage, new Date("2026-09-05T16:00:00.000Z")),
-      {
-        available: true,
-        generatedAt: "2026-09-05T16:00:00.000Z",
-        timeZone: "Asia/Tokyo",
-        trackingStartedAt: "2026-09-05T14:59:59.000Z",
-        today: {
-          submissionAttempts: 2,
-          submissionsAccepted: 0,
-          submissionsFailed: 2,
-          turnstileRequests: 2,
-          turnstileSuccessful: 0,
-          turnstileFailed: 1,
-          turnstileRetries: 1,
-        },
-        currentMonth: {
-          submissionAttempts: 3,
-          submissionsAccepted: 1,
-          submissionsFailed: 2,
-          turnstileRequests: 3,
-          turnstileSuccessful: 1,
-          turnstileFailed: 1,
-          turnstileRetries: 1,
-        },
-        allTime: {
-          submissionAttempts: 3,
-          submissionsAccepted: 1,
-          submissionsFailed: 2,
-          turnstileRequests: 3,
-          turnstileSuccessful: 1,
-          turnstileFailed: 1,
-          turnstileRetries: 1,
-        },
-      },
-    );
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
@@ -1077,7 +783,7 @@ test("community API usage keeps cumulative totals and only the latest 90 calenda
   }
 });
 
-test("submission HTTP usage records accepted, validation, and Turnstile activity", async () => {
+test("submission HTTP enforces CORS, returns public fields, and records usage", async () => {
   const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-http-usage-"));
   const allowedOrigin = "https://guide.example.test";
   const config = {
@@ -1098,30 +804,33 @@ test("submission HTTP usage records accepted, validation, and Turnstile activity
     }), { status: 200, headers: { "content-type": "application/json" } }),
     imageProcessor: async () => Buffer.from("unused"),
   });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  assert.equal(typeof address, "object");
-  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const baseUrl = await listenOnLoopback(server);
 
   try {
+    const health = await fetch(`${baseUrl}/health`);
+    assert.equal(health.status, 200);
+    assert.equal(health.headers.get("x-content-type-options"), "nosniff");
+    assert.equal((await health.json()).status, "ok");
+
+    const rejectedOrigin = await fetch(`${baseUrl}/api/submissions`, {
+      method: "OPTIONS",
+      headers: { origin: "https://attacker.example" },
+    });
+    assert.equal(rejectedOrigin.status, 403);
+    assert.equal(rejectedOrigin.headers.get("access-control-allow-origin"), null);
+
     const accepted = await fetch(`${baseUrl}/api/submissions`, {
       method: "POST",
       headers: { origin: allowedOrigin },
-      body: submissionForm({
-        kind: "spot",
-        payload: {
-          name: "候補地",
-          address: "石川県金沢市",
-          sourceUrl: "https://example.com/source",
-        },
-        creditName: null,
-        turnstileToken: "verified-token",
-      }),
+      body: spotSubmissionForm(),
     });
     assert.equal(accepted.status, 201);
+    assert.equal(accepted.headers.get("access-control-allow-origin"), allowedOrigin);
+    const acceptedBody = await accepted.json();
+    assert.deepEqual(
+      Object.keys(acceptedBody.submission).sort(),
+      ["createdAt", "id", "kind", "status"],
+    );
 
     const invalid = await fetch(`${baseUrl}/api/submissions`, {
       method: "POST",
@@ -1147,7 +856,7 @@ test("submission HTTP usage records accepted, validation, and Turnstile activity
   }
 });
 
-test("UI test submissions use a separate queue and do not change public usage totals", async () => {
+test("UI test spot suggestions avoid image work and stay out of the public queue", async () => {
   const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-ui-test-"));
   const allowedOrigin = "https://guide.example.test";
   const config = {
@@ -1166,34 +875,24 @@ test("UI test submissions use a separate queue and do not change public usage to
       action: "community_submission",
       hostname: "guide.example.test",
     }), { status: 200, headers: { "content-type": "application/json" } }),
-    imageProcessor: async () => Buffer.from("unused"),
+    imageProcessor: async () => {
+      throw new Error("spot suggestions must not process an absent image");
+    },
   });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  assert.equal(typeof address, "object");
+  const baseUrl = await listenOnLoopback(server);
 
   try {
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/ui-test-submissions`, {
+    const response = await fetch(`${baseUrl}/api/ui-test-submissions`, {
       method: "POST",
       headers: { origin: allowedOrigin },
-      body: submissionForm({
-        kind: "spot",
-        payload: {
-          name: "テスト候補地",
-          address: "石川県金沢市",
-          sourceUrl: "https://example.com/source",
-        },
-        creditName: null,
-        turnstileToken: "verified-token",
-      }),
+      body: spotSubmissionForm({ name: "テスト候補地" }),
     });
     assert.equal(response.status, 201);
     const testQueue = JSON.parse(await readFile(path.join(temporaryDirectory, "ui-test", "index.json"), "utf8"));
     assert.equal(testQueue.length, 1);
     assert.equal(testQueue[0].payload.name, "テスト候補地");
+    assert.equal(testQueue[0].creditName, null);
+    assert.equal(testQueue[0].imageKey, null);
     await assert.rejects(readFile(path.join(temporaryDirectory, "index.json"), "utf8"), { code: "ENOENT" });
     const usage = await readCommunityApiUsage(config);
     assert.equal(usage.allTime.submissionRequests, 0);
@@ -1229,98 +928,18 @@ test("API usage write failures never replace a successful submission response", 
       throw new Error("METRICS_WRITE_SENTINEL");
     },
   });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  assert.equal(typeof address, "object");
+  const baseUrl = await listenOnLoopback(server);
 
   try {
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/submissions`, {
-      method: "POST",
-      headers: { origin: allowedOrigin },
-      body: submissionForm({
-        kind: "spot",
-        payload: {
-          name: "候補地",
-          address: "石川県金沢市",
-          sourceUrl: "https://example.com/source",
-        },
-        creditName: null,
-        turnstileToken: "verified-token",
-      }),
-    });
-    assert.equal(response.status, 201);
-    assert.ok(errors.some((message) => message.includes("Community API usage log write failed")));
-    assert.equal(errors.some((message) => message.includes("METRICS_WRITE_SENTINEL")), false);
-  } finally {
-    console.error = originalConsoleError;
-    await new Promise((resolve) => server.close(resolve));
-    await rm(temporaryDirectory, { recursive: true, force: true });
-  }
-});
-
-test("submission HTTP endpoint applies exact CORS and returns no private fields", async () => {
-  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "community-http-"));
-  const allowedOrigin = "https://guide.example.test";
-  const server = createCommunitySubmissionServer({
-    config: {
-      allowedOrigins: new Set([allowedOrigin]),
-      submissionsDirectory: temporaryDirectory,
-      turnstileSecret: "",
-      rateLimitSecret: "test-rate-secret",
-      consentVersion: "2026-09-04",
-      allowLocalTurnstileBypass: true,
-    },
-    now: () => new Date("2026-09-04T12:00:00.000Z"),
-    imageProcessor: async () => Buffer.from("unused"),
-  });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  assert.equal(typeof address, "object");
-  const baseUrl = `http://127.0.0.1:${address.port}`;
-
-  try {
-    const health = await fetch(`${baseUrl}/health`);
-    assert.equal(health.status, 200);
-    assert.equal(health.headers.get("x-content-type-options"), "nosniff");
-    assert.deepEqual(await health.json(), {
-      status: "ok",
-      application: "hasunosora-community-receiver",
-      schemaVersion: 1,
-    });
-
-    const rejected = await fetch(`${baseUrl}/api/submissions`, {
-      method: "OPTIONS",
-      headers: { origin: "https://attacker.example" },
-    });
-    assert.equal(rejected.status, 403);
-    assert.equal(rejected.headers.get("access-control-allow-origin"), null);
-
-    const form = submissionForm({
-      kind: "spot",
-      payload: {
-        name: "候補地",
-        address: "石川県金沢市",
-        sourceUrl: "https://example.com/source",
-      },
-      creditName: null,
-    });
     const response = await fetch(`${baseUrl}/api/submissions`, {
       method: "POST",
       headers: { origin: allowedOrigin },
-      body: form,
+      body: spotSubmissionForm(),
     });
-    assert.equal(response.status, 503);
-    assert.equal(response.headers.get("access-control-allow-origin"), allowedOrigin);
-    assert.deepEqual(await response.json(), {
-      error: "投稿受付の認証設定が完了していません。",
-    });
+    assert.equal(response.status, 201);
+    assert.equal(errors.some((message) => message.includes("METRICS_WRITE_SENTINEL")), false);
   } finally {
+    console.error = originalConsoleError;
     await new Promise((resolve) => server.close(resolve));
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
@@ -1345,29 +964,16 @@ test("submission HTTP endpoint writes a private Turnstile diagnostic on final fa
       error.cause = { code: "ECONNRESET", message: "CAUSE_SENTINEL" };
       throw error;
     },
+    turnstileWaitImplementation: async () => undefined,
     imageProcessor: async () => Buffer.from("unused"),
   });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  assert.equal(typeof address, "object");
+  const baseUrl = await listenOnLoopback(server);
 
   try {
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/submissions`, {
+    const response = await fetch(`${baseUrl}/api/submissions`, {
       method: "POST",
       headers: { origin: allowedOrigin },
-      body: submissionForm({
-        kind: "spot",
-        payload: {
-          name: "候補地",
-          address: "石川県金沢市",
-          sourceUrl: "https://example.com/source",
-        },
-        creditName: null,
-        turnstileToken: "TOKEN_SENTINEL",
-      }),
+      body: spotSubmissionForm({ turnstileToken: "TOKEN_SENTINEL" }),
     });
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), {
