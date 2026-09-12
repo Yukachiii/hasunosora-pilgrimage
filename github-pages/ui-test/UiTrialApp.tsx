@@ -256,11 +256,7 @@ function PageLink({ page, currentPage, onNavigate, children }: {
 function Brand(): ReactElement {
   return (
     <button className="ui-trial__brand" type="button" aria-label="蓮ノ旅 探すページ">
-      <span aria-hidden="true">蓮</span>
-      <span>
-        <strong>蓮ノ旅</strong>
-        <small>HASUNOSORA PILGRIMAGE GUIDE</small>
-      </span>
+      <img className="ui-trial__header-logo" src={assetUrl("brand/hero-logo-c.png")} alt="" aria-hidden="true" />
     </button>
   );
 }
