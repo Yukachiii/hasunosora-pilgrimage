@@ -15,7 +15,18 @@ PowerShellから起動する場合は次のとおりです。
 .\start-admin.ps1
 ```
 
-サーバー機では、先に管理サーバーを8766番で起動しておいてください。SSHトンネルを使わず、このPCの作業コピーに対して管理画面を起動する開発用モードは次のとおりです。
+サーバー機では、先に管理サーバーを8766番で起動しておいてください。`yuimarine@192.168.0.4` のWindowsへログインしたとき自動起動させる場合は、サーバー機のプロジェクト直下で `install-admin-autostart.bat` を1回実行します。現在のプロジェクトを呼び出すBATが、そのWindowsユーザーのスタートアップフォルダーへ登録されます。
+
+PowerShellから登録する場合は次のとおりです。管理者権限やWindowsパスワードの入力は不要です。
+
+```powershell
+Set-Location -LiteralPath 'C:\Users\Yuimarine\pilgrimage-system'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\install-admin-autostart.ps1'
+```
+
+次回ログインから `start-admin-server.bat` のウィンドウが表示され、管理画面をビルドして `127.0.0.1:8766` で起動します。このウィンドウを閉じると管理サーバーも停止します。ログイン前には起動しないため、Windows再起動後は `Yuimarine` ユーザーでログインしてください。今すぐ起動するときは、サーバー機で `start-admin-server.bat` をダブルクリックします。
+
+SSHトンネルを使わず、このPCの作業コピーに対して管理画面を起動する開発用モードは次のとおりです。
 
 ```powershell
 .\start-admin.ps1 local

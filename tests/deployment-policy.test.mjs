@@ -24,3 +24,17 @@ test("automatic update state cannot be committed", () => {
 
   assert.equal(result.status, 0, result.stderr);
 });
+
+test("the Windows startup launcher keeps the private admin server visible and loopback-only", async () => {
+  const [installer, launcher] = await Promise.all([
+    readFile(new URL("../install-admin-autostart.ps1", import.meta.url), "utf8"),
+    readFile(new URL("../start-admin-server.bat", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(installer, /\[Environment\+SpecialFolder\]::Startup/);
+  assert.match(installer, /Hasunosora Admin Server\.cmd/);
+  assert.match(installer, /call \"\{0\}\"/);
+  assert.match(launcher, /node\.exe "server\.mjs" --bind 127\.0\.0\.1 --port 8766/);
+  assert.match(launcher, /Keep this window open/);
+  assert.doesNotMatch(launcher, /--bind 0\.0\.0\.0/);
+});
