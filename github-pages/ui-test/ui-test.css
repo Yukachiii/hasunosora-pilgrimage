@@ -5397,6 +5397,18 @@ a {
     font-size: 16px;
   }
 
+  .ui-trial__planner-fields input[type="date"],
+  .ui-trial__planner-fields input[type="time"] {
+    padding: 0;
+    text-align: center;
+  }
+
+  .ui-trial__planner-fields input[type="date"]::-webkit-date-and-time-value,
+  .ui-trial__planner-fields input[type="time"]::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: center;
+  }
+
   .ui-trial__planner-fields label:last-child:nth-child(5) {
     grid-column: 1 / -1;
   }
