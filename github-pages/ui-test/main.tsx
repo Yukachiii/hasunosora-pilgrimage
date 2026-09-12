@@ -78,6 +78,8 @@ createRoot(document.getElementById("root")!).render(
         communityApiUrl={communityApiUrl}
         turnstileSiteKey={turnstileSiteKey}
         communitySubmissionsEnabled={Boolean(communityApiUrl)}
+        runtime="test"
+        submissionPath="/api/ui-test-submissions"
       />
     </TrialAppErrorBoundary>
   </StrictMode>,

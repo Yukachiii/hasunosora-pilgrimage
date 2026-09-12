@@ -42,6 +42,7 @@ test("public release metadata uses one version and one canonical origin", async 
 test("non-production pages cannot be indexed", async () => {
   const trialEntries = await Promise.all([
     readText("../github-pages/guide-test/index.html"),
+    readText("../github-pages/legacy/index.html"),
     readText("../github-pages/ui-test/index.html"),
   ]);
 
@@ -54,7 +55,7 @@ test("public metadata and guide pages refer only to existing assets", async () =
   const [siteRaw, manifestRaw, publicGuide, trialGuide] = await Promise.all([
     readText("../content/site.json"),
     readText("../public/site.webmanifest"),
-    readText("../app/PilgrimageApp.tsx"),
+    readText("../github-pages/ui-test/UiTrialApp.tsx"),
     readText("../github-pages/guide-test/GuideTestPage.tsx"),
   ]);
   const site = JSON.parse(siteRaw);
@@ -84,4 +85,20 @@ test("public metadata and guide pages refer only to existing assets", async () =
   assert.ok(guideImages.size > 0, "no guide images are referenced");
   await Promise.all([...guideImages].map((image) =>
     access(new URL(`../public/guide/${image}`, import.meta.url))));
+});
+
+test("production and UI test entries use separate persistence and submission targets", async () => {
+  const [productionEntry, testEntry, planner] = await Promise.all([
+    readText("../github-pages/main.tsx"),
+    readText("../github-pages/ui-test/main.tsx"),
+    readText("../github-pages/ui-test/use-live-planner.ts"),
+  ]);
+
+  assert.ok(productionEntry.includes('runtime="production"'));
+  assert.ok(productionEntry.includes('submissionPath="/api/submissions"'));
+  assert.ok(!productionEntry.includes('submissionPath="/api/ui-test-submissions"'));
+  assert.ok(testEntry.includes('runtime="test"'));
+  assert.ok(testEntry.includes('submissionPath="/api/ui-test-submissions"'));
+  assert.ok(planner.includes("PLANNER_DRAFT_COOKIE_KEY"));
+  assert.ok(planner.includes("TEST_PLANNER_STORAGE_KEY"));
 });

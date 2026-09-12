@@ -678,6 +678,10 @@ a {
   padding: 32px 0 44px;
 }
 
+.ui-trial__planner[hidden] {
+  display: none !important;
+}
+
 .ui-trial__planner-summary > h1 {
   margin: 26px 0 6px;
   font-family: var(--trial-serif);

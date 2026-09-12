@@ -6,11 +6,11 @@ import {
 } from "react";
 import { createRoot } from "react-dom/client";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { spots } from "../app/spots";
-import mediaAssets from "../content/media.json";
-import siteSettings from "../content/site.json";
-import { UiTrialApp } from "./ui-test/UiTrialApp";
-import "./ui-test/ui-test.css";
+import { PilgrimageApp } from "../../app/PilgrimageApp";
+import { spots } from "../../app/spots";
+import mediaAssets from "../../content/media.json";
+import siteSettings from "../../content/site.json";
+import "../../app/globals.css";
 
 type PublicMediaAsset = {
   placement: string;
@@ -22,13 +22,41 @@ type PublicMediaAsset = {
 const publicMediaAssets = mediaAssets as PublicMediaAsset[];
 
 const photoModules = import.meta.glob(
-  "../public/photos/**/*.{jpg,jpeg,png,webp}",
+  "../../public/photos/**/*.{jpg,jpeg,png,webp}",
   { eager: true, query: "?url", import: "default" },
 ) as Record<string, string>;
 
 function resolvePhotoUrl(source?: string | null) {
   if (!source?.startsWith("/photos/")) return undefined;
-  return photoModules[`../public${source}`];
+  return photoModules[`../../public${source}`];
+}
+
+function uniquePhotoUrls(sources: Array<string | undefined>) {
+  return Array.from(new Set(sources.filter((source): source is string => Boolean(source))));
+}
+
+function chooseHeroIndex(heroImages: string[]) {
+  if (heroImages.length < 2) return 0;
+
+  const storageKey = "hasunosora-pilgrimage.hero-image.v1";
+  let previousImage = "";
+  try {
+    previousImage = window.localStorage.getItem(storageKey) ?? "";
+  } catch {
+    // Browsers can block storage while still allowing the page to render.
+  }
+
+  const candidateIndexes = heroImages.flatMap((image, index) =>
+    image === previousImage ? [] : [index],
+  );
+  const index = candidateIndexes[Math.floor(Math.random() * candidateIndexes.length)] ?? 0;
+
+  try {
+    window.localStorage.setItem(storageKey, heroImages[index]);
+  } catch {
+    // Random selection itself does not depend on storage being available.
+  }
+  return index;
 }
 
 const publicSpots = spots.map((spot) => ({
@@ -51,10 +79,15 @@ const photoCredits = publicMediaAssets.reduce<Record<string, string>>((credits, 
   return credits;
 }, {});
 
+const heroImages = uniquePhotoUrls([
+  resolvePhotoUrl(siteSettings.heroImage),
+  ...siteSettings.heroImages.map(resolvePhotoUrl),
+]);
+const initialHeroIndex = chooseHeroIndex(heroImages);
 const communityApiUrl = import.meta.env.VITE_COMMUNITY_API_URL?.trim() ?? "";
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
 
-class PublicAppErrorBoundary extends Component<
+class LegacyAppErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }
 > {
@@ -65,17 +98,17 @@ class PublicAppErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Public application rendering failed", error, info.componentStack);
+    console.error("Legacy public application rendering failed", error, info.componentStack);
   }
 
   render() {
     if (this.state.failed) {
       return (
-        <main className="ui-trial__error" role="alert">
+        <main className="public-app-error" role="alert">
           <span aria-hidden="true">蓮</span>
           <small>DISPLAY RECOVERY</small>
-          <h1>画面を表示できませんでした</h1>
-          <p>予定はこの端末に保存されています。再読み込みしてください。</p>
+          <h1>画面の表示を続けられませんでした</h1>
+          <p>予定はこの端末に保存されています。再読み込みして、もう一度お試しください。</p>
           <button type="button" onClick={() => window.location.reload()}>
             再読み込み
           </button>
@@ -88,18 +121,21 @@ class PublicAppErrorBoundary extends Component<
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <PublicAppErrorBoundary>
-      <UiTrialApp
+    <LegacyAppErrorBoundary>
+      <PilgrimageApp
+        mapboxConfig={{
+          accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "",
+        }}
         spots={publicSpots}
         spotPhotoGroups={spotPhotoGroups}
         photoCredits={photoCredits}
+        heroImages={heroImages}
+        initialHeroIndex={initialHeroIndex}
         siteVersion={siteSettings.version}
         communityApiUrl={communityApiUrl}
         turnstileSiteKey={turnstileSiteKey}
         communitySubmissionsEnabled={Boolean(communityApiUrl)}
-        runtime="production"
-        submissionPath="/api/submissions"
       />
-    </PublicAppErrorBoundary>
+    </LegacyAppErrorBoundary>
   </StrictMode>,
 );

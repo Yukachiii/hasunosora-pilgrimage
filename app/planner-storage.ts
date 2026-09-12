@@ -1,4 +1,4 @@
-import type { TravelMode } from "./route-planner";
+import { maximumItineraryStops, type TravelMode } from "./route-planner.ts";
 
 export const PLANNER_DRAFT_COOKIE_KEY = "hasunosora_planner_v2";
 
@@ -252,7 +252,7 @@ function sanitizePlannerDay(
     itineraryIds: Array.isArray(candidate.itineraryIds)
       ? Array.from(new Set(candidate.itineraryIds.filter(
         (id): id is string => typeof id === "string" && validSpotIds.has(id),
-      ))).slice(0, 27)
+      ))).slice(0, maximumItineraryStops)
       : [],
     hotelName: typeof candidate.hotelName === "string" ? candidate.hotelName.trim().slice(0, 120) : "",
     appointments: Array.isArray(candidate.appointments)
@@ -295,7 +295,9 @@ function sanitizeTransitLegProgress(value: unknown): TransitLegProgress {
 
 function sanitizeItineraryIds(value: unknown, validSpotIds: ReadonlySet<string>): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((id): id is string => typeof id === "string" && validSpotIds.has(id));
+  return Array.from(new Set(value.filter(
+    (id): id is string => typeof id === "string" && validSpotIds.has(id),
+  ))).slice(0, maximumItineraryStops);
 }
 
 function sanitizedPlannerDays(

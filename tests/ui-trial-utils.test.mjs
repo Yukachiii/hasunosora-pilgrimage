@@ -11,6 +11,11 @@ import {
   orderItemsByIds,
   retainCompletedSpotIds,
 } from "../github-pages/ui-test/trial-utils.ts";
+import {
+  restoreRouteCache,
+  routeCacheAfterDayRemoval,
+  routeResultAfterMapUpdate,
+} from "../github-pages/ui-test/route-cache.ts";
 
 test("the default trial card list includes every content record", async () => {
   const [cards, spots] = await Promise.all([
@@ -128,4 +133,81 @@ test("route calculation requires a real visit date", () => {
   assert.equal(hasValidVisitDate(""), false);
   assert.equal(hasValidVisitDate("2026-02-30"), false);
   assert.equal(hasValidVisitDate("2026-13-01"), false);
+});
+
+test("stored routes reject malformed result fields instead of restoring unsafe data", () => {
+  const spots = [{ id: "station" }, { id: "market" }];
+  const request = {
+    stops: [{ id: "station" }, { id: "market" }],
+    travelMode: "WALKING",
+    optimizeWaypointOrder: false,
+    stayMinutes: { station: 15, market: 35 },
+    departureTime: "2026-09-12T00:00:00.000Z",
+  };
+  const validResult = {
+    state: "success",
+    distance: "1 km",
+    duration: "12分",
+    travelDurationMinutes: 12,
+    accessDurationMinutes: 0,
+    legDurationMinutes: [12],
+    orderedStopIds: ["station", "market"],
+  };
+
+  assert.equal(
+    restoreRouteCache({ day: { request, result: validResult } }, spots, new Set(["day"]))
+      .day.result.state,
+    "success",
+  );
+  assert.deepEqual(
+    restoreRouteCache({ day: { request, result: { ...validResult, legDurationMinutes: ["12"] } } }, spots),
+    {},
+  );
+  assert.deepEqual(
+    restoreRouteCache({ day: { request, result: { ...validResult, orderedStopIds: ["station", "station"] } } }, spots),
+    {},
+  );
+  assert.deepEqual(
+    restoreRouteCache({ day: { request, result: { state: "external" } } }, spots),
+    {},
+  );
+});
+
+test("a cached usable route survives a background map refresh failure", () => {
+  const cached = {
+    state: "success",
+    distance: "1 km",
+    duration: "12分",
+    legDurationMinutes: [12],
+    orderedStopIds: ["station", "market"],
+  };
+
+  assert.equal(routeResultAfterMapUpdate(cached, { state: "loading" }, true), cached);
+  assert.equal(routeResultAfterMapUpdate(cached, { state: "error", message: "offline" }, true), cached);
+  assert.equal(routeResultAfterMapUpdate(cached, { state: "fallback", message: "offline" }, true), cached);
+
+  const refreshed = { ...cached, duration: "10分", legDurationMinutes: [10] };
+  assert.equal(routeResultAfterMapUpdate(cached, refreshed, true), refreshed);
+  assert.deepEqual(
+    routeResultAfterMapUpdate({ state: "loading" }, { state: "error", message: "offline" }, true),
+    { state: "error", message: "offline" },
+  );
+  assert.deepEqual(
+    routeResultAfterMapUpdate(cached, { state: "error", message: "stale route" }, false),
+    { state: "error", message: "stale route" },
+  );
+});
+
+test("removing a day restores the remaining active day's cached route", () => {
+  const dayOne = { request: { requestId: 1 }, result: { state: "success", duration: "10分" } };
+  const dayTwo = { request: { requestId: 2 }, result: { state: "success", duration: "20分" } };
+
+  const transition = routeCacheAfterDayRemoval(
+    { "day-1": dayOne, "day-2": dayTwo },
+    "day-1",
+    "day-2",
+  );
+
+  assert.deepEqual(transition.routes, { "day-2": dayTwo });
+  assert.equal(transition.activeRoute, dayTwo);
 });

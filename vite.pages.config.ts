@@ -16,6 +16,7 @@ export default defineConfig({
       input: {
         main: resolve("github-pages/index.html"),
         guideTest: resolve("github-pages/guide-test/index.html"),
+        legacy: resolve("github-pages/legacy/index.html"),
         uiTest: resolve("github-pages/ui-test/index.html"),
       },
     },
