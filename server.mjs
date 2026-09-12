@@ -321,32 +321,28 @@ function officialUrl(value) {
   return text;
 }
 
-function validateSpot(value, spotId, current) {
+function assertSpotValue(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new AdminError("スポット情報が正しくありません。");
   }
-  const category = requiredText(value.category, "カテゴリ", 30);
+}
+
+function validatedSpotCategory(value) {
+  const category = requiredText(value, "カテゴリ", 30);
   if (!allowedCategories.has(category)) throw new AdminError("カテゴリが正しくありません。");
-  const activityRecords = optionalTextList(
-    value.activityRecords,
-    current.activityRecords,
-    "活動記録",
-  );
-  const sehasEpisodes = optionalTextList(
-    value.sehasEpisodes,
-    current.sehasEpisodes,
-    "せーはす！放送回",
-  );
-  const withMeetsEpisodes = optionalTextList(
-    value.withMeetsEpisodes,
-    current.withMeetsEpisodes,
-    "With×MEETS配信回",
-  );
-  const normalizedAppearances = optionalTextList(
-    value.appearances,
-    current.appearances,
-    "カード・その他の登場情報",
-  );
+  return category;
+}
+
+function validatedSpotAppearances(value, current) {
+  return {
+    activityRecords: optionalTextList(value.activityRecords, current.activityRecords, "活動記録"),
+    sehasEpisodes: optionalTextList(value.sehasEpisodes, current.sehasEpisodes, "せーはす！放送回"),
+    withMeetsEpisodes: optionalTextList(value.withMeetsEpisodes, current.withMeetsEpisodes, "With×MEETS配信回"),
+    appearances: optionalTextList(value.appearances, current.appearances, "カード・その他の登場情報"),
+  };
+}
+
+function validatedOpeningHours(value) {
   const openingTime = optionalTime(value.openingTime, "営業開始時刻");
   const closingTime = optionalTime(value.closingTime, "営業終了時刻");
   if (Boolean(openingTime) !== Boolean(closingTime)) {
@@ -355,6 +351,14 @@ function validateSpot(value, spotId, current) {
   if (openingTime && closingTime && openingTime >= closingTime) {
     throw new AdminError("営業終了時刻は開始時刻より後にしてください。");
   }
+  return { openingTime, closingTime };
+}
+
+function validateSpot(value, spotId, current) {
+  assertSpotValue(value);
+  const category = validatedSpotCategory(value.category);
+  const appearances = validatedSpotAppearances(value, current);
+  const openingHours = validatedOpeningHours(value);
   return {
     ...current,
     id: spotId,
@@ -370,17 +374,16 @@ function validateSpot(value, spotId, current) {
       value.recommendedStayMinutes,
       current.recommendedStayMinutes,
     ),
-    openingTime,
-    closingTime,
+    ...openingHours,
     closedWeekdays: closedWeekdays(value.closedWeekdays),
     openingHoursNote: optionalText(value.openingHoursNote, "営業時間の補足", 300),
     openingHoursCheckedAt: optionalDate(value.openingHoursCheckedAt, "営業時間の確認日"),
-    activityRecords,
-    sehasEpisodes,
-    withMeetsEpisodes,
+    activityRecords: appearances.activityRecords,
+    sehasEpisodes: appearances.sehasEpisodes,
+    withMeetsEpisodes: appearances.withMeetsEpisodes,
     accessNote: requiredText(value.accessNote, "アクセス案内", 160),
     sourceUrl: officialUrl(value.sourceUrl),
-    appearances: normalizedAppearances,
+    appearances: appearances.appearances,
   };
 }
 
@@ -626,7 +629,7 @@ async function resetSpot(spotId, initialSpots) {
   });
 }
 
-async function saveMedia(payload) {
+function validatedMediaUpload(payload) {
   if (!payload || typeof payload !== "object") throw new AdminError("画像データが正しくありません。");
   const contentType = String(payload.contentType || "");
   const extension = new Map([["image/webp", "webp"], ["image/jpeg", "jpg"]]).get(contentType);
@@ -636,55 +639,80 @@ async function saveMedia(payload) {
   const imageBytes = Buffer.from(base64, "base64");
   if (!imageBytes.length || imageBytes.length > 5 * 1024 * 1024) throw new AdminError("公開用画像のサイズが正しくありません。");
   const metadata = payload.metadata && typeof payload.metadata === "object" ? payload.metadata : {};
+  return { extension, imageBytes, metadata };
+}
 
-  return withWriteLock(async () => {
-    const spots = await readJson(spotsPath, []);
-    const placement = metadata.placement === "hero" ? "hero" : "spot";
-    const spotId = placement === "spot" ? String(metadata.spotId || "") : "";
-    const spot = spots.find((item) => item.id === spotId);
-    if (placement === "spot" && !spot) throw new AdminError("配置するスポットを選んでください。");
+function mediaPlacement(metadata, spots) {
+  const placement = metadata.placement === "hero" ? "hero" : "spot";
+  const spotId = placement === "spot" ? String(metadata.spotId || "") : "";
+  const spot = spots.find((item) => item.id === spotId);
+  if (placement === "spot" && !spot) throw new AdminError("配置するスポットを選んでください。");
+  return { placement, spotId, spot };
+}
 
-    const assetId = randomBytes(8).toString("hex");
-    const directory = spotId || "hero";
-    const timestamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
-    const filename = `${timestamp}-${assetId}-watermarked.${extension}`;
-    const imageUrl = `/photos/${directory}/${filename}`;
-    const imagePath = safeChild(photosDirectory, `${directory}/${filename}`);
-    if (!imagePath) throw new AdminError("画像の保存先が正しくありません。");
-    const asset = {
-      id: assetId,
-      displayName: spot ? `${spot.name} 公開画像` : "タイトル背景",
-      placement,
-      spotId: spotId || null,
-      createdAt: new Date().toISOString(),
-      imageUrl,
-      cropX: Number(metadata.cropX) || 50,
-      cropY: Number(metadata.cropY) || 50,
-      zoom: Number(metadata.zoom) || 1,
-    };
+function createMediaAsset(metadata, placement, spotId, spot, extension) {
+  const assetId = randomBytes(8).toString("hex");
+  const directory = spotId || "hero";
+  const timestamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
+  const filename = `${timestamp}-${assetId}-watermarked.${extension}`;
+  const imageUrl = `/photos/${directory}/${filename}`;
+  const imagePath = safeChild(photosDirectory, `${directory}/${filename}`);
+  if (!imagePath) throw new AdminError("画像の保存先が正しくありません。");
+  const asset = {
+    id: assetId,
+    displayName: spot ? `${spot.name} 公開画像` : "タイトル背景",
+    placement,
+    spotId: spotId || null,
+    createdAt: new Date().toISOString(),
+    imageUrl,
+    cropX: Number(metadata.cropX) || 50,
+    cropY: Number(metadata.cropY) || 50,
+    zoom: Number(metadata.zoom) || 1,
+  };
+  return { asset, imagePath };
+}
 
-    await writeBytesAtomic(imagePath, imageBytes);
-    try {
-      const media = await readJson(mediaPath, []);
-      media.unshift(asset);
-      if (spot) {
-        spot.imageUrl = imageUrl;
-        spot.imagePosition = "center center";
-        await writeJsonIfChanged(spotsPath, spots);
-      } else {
-        const site = await readJson(sitePath, { heroImage: null, heroImages: [] });
-        const heroImages = siteHeroImages(site);
-        if (!heroImages.includes(imageUrl)) heroImages.push(imageUrl);
-        updateSiteHeroImages(site, heroImages);
-        await writeJsonIfChanged(sitePath, site);
-      }
-      await writeJsonIfChanged(mediaPath, media);
-    } catch (error) {
-      await rm(imagePath, { force: true });
-      throw error;
-    }
-    return serializeAsset(asset, placement === "hero" ? new Set([imageUrl]) : undefined);
-  });
+async function persistMediaReferences({ asset, placement, spot, spots }) {
+  const media = await readJson(mediaPath, []);
+  media.unshift(asset);
+  if (spot) {
+    spot.imageUrl = asset.imageUrl;
+    spot.imagePosition = "center center";
+    await writeJsonIfChanged(spotsPath, spots);
+  } else {
+    const site = await readJson(sitePath, { heroImage: null, heroImages: [] });
+    const heroImages = siteHeroImages(site);
+    if (!heroImages.includes(asset.imageUrl)) heroImages.push(asset.imageUrl);
+    updateSiteHeroImages(site, heroImages);
+    await writeJsonIfChanged(sitePath, site);
+  }
+  await writeJsonIfChanged(mediaPath, media);
+  return serializeAsset(asset, placement === "hero" ? new Set([asset.imageUrl]) : undefined);
+}
+
+async function persistMediaUpload({ extension, imageBytes, metadata }) {
+  const spots = await readJson(spotsPath, []);
+  const placement = mediaPlacement(metadata, spots);
+  const created = createMediaAsset(
+    metadata, placement.placement, placement.spotId, placement.spot, extension,
+  );
+  await writeBytesAtomic(created.imagePath, imageBytes);
+  try {
+    return await persistMediaReferences({
+      asset: created.asset,
+      placement: placement.placement,
+      spot: placement.spot,
+      spots,
+    });
+  } catch (error) {
+    await rm(created.imagePath, { force: true });
+    throw error;
+  }
+}
+
+async function saveMedia(payload) {
+  const upload = validatedMediaUpload(payload);
+  return withWriteLock(async () => persistMediaUpload(upload));
 }
 
 async function setMediaHeroCandidate(assetId, enabled) {
@@ -1019,311 +1047,343 @@ async function rejectCommunitySubmission(submissionId, payload) {
   });
 }
 
+async function readCommunityImportData() {
+  const spots = await readJson(spotsPath, []);
+  const media = await readJson(mediaPath, []);
+  const transitNames = await readJson(transitNamesPath, {});
+  if (!Array.isArray(spots) || !Array.isArray(media) || !transitNames || typeof transitNames !== "object") {
+    throw new AdminError("公開データを読み込めませんでした。");
+  }
+  return {
+    spots,
+    media,
+    transitNames,
+    originalSpots: structuredClone(spots),
+    originalMedia: structuredClone(media),
+    originalTransitNames: structuredClone(transitNames),
+    importedSpot: undefined,
+    asset: undefined,
+    publicImagePath: "",
+  };
+}
+
+async function prepareCommunityImage(submission, spot, createdAt) {
+  const imageBytes = await createAttributedCommunityImage(
+    await readCommunityImage(submission),
+    submission.creditName,
+  );
+  const assetId = randomBytes(8).toString("hex");
+  const timestamp = createdAt.replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
+  const filename = `${timestamp}-${assetId}-community.webp`;
+  const imageUrl = `/photos/${spot.id}/${filename}`;
+  const publicImagePath = safeChild(photosDirectory, `${spot.id}/${filename}`) || "";
+  if (!publicImagePath) throw new AdminError("公開画像の保存先が正しくありません。");
+  return {
+    imageBytes,
+    publicImagePath,
+    asset: communityPhotoAsset(submission, spot, assetId, imageUrl, createdAt),
+  };
+}
+
+async function attachCommunityImage(data, submission, spot, createdAt) {
+  const prepared = await prepareCommunityImage(submission, spot, createdAt);
+  data.publicImagePath = prepared.publicImagePath;
+  data.asset = prepared.asset;
+  data.media.unshift(prepared.asset);
+  await writeBytesAtomic(prepared.publicImagePath, prepared.imageBytes);
+  return prepared.asset.imageUrl;
+}
+
+async function importCommunityPhoto(data, submission, payload, createdAt) {
+  const spotId = requiredText(payload?.spotId, "取り込み先スポット", 80);
+  if (!spotIdPattern.test(spotId)) throw new AdminError("取り込み先スポットが正しくありません。");
+  const spot = data.spots.find((item) => item.id === spotId);
+  if (!spot) throw new AdminError("取り込み先スポットが見つかりません。");
+  const imageUrl = await attachCommunityImage(data, submission, spot, createdAt);
+  if (spot.imageUrl) return;
+  spot.imageUrl = imageUrl;
+  spot.imagePosition = "center center";
+}
+
+async function importCommunitySpot(data, submission, payload, createdAt) {
+  const requestedSpot = payload?.spot;
+  assertSpotValue(requestedSpot);
+  const spotId = requiredText(requestedSpot.id, "スポットID", 80);
+  if (!spotIdPattern.test(spotId)) throw new AdminError("スポットIDが正しくありません。");
+  if (data.spots.some((item) => item.id === spotId)) throw new AdminError("同じスポットIDがすでにあります。");
+  const importedSpot = validateSpot(requestedSpot, spotId, {});
+  const transitSearchName = requiredText(
+    requestedSpot.transitSearchName || requestedSpot.name,
+    "経路検索名",
+    160,
+  );
+  if (submission.imageKey) {
+    importedSpot.imageUrl = await attachCommunityImage(data, submission, importedSpot, createdAt);
+    importedSpot.imagePosition = "center center";
+  }
+  data.importedSpot = importedSpot;
+  data.spots.push(importedSpot);
+  data.transitNames[spotId] = transitSearchName;
+}
+
+async function persistCommunityImport(data) {
+  await writeJsonIfChanged(spotsPath, data.spots);
+  await writeJsonIfChanged(mediaPath, data.media);
+  await writeJsonIfChanged(transitNamesPath, data.transitNames);
+}
+
+async function rollbackCommunityImport(data) {
+  if (data.publicImagePath) await rm(data.publicImagePath, { force: true }).catch(() => undefined);
+  await writeJsonIfChanged(spotsPath, data.originalSpots).catch(() => undefined);
+  await writeJsonIfChanged(mediaPath, data.originalMedia).catch(() => undefined);
+  await writeJsonIfChanged(transitNamesPath, data.originalTransitNames).catch(() => undefined);
+}
+
+function completeCommunityImport(submission, payload, createdAt, data) {
+  submission.status = "imported";
+  submission.reviewedAt = createdAt;
+  submission.reviewedBy = "local-admin";
+  submission.reviewNote = communityReviewNote(payload?.reviewNote);
+  return {
+    submission: serializeCommunitySubmission(submission),
+    spot: data.importedSpot,
+    asset: data.asset ? serializeAsset(data.asset) : undefined,
+  };
+}
+
+async function importPendingCommunitySubmission(submissions, submissionId, payload) {
+  const submission = communitySubmissionById(submissions, submissionId);
+  if (submission.status !== "pending") throw new AdminError("この投稿はすでに審査済みです。");
+  const createdAt = new Date().toISOString();
+  const data = await readCommunityImportData();
+  try {
+    if (submission.kind === "photo") await importCommunityPhoto(data, submission, payload, createdAt);
+    else if (submission.kind === "spot") await importCommunitySpot(data, submission, payload, createdAt);
+    else throw new AdminError("投稿の種類が正しくありません。");
+    await persistCommunityImport(data);
+    const result = completeCommunityImport(submission, payload, createdAt, data);
+    // 審査状態の保存に失敗した場合も公開データを戻し、二重登録を防ぎます。
+    await writeJsonIfChanged(communitySubmissionIndexPath, submissions);
+    return result;
+  } catch (error) {
+    await rollbackCommunityImport(data);
+    throw error;
+  }
+}
+
 async function importCommunitySubmission(submissionId, payload) {
-  return withCommunitySubmissionIndex(async (submissions) => {
-    const submission = communitySubmissionById(submissions, submissionId);
-    if (submission.status !== "pending") {
-      throw new AdminError("この投稿はすでに審査済みです。");
-    }
-    const now = new Date();
-    const createdAt = now.toISOString();
-    const spots = await readJson(spotsPath, []);
-    const media = await readJson(mediaPath, []);
-    const transitNames = await readJson(transitNamesPath, {});
-    if (!Array.isArray(spots) || !Array.isArray(media) || !transitNames || typeof transitNames !== "object") {
-      throw new AdminError("公開データを読み込めませんでした。");
-    }
+  return withCommunitySubmissionIndex(
+    async (submissions) => importPendingCommunitySubmission(submissions, submissionId, payload),
+  );
+}
 
-    let importedSpot;
-    let asset;
-    let publicImagePath = "";
-    const originalSpots = structuredClone(spots);
-    const originalMedia = structuredClone(media);
-    const originalTransitNames = structuredClone(transitNames);
+function compareCommunitySubmissions(left, right) {
+  if (left.status === "pending" && right.status !== "pending") return -1;
+  if (left.status !== "pending" && right.status === "pending") return 1;
+  return right.createdAt.localeCompare(left.createdAt);
+}
 
-    try {
-      if (submission.kind === "photo") {
-        const spotId = requiredText(payload?.spotId, "取り込み先スポット", 80);
-        if (!spotIdPattern.test(spotId)) throw new AdminError("取り込み先スポットが正しくありません。");
-        const spot = spots.find((item) => item.id === spotId);
-        if (!spot) throw new AdminError("取り込み先スポットが見つかりません。");
-        const imageBytes = await createAttributedCommunityImage(
-          await readCommunityImage(submission),
-          submission.creditName,
-        );
-        const assetId = randomBytes(8).toString("hex");
-        const timestamp = createdAt.replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
-        const filename = `${timestamp}-${assetId}-community.webp`;
-        const imageUrl = `/photos/${spot.id}/${filename}`;
-        publicImagePath = safeChild(photosDirectory, `${spot.id}/${filename}`) || "";
-        if (!publicImagePath) throw new AdminError("公開画像の保存先が正しくありません。");
-        asset = communityPhotoAsset(submission, spot, assetId, imageUrl, createdAt);
-        media.unshift(asset);
-        if (!spot.imageUrl) {
-          spot.imageUrl = imageUrl;
-          spot.imagePosition = "center center";
-        }
-        await writeBytesAtomic(publicImagePath, imageBytes);
-      } else if (submission.kind === "spot") {
-        const requestedSpot = payload?.spot;
-        if (!requestedSpot || typeof requestedSpot !== "object" || Array.isArray(requestedSpot)) {
-          throw new AdminError("スポット情報が正しくありません。");
-        }
-        const spotId = requiredText(requestedSpot.id, "スポットID", 80);
-        if (!spotIdPattern.test(spotId)) throw new AdminError("スポットIDが正しくありません。");
-        if (spots.some((item) => item.id === spotId)) throw new AdminError("同じスポットIDがすでにあります。");
-        importedSpot = validateSpot(requestedSpot, spotId, {});
-        const transitSearchName = requiredText(
-          requestedSpot.transitSearchName || requestedSpot.name,
-          "経路検索名",
-          160,
-        );
+async function readAdminState() {
+  const [spots, media, site, communitySubmissions] = await Promise.all([
+    readJson(spotsPath, []),
+    readJson(mediaPath, []),
+    readJson(sitePath, { heroImage: null, heroImages: [] }),
+    readCommunitySubmissions(),
+  ]);
+  const heroImageSet = new Set(siteHeroImages(site));
+  return {
+    spots,
+    assets: media.map((asset) => serializeAsset(asset, heroImageSet)),
+    submissions: communitySubmissions.map(serializeCommunitySubmission).sort(compareCommunitySubmissions),
+    siteVersion: normalizedSiteVersion(site.version),
+    writeToken,
+    lanUrl: lanAdminUrl,
+  };
+}
 
-        if (submission.imageKey) {
-          const imageBytes = await createAttributedCommunityImage(
-            await readCommunityImage(submission),
-            submission.creditName,
-          );
-          const assetId = randomBytes(8).toString("hex");
-          const timestamp = createdAt.replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
-          const filename = `${timestamp}-${assetId}-community.webp`;
-          const imageUrl = `/photos/${spotId}/${filename}`;
-          publicImagePath = safeChild(photosDirectory, `${spotId}/${filename}`) || "";
-          if (!publicImagePath) throw new AdminError("公開画像の保存先が正しくありません。");
-          asset = communityPhotoAsset(submission, importedSpot, assetId, imageUrl, createdAt);
-          importedSpot.imageUrl = imageUrl;
-          importedSpot.imagePosition = "center center";
-          media.unshift(asset);
-          await writeBytesAtomic(publicImagePath, imageBytes);
-        }
-        spots.push(importedSpot);
-        transitNames[spotId] = transitSearchName;
-      } else {
-        throw new AdminError("投稿の種類が正しくありません。");
-      }
+async function sendCommunitySubmissionImage(response, submissionId) {
+  const submissions = await readCommunitySubmissions();
+  const submission = communitySubmissionById(submissions, submissionId);
+  const imagePath = safeChild(
+    communitySubmissionsDirectory,
+    typeof submission.imageKey === "string" ? submission.imageKey : "",
+  );
+  if (imagePath) {
+    await sendFile(response, imagePath);
+    return;
+  }
+  sendJson(response, { error: "投稿画像が見つかりません。" }, 404);
+}
 
-      await writeJsonIfChanged(spotsPath, spots);
-      await writeJsonIfChanged(mediaPath, media);
-      await writeJsonIfChanged(transitNamesPath, transitNames);
+async function handleAdminGet(request, response, pathname) {
+  if (request.method !== "GET") return false;
+  if (!requireLocal(request, response)) return true;
+  if (pathname === "/api/admin/identity") {
+    sendJson(response, { application: adminApplicationId, schemaVersion: 1 });
+    return true;
+  }
+  const imageMatch = pathname.match(/^\/api\/admin\/submissions\/([a-f0-9-]+)\/image$/i);
+  if (imageMatch) {
+    await sendCommunitySubmissionImage(response, imageMatch[1]);
+    return true;
+  }
+  if (pathname === "/api/admin/state") {
+    sendJson(response, await readAdminState());
+    return true;
+  }
+  if (pathname === "/api/admin/publish-status") {
+    sendJson(response, { ...gitStatus(), publishToken: writeToken });
+    return true;
+  }
+  if (pathname !== "/api/admin/community-usage") return false;
+  sendJson(response, await readCommunityUsageSummary());
+  return true;
+}
 
-      submission.status = "imported";
-      submission.reviewedAt = createdAt;
-      submission.reviewedBy = "local-admin";
-      submission.reviewNote = communityReviewNote(payload?.reviewNote);
-      const result = {
-        submission: serializeCommunitySubmission(submission),
-        spot: importedSpot,
-        asset: asset ? serializeAsset(asset) : undefined,
-      };
+async function handleAdminSpotWrite(request, response, pathname, initialSpots) {
+  if (!pathname.startsWith("/api/admin/spots/")) return false;
+  if (request.method !== "PUT" && request.method !== "DELETE") return false;
+  if (!requireWriteAccess(request, response)) return true;
+  const spotId = pathname.slice("/api/admin/spots/".length);
+  if (request.method === "DELETE") {
+    await resetSpot(spotId, initialSpots);
+    sendEmpty(response);
+    return true;
+  }
+  sendJson(response, { spot: await updateSpot(spotId, await readJsonBody(request, 1024 * 1024)) });
+  return true;
+}
 
-      // 公開データと審査状態を同じ失敗境界に置きます。審査状態の保存に
-      // 失敗した場合は catch 側で公開データも元に戻し、再取り込みによる
-      // 二重登録を防ぎます。外側の保存は同内容のため no-op になります。
-      await writeJsonIfChanged(communitySubmissionIndexPath, submissions);
-      return result;
-    } catch (error) {
-      if (publicImagePath) await rm(publicImagePath, { force: true }).catch(() => undefined);
-      await writeJsonIfChanged(spotsPath, originalSpots).catch(() => undefined);
-      await writeJsonIfChanged(mediaPath, originalMedia).catch(() => undefined);
-      await writeJsonIfChanged(transitNamesPath, originalTransitNames).catch(() => undefined);
-      throw error;
-    }
+async function handleAdminSiteVersion(request, response, pathname) {
+  if (request.method !== "PUT" || pathname !== "/api/admin/site-version") return false;
+  if (!requireWriteAccess(request, response)) return true;
+  const version = await updateSiteVersion(await readJsonBody(request, 32 * 1024));
+  sendJson(response, { version });
+  return true;
+}
+
+async function handleAdminMedia(request, response, pathname) {
+  if (request.method === "POST" && pathname === "/api/admin/media") {
+    if (!requireWriteAccess(request, response)) return true;
+    sendJson(response, { asset: await saveMedia(await readJsonBody(request)) }, 201);
+    return true;
+  }
+  if (request.method === "DELETE" && pathname.startsWith("/api/admin/media/")) {
+    if (!requireWriteAccess(request, response)) return true;
+    await deleteMedia(pathname.slice("/api/admin/media/".length));
+    sendEmpty(response);
+    return true;
+  }
+  const suffix = "/hero-candidate";
+  if (request.method !== "PATCH" || !pathname.startsWith("/api/admin/media/") || !pathname.endsWith(suffix)) {
+    return false;
+  }
+  if (!requireWriteAccess(request, response)) return true;
+  const assetId = pathname.slice("/api/admin/media/".length, -suffix.length);
+  const body = await readJsonBody(request, 32 * 1024);
+  sendJson(response, { asset: await setMediaHeroCandidate(assetId, body.enabled) });
+  return true;
+}
+
+async function handleAdminSubmission(request, response, pathname) {
+  if (request.method !== "POST") return false;
+  const rejectMatch = pathname.match(/^\/api\/admin\/submissions\/([a-f0-9-]+)\/reject$/i);
+  const importMatch = pathname.match(/^\/api\/admin\/submissions\/([a-f0-9-]+)\/import$/i);
+  if (!rejectMatch && !importMatch) return false;
+  if (!requireWriteAccess(request, response)) return true;
+  if (rejectMatch) {
+    const submission = await rejectCommunitySubmission(rejectMatch[1], await readJsonBody(request, 64 * 1024));
+    sendJson(response, { submission });
+    return true;
+  }
+  sendJson(response, await importCommunitySubmission(importMatch[1], await readJsonBody(request, 256 * 1024)));
+  return true;
+}
+
+async function handleAdminPublish(request, response, pathname) {
+  if (request.method !== "POST" || pathname !== "/api/admin/publish") return false;
+  if (!requireLocal(request, response)) return true;
+  const body = await readJsonBody(request, 1024 * 1024);
+  if (!safeCompare(body.publishToken || "", writeToken)) {
+    sendJson(response, { error: "公開操作の認証に失敗しました。" }, 403);
+    return true;
+  }
+  sendJson(response, await publishToGitHub());
+  return true;
+}
+
+function stopAdminServerAfterResponse(response) {
+  response.once("finish", () => {
+    setTimeout(() => {
+      console.log("Hasunosora Admin: stopped from the admin page.");
+      server.close(() => process.exit(0));
+      server.closeIdleConnections?.();
+    }, 100);
   });
+}
+
+async function handleAdminShutdown(request, response, pathname) {
+  if (request.method !== "POST" || pathname !== "/api/admin/shutdown") return false;
+  if (!requireWriteAccess(request, response)) return true;
+  stopAdminServerAfterResponse(response);
+  sendJson(response, { stopped: true });
+  return true;
+}
+
+async function handleAdminRequest(request, response, pathname, initialSpots) {
+  if (await handleAdminGet(request, response, pathname)) return;
+  if (await handleAdminSpotWrite(request, response, pathname, initialSpots)) return;
+  if (await handleAdminSiteVersion(request, response, pathname)) return;
+  if (await handleAdminMedia(request, response, pathname)) return;
+  if (await handleAdminSubmission(request, response, pathname)) return;
+  if (await handleAdminPublish(request, response, pathname)) return;
+  if (await handleAdminShutdown(request, response, pathname)) return;
+  sendJson(response, { error: "APIが見つかりません。" }, 404);
+}
+
+async function handleAdminPageRequest(response, pathname) {
+  if (pathname === "/") {
+    response.writeHead(302, { location: "/admin/" });
+    response.end();
+    return;
+  }
+  if (pathname === "/admin") {
+    response.writeHead(301, { location: "/admin/" });
+    response.end();
+    return;
+  }
+  if (pathname.startsWith("/admin/")) {
+    const relative = pathname.slice("/admin/".length) || "index.html";
+    await sendFile(response, safeChild(adminDirectory, relative));
+    return;
+  }
+  if (pathname.startsWith("/photos/")) {
+    await sendFile(response, safeChild(photosDirectory, pathname.slice("/photos/".length)));
+    return;
+  }
+  sendJson(response, { error: "ページが見つかりません。" }, 404);
+}
+
+function handleAdminError(response, error) {
+  if (error instanceof AdminError) {
+    sendJson(response, { error: error.message }, 400);
+    return;
+  }
+  console.error(error);
+  sendJson(response, { error: "ローカル管理処理に失敗しました。" }, 500);
 }
 
 async function requestHandler(request, response, initialSpots) {
   const requestUrl = new URL(request.url || "/", "http://localhost");
   const pathname = decodeURIComponent(requestUrl.pathname);
-
   try {
     if (pathname.startsWith("/api/admin/")) {
-      if (request.method === "GET") {
-        if (!requireLocal(request, response)) return;
-        if (pathname === "/api/admin/identity") {
-          sendJson(response, { application: adminApplicationId, schemaVersion: 1 });
-          return;
-        }
-        const submissionImageMatch = pathname.match(
-          /^\/api\/admin\/submissions\/([a-f0-9-]+)\/image$/i,
-        );
-        if (submissionImageMatch) {
-          const submissions = await readCommunitySubmissions();
-          const submission = communitySubmissionById(submissions, submissionImageMatch[1]);
-          const imagePath = safeChild(
-            communitySubmissionsDirectory,
-            typeof submission.imageKey === "string" ? submission.imageKey : "",
-          );
-          if (!imagePath) {
-            sendJson(response, { error: "投稿画像が見つかりません。" }, 404);
-            return;
-          }
-          await sendFile(response, imagePath);
-          return;
-        }
-        if (pathname === "/api/admin/state") {
-          const [spots, media, site, communitySubmissions] = await Promise.all([
-            readJson(spotsPath, []),
-            readJson(mediaPath, []),
-            readJson(sitePath, { heroImage: null, heroImages: [] }),
-            readCommunitySubmissions(),
-          ]);
-          const heroImageSet = new Set(siteHeroImages(site));
-          sendJson(response, {
-            spots,
-            assets: media.map((asset) => serializeAsset(asset, heroImageSet)),
-            submissions: communitySubmissions
-              .map(serializeCommunitySubmission)
-              .sort((left, right) => {
-                if (left.status === "pending" && right.status !== "pending") return -1;
-                if (left.status !== "pending" && right.status === "pending") return 1;
-                return right.createdAt.localeCompare(left.createdAt);
-              }),
-            siteVersion: normalizedSiteVersion(site.version),
-            writeToken,
-            lanUrl: lanAdminUrl,
-          });
-          return;
-        }
-        if (pathname === "/api/admin/publish-status") {
-          sendJson(response, { ...gitStatus(), publishToken: writeToken });
-          return;
-        }
-        if (pathname === "/api/admin/community-usage") {
-          sendJson(response, await readCommunityUsageSummary());
-          return;
-        }
-      }
-
-      if (request.method === "PUT" && pathname.startsWith("/api/admin/spots/")) {
-        if (!requireWriteAccess(request, response)) return;
-        const spotId = pathname.slice("/api/admin/spots/".length);
-        sendJson(response, { spot: await updateSpot(spotId, await readJsonBody(request, 1024 * 1024)) });
-        return;
-      }
-
-      if (request.method === "PUT" && pathname === "/api/admin/site-version") {
-        if (!requireWriteAccess(request, response)) return;
-        const version = await updateSiteVersion(await readJsonBody(request, 32 * 1024));
-        sendJson(response, { version });
-        return;
-      }
-
-      if (request.method === "DELETE" && pathname.startsWith("/api/admin/spots/")) {
-        if (!requireWriteAccess(request, response)) return;
-        await resetSpot(pathname.slice("/api/admin/spots/".length), initialSpots);
-        sendEmpty(response);
-        return;
-      }
-
-      if (request.method === "POST" && pathname === "/api/admin/media") {
-        if (!requireWriteAccess(request, response)) return;
-        sendJson(response, { asset: await saveMedia(await readJsonBody(request)) }, 201);
-        return;
-      }
-
-      const rejectSubmissionMatch = pathname.match(
-        /^\/api\/admin\/submissions\/([a-f0-9-]+)\/reject$/i,
-      );
-      if (request.method === "POST" && rejectSubmissionMatch) {
-        if (!requireWriteAccess(request, response)) return;
-        const submission = await rejectCommunitySubmission(
-          rejectSubmissionMatch[1],
-          await readJsonBody(request, 64 * 1024),
-        );
-        sendJson(response, { submission });
-        return;
-      }
-
-      const importSubmissionMatch = pathname.match(
-        /^\/api\/admin\/submissions\/([a-f0-9-]+)\/import$/i,
-      );
-      if (request.method === "POST" && importSubmissionMatch) {
-        if (!requireWriteAccess(request, response)) return;
-        sendJson(
-          response,
-          await importCommunitySubmission(
-            importSubmissionMatch[1],
-            await readJsonBody(request, 256 * 1024),
-          ),
-        );
-        return;
-      }
-
-      if (request.method === "DELETE" && pathname.startsWith("/api/admin/media/")) {
-        if (!requireWriteAccess(request, response)) return;
-        await deleteMedia(pathname.slice("/api/admin/media/".length));
-        sendEmpty(response);
-        return;
-      }
-
-      if (
-        request.method === "PATCH" &&
-        pathname.startsWith("/api/admin/media/") &&
-        pathname.endsWith("/hero-candidate")
-      ) {
-        if (!requireWriteAccess(request, response)) return;
-        const suffix = "/hero-candidate";
-        const assetId = pathname.slice("/api/admin/media/".length, -suffix.length);
-        const body = await readJsonBody(request, 32 * 1024);
-        sendJson(response, { asset: await setMediaHeroCandidate(assetId, body.enabled) });
-        return;
-      }
-
-      if (request.method === "POST" && pathname === "/api/admin/publish") {
-        if (!requireLocal(request, response)) return;
-        const body = await readJsonBody(request, 1024 * 1024);
-        if (!safeCompare(body.publishToken || "", writeToken)) {
-          sendJson(response, { error: "公開操作の認証に失敗しました。" }, 403);
-          return;
-        }
-        sendJson(response, await publishToGitHub());
-        return;
-      }
-
-      if (request.method === "POST" && pathname === "/api/admin/shutdown") {
-        if (!requireWriteAccess(request, response)) return;
-        response.once("finish", () => {
-          setTimeout(() => {
-            console.log("Hasunosora Admin: stopped from the admin page.");
-            server.close(() => process.exit(0));
-            server.closeIdleConnections?.();
-          }, 100);
-        });
-        sendJson(response, { stopped: true });
-        return;
-      }
-
-      sendJson(response, { error: "APIが見つかりません。" }, 404);
+      await handleAdminRequest(request, response, pathname, initialSpots);
       return;
     }
-
-    if (pathname === "/") {
-      response.writeHead(302, { location: "/admin/" });
-      response.end();
-      return;
-    }
-    if (pathname === "/admin") {
-      response.writeHead(301, { location: "/admin/" });
-      response.end();
-      return;
-    }
-    if (pathname.startsWith("/admin/")) {
-      const relative = pathname.slice("/admin/".length) || "index.html";
-      await sendFile(response, safeChild(adminDirectory, relative));
-      return;
-    }
-    if (pathname.startsWith("/photos/")) {
-      await sendFile(response, safeChild(photosDirectory, pathname.slice("/photos/".length)));
-      return;
-    }
-    sendJson(response, { error: "ページが見つかりません。" }, 404);
+    await handleAdminPageRequest(response, pathname);
   } catch (error) {
-    if (error instanceof AdminError) {
-      sendJson(response, { error: error.message }, 400);
-    } else {
-      console.error(error);
-      sendJson(response, { error: "ローカル管理処理に失敗しました。" }, 500);
-    }
+    handleAdminError(response, error);
   }
 }
 

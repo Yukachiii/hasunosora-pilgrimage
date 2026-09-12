@@ -910,16 +910,7 @@ function isRetryableTurnstileStatus(status) {
   return status === 408 || status === 425 || status >= 500;
 }
 
-async function verifyTurnstile(
-  token,
-  ipAddress,
-  origin,
-  config,
-  fetchImplementation,
-  recordFailure,
-  recordUsage,
-  waitImplementation = wait,
-) {
+function assertTurnstileVerificationAvailable(token, config) {
   if (!config.turnstileSecret) {
     throw new CommunityRequestError(
       503,
@@ -927,20 +918,25 @@ async function verifyTurnstile(
       "TURNSTILE_NOT_CONFIGURED",
     );
   }
-  if (!token) {
-    throw new CommunityRequestError(
-      400,
-      "投稿前の確認を完了してください。",
-      "TURNSTILE_REQUIRED",
-    );
-  }
-  const verificationBody = new URLSearchParams({
+  if (token) return;
+  throw new CommunityRequestError(
+    400,
+    "投稿前の確認を完了してください。",
+    "TURNSTILE_REQUIRED",
+  );
+}
+
+function turnstileVerificationBody(token, ipAddress, config) {
+  return new URLSearchParams({
     secret: config.turnstileSecret,
     response: token,
     remoteip: ipAddress,
     idempotency_key: randomUUID(),
   });
-  const allowedHostnames = new Set(
+}
+
+function turnstileAllowedHostnames(config, origin) {
+  return new Set(
     [...config.allowedOrigins, origin]
       .map((allowedOrigin) => {
         try {
@@ -951,155 +947,196 @@ async function verifyTurnstile(
       })
       .filter(Boolean),
   );
-  const startedAt = Date.now();
-  for (let attempt = 1; attempt <= turnstileVerificationMaximumAttempts; attempt += 1) {
-    await tryRecordCommunityApiUsage(recordUsage, {
-      turnstileApiRequests: 1,
-      turnstileRetries: attempt > 1 ? 1 : 0,
-    });
-    let response;
-    try {
-      response = await fetchImplementation(
-        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-        {
-          method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: verificationBody,
-          signal: AbortSignal.timeout(turnstileVerificationTimeoutMs),
-        },
-      );
-    } catch (error) {
-      if (attempt < turnstileVerificationMaximumAttempts) {
-        await waitImplementation(turnstileVerificationRetryDelayMs);
-        continue;
-      }
-      await tryRecordTurnstileFailure(recordFailure, {
-        reason: isTurnstileTimeout(error) ? "timeout" : "network_error",
-        durationMs: Date.now() - startedAt,
-        attemptCount: attempt,
-        networkErrorCode: turnstileNetworkErrorCode(error),
-      });
-      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
-      throw new CommunityRequestError(
-        503,
-        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
-        "TURNSTILE_UNAVAILABLE",
-      );
-    }
-    if (!response.ok) {
-      if (
-        attempt < turnstileVerificationMaximumAttempts &&
-        isRetryableTurnstileStatus(response.status)
-      ) {
-        await response.body?.cancel().catch(() => undefined);
-        await waitImplementation(turnstileVerificationRetryDelayMs);
-        continue;
-      }
-      const failureResult = await response.json().catch(() => null);
-      await tryRecordTurnstileFailure(recordFailure, {
-        reason: "http_error",
-        httpStatus: response.status,
-        durationMs: Date.now() - startedAt,
-        attemptCount: attempt,
-        serviceErrorCodes: failureResult?.["error-codes"],
-      });
-      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
-      throw new CommunityRequestError(
-        503,
-        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
-        "TURNSTILE_UNAVAILABLE",
-      );
-    }
+}
 
-    let result;
-    try {
-      result = await response.json();
-    } catch {
-      if (attempt < turnstileVerificationMaximumAttempts) {
-        await waitImplementation(turnstileVerificationRetryDelayMs);
-        continue;
-      }
-      await tryRecordTurnstileFailure(recordFailure, {
-        reason: "invalid_response",
-        httpStatus: response.status,
-        durationMs: Date.now() - startedAt,
-        attemptCount: attempt,
-      });
-      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
-      throw new CommunityRequestError(
-        503,
-        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
-        "TURNSTILE_UNAVAILABLE",
-      );
-    }
-    if (
-      !result ||
-      typeof result !== "object" ||
-      Array.isArray(result) ||
-      typeof result.success !== "boolean"
-    ) {
-      if (attempt < turnstileVerificationMaximumAttempts) {
-        await waitImplementation(turnstileVerificationRetryDelayMs);
-        continue;
-      }
-      await tryRecordTurnstileFailure(recordFailure, {
-        reason: "invalid_response",
-        httpStatus: response.status,
-        durationMs: Date.now() - startedAt,
-        attemptCount: attempt,
-      });
-      await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
-      throw new CommunityRequestError(
-        503,
-        "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
-        "TURNSTILE_UNAVAILABLE",
-      );
-    }
-    const verifiedHostname = typeof result.hostname === "string"
-      ? result.hostname.toLowerCase().replace(/\.$/, "")
-      : "";
-    const successCheck = result.success === true;
-    const actionCheck = result.action === "community_submission";
-    const hostnameCheck = allowedHostnames.has(verifiedHostname);
-    if (successCheck && actionCheck && hostnameCheck) {
-      await tryRecordCommunityApiUsage(recordUsage, { turnstileVerified: 1 });
-      return;
-    }
-
-    const serviceErrorCodes = Array.isArray(result["error-codes"])
-      ? result["error-codes"]
-      : [];
-    const isInternalServiceError = !successCheck && serviceErrorCodes.includes("internal-error");
-    if (isInternalServiceError && attempt < turnstileVerificationMaximumAttempts) {
-      await waitImplementation(turnstileVerificationRetryDelayMs);
-      continue;
-    }
-    await tryRecordTurnstileFailure(recordFailure, {
-      reason: isInternalServiceError ? "service_error" : "rejected",
-      httpStatus: response.status,
-      durationMs: Date.now() - startedAt,
-      attemptCount: attempt,
-      serviceErrorCodes,
-      successCheck,
-      actionCheck,
-      hostnameCheck,
-    });
-    await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
-    throw new CommunityRequestError(
-      isInternalServiceError ? 503 : 400,
-      isInternalServiceError
-        ? "投稿前の確認に接続できませんでした。少し待ってからお試しください。"
-        : "投稿前の確認に失敗しました。画面を再読み込みしてお試しください。",
-      isInternalServiceError ? "TURNSTILE_UNAVAILABLE" : "TURNSTILE_FAILED",
-    );
-  }
-
-  await tryRecordCommunityApiUsage(recordUsage, { turnstileFailed: 1 });
-  throw new CommunityRequestError(
+function turnstileUnavailableError() {
+  return new CommunityRequestError(
     503,
     "投稿前の確認に接続できませんでした。少し待ってからお試しください。",
     "TURNSTILE_UNAVAILABLE",
   );
+}
+
+async function recordFailedTurnstileVerification(context, diagnostic) {
+  await tryRecordTurnstileFailure(context.recordFailure, diagnostic);
+  await tryRecordCommunityApiUsage(context.recordUsage, { turnstileFailed: 1 });
+}
+
+async function waitForTurnstileRetry(context) {
+  await context.waitImplementation(turnstileVerificationRetryDelayMs);
+}
+
+function hasRemainingTurnstileAttempt(attempt) {
+  return attempt < turnstileVerificationMaximumAttempts;
+}
+
+async function fetchTurnstileVerification(context, attempt) {
+  await tryRecordCommunityApiUsage(context.recordUsage, {
+    turnstileApiRequests: 1,
+    turnstileRetries: attempt > 1 ? 1 : 0,
+  });
+  try {
+    return await context.fetchImplementation(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: context.verificationBody,
+        signal: AbortSignal.timeout(turnstileVerificationTimeoutMs),
+      },
+    );
+  } catch (error) {
+    if (hasRemainingTurnstileAttempt(attempt)) {
+      await waitForTurnstileRetry(context);
+      return null;
+    }
+    await recordFailedTurnstileVerification(context, {
+      reason: isTurnstileTimeout(error) ? "timeout" : "network_error",
+      durationMs: Date.now() - context.startedAt,
+      attemptCount: attempt,
+      networkErrorCode: turnstileNetworkErrorCode(error),
+    });
+    throw turnstileUnavailableError();
+  }
+}
+
+async function handleTurnstileHttpFailure(response, context, attempt) {
+  if (
+    hasRemainingTurnstileAttempt(attempt) &&
+    isRetryableTurnstileStatus(response.status)
+  ) {
+    await response.body?.cancel().catch(() => undefined);
+    await waitForTurnstileRetry(context);
+    return;
+  }
+  const failureResult = await response.json().catch(() => null);
+  await recordFailedTurnstileVerification(context, {
+    reason: "http_error",
+    httpStatus: response.status,
+    durationMs: Date.now() - context.startedAt,
+    attemptCount: attempt,
+    serviceErrorCodes: failureResult?.["error-codes"],
+  });
+  throw turnstileUnavailableError();
+}
+
+function isValidTurnstileResult(result) {
+  return Boolean(
+    result &&
+    typeof result === "object" &&
+    !Array.isArray(result) &&
+    typeof result.success === "boolean",
+  );
+}
+
+async function handleInvalidTurnstileResult(response, context, attempt) {
+  if (hasRemainingTurnstileAttempt(attempt)) {
+    await waitForTurnstileRetry(context);
+    return;
+  }
+  await recordFailedTurnstileVerification(context, {
+    reason: "invalid_response",
+    httpStatus: response.status,
+    durationMs: Date.now() - context.startedAt,
+    attemptCount: attempt,
+  });
+  throw turnstileUnavailableError();
+}
+
+async function readTurnstileResult(response, context, attempt) {
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    await handleInvalidTurnstileResult(response, context, attempt);
+    return null;
+  }
+  if (isValidTurnstileResult(result)) return result;
+  await handleInvalidTurnstileResult(response, context, attempt);
+  return null;
+}
+
+function evaluateTurnstileChecks(result, allowedHostnames) {
+  const verifiedHostname = typeof result.hostname === "string"
+    ? result.hostname.toLowerCase().replace(/\.$/, "")
+    : "";
+  return {
+    successCheck: result.success === true,
+    actionCheck: result.action === "community_submission",
+    hostnameCheck: allowedHostnames.has(verifiedHostname),
+  };
+}
+
+function turnstileResultError(isInternalServiceError) {
+  return new CommunityRequestError(
+    isInternalServiceError ? 503 : 400,
+    isInternalServiceError
+      ? "投稿前の確認に接続できませんでした。少し待ってからお試しください。"
+      : "投稿前の確認に失敗しました。画面を再読み込みしてお試しください。",
+    isInternalServiceError ? "TURNSTILE_UNAVAILABLE" : "TURNSTILE_FAILED",
+  );
+}
+
+async function evaluateTurnstileResult(result, response, context, attempt) {
+  const checks = evaluateTurnstileChecks(result, context.allowedHostnames);
+  if (checks.successCheck && checks.actionCheck && checks.hostnameCheck) {
+    await tryRecordCommunityApiUsage(context.recordUsage, { turnstileVerified: 1 });
+    return true;
+  }
+  const serviceErrorCodes = Array.isArray(result["error-codes"])
+    ? result["error-codes"]
+    : [];
+  const isInternalServiceError = !checks.successCheck &&
+    serviceErrorCodes.includes("internal-error");
+  if (isInternalServiceError && hasRemainingTurnstileAttempt(attempt)) {
+    await waitForTurnstileRetry(context);
+    return false;
+  }
+  await recordFailedTurnstileVerification(context, {
+    reason: isInternalServiceError ? "service_error" : "rejected",
+    httpStatus: response.status,
+    durationMs: Date.now() - context.startedAt,
+    attemptCount: attempt,
+    serviceErrorCodes,
+    ...checks,
+  });
+  throw turnstileResultError(isInternalServiceError);
+}
+
+async function verifyTurnstile(
+  token,
+  ipAddress,
+  origin,
+  config,
+  fetchImplementation,
+  recordFailure,
+  recordUsage,
+  waitImplementation = wait,
+) {
+  assertTurnstileVerificationAvailable(token, config);
+  const context = {
+    allowedHostnames: turnstileAllowedHostnames(config, origin),
+    fetchImplementation,
+    recordFailure,
+    recordUsage,
+    startedAt: Date.now(),
+    verificationBody: turnstileVerificationBody(token, ipAddress, config),
+    waitImplementation,
+  };
+  for (let attempt = 1; attempt <= turnstileVerificationMaximumAttempts; attempt += 1) {
+    const response = await fetchTurnstileVerification(context, attempt);
+    if (!response) continue;
+    if (!response.ok) {
+      await handleTurnstileHttpFailure(response, context, attempt);
+      continue;
+    }
+    const result = await readTurnstileResult(response, context, attempt);
+    if (!result) continue;
+    if (await evaluateTurnstileResult(result, response, context, attempt)) return;
+  }
+
+  await tryRecordCommunityApiUsage(context.recordUsage, { turnstileFailed: 1 });
+  throw turnstileUnavailableError();
 }
 
 async function readSubmissionIndex(indexPath) {
@@ -1202,6 +1239,80 @@ export async function withCommunitySubmissionIndexLock(
   });
 }
 
+function assertDailySubmissionLimit(submissions, dailyRateKey) {
+  const dailyCount = submissions.filter(
+    (item) => item?.dailyRateKey === dailyRateKey,
+  ).length;
+  if (dailyCount < maximumDailySubmissions) return;
+  throw new CommunityRequestError(
+    429,
+    "本日の投稿上限に達しました。明日もう一度お試しください。",
+    "DAILY_RATE_LIMIT",
+  );
+}
+
+function communitySubmissionImagePath(config, imageKey) {
+  return imageKey
+    ? path.join(config.submissionsDirectory, ...imageKey.split("/"))
+    : "";
+}
+
+async function writeCommunitySubmission(
+  writeSubmissions,
+  submissions,
+  submission,
+  imagePath,
+) {
+  try {
+    await writeSubmissions([...submissions, submission]);
+  } catch (error) {
+    if (imagePath) await rm(imagePath, { force: true }).catch(() => undefined);
+    if (error instanceof CommunityRequestError) throw error;
+    throw new CommunityRequestError(
+      500,
+      "投稿を保存できませんでした。",
+      "INDEX_WRITE_FAILED",
+    );
+  }
+}
+
+async function removeCommunitySubmissionImages(config, imageKeys) {
+  const submissionsDirectory = path.resolve(config.submissionsDirectory);
+  for (const imageKey of imageKeys) {
+    const expiredImagePath = path.resolve(
+      config.submissionsDirectory,
+      ...imageKey.split("/"),
+    );
+    if (!expiredImagePath.startsWith(`${submissionsDirectory}${path.sep}`)) continue;
+    await rm(expiredImagePath, { force: true }).catch(() => undefined);
+  }
+}
+
+async function persistCommunitySubmissionWithinLock(
+  config,
+  submission,
+  imageBytes,
+  submissions,
+  writeSubmissions,
+) {
+  const pruned = pruneReviewedCommunitySubmissions(
+    submissions,
+    new Date(submission.createdAt),
+    config.retentionDays ?? 30,
+  );
+  assertDailySubmissionLimit(pruned.submissions, submission.dailyRateKey);
+  const imagePath = communitySubmissionImagePath(config, submission.imageKey);
+  if (imagePath && imageBytes) await atomicWrite(imagePath, imageBytes);
+  await writeCommunitySubmission(
+    writeSubmissions,
+    pruned.submissions,
+    submission,
+    imagePath,
+  );
+  await removeCommunitySubmissionImages(config, pruned.removedImageKeys);
+  return submission;
+}
+
 export async function persistCommunitySubmission({
   config,
   submission,
@@ -1211,53 +1322,13 @@ export async function persistCommunitySubmission({
   await mkdir(imagesDirectory, { recursive: true, mode: 0o700 });
   return withCommunitySubmissionIndexLock(
     config.submissionsDirectory,
-    async ({ submissions, writeSubmissions }) => {
-      const pruned = pruneReviewedCommunitySubmissions(
-        submissions,
-        new Date(submission.createdAt),
-        config.retentionDays ?? 30,
-      );
-      const dailyCount = pruned.submissions.filter(
-        (item) => item?.dailyRateKey === submission.dailyRateKey,
-      ).length;
-      if (dailyCount >= maximumDailySubmissions) {
-        throw new CommunityRequestError(
-          429,
-          "本日の投稿上限に達しました。明日もう一度お試しください。",
-          "DAILY_RATE_LIMIT",
-        );
-      }
-
-      const imagePath = submission.imageKey
-        ? path.join(config.submissionsDirectory, ...submission.imageKey.split("/"))
-        : "";
-      if (imagePath && imageBytes) await atomicWrite(imagePath, imageBytes);
-      try {
-        await writeSubmissions([...pruned.submissions, submission]);
-      } catch (error) {
-        if (imagePath) await rm(imagePath, { force: true }).catch(() => undefined);
-        if (error instanceof CommunityRequestError) throw error;
-        throw new CommunityRequestError(
-          500,
-          "投稿を保存できませんでした。",
-          "INDEX_WRITE_FAILED",
-        );
-      }
-      for (const imageKey of pruned.removedImageKeys) {
-        const expiredImagePath = path.resolve(
-          config.submissionsDirectory,
-          ...imageKey.split("/"),
-        );
-        if (
-          expiredImagePath.startsWith(
-            `${path.resolve(config.submissionsDirectory)}${path.sep}`,
-          )
-        ) {
-          await rm(expiredImagePath, { force: true }).catch(() => undefined);
-        }
-      }
-      return submission;
-    },
+    ({ submissions, writeSubmissions }) => persistCommunitySubmissionWithinLock(
+      config,
+      submission,
+      imageBytes,
+      submissions,
+      writeSubmissions,
+    ),
   );
 }
 
@@ -1273,19 +1344,7 @@ export async function cleanupReviewedCommunitySubmissions(config, now = new Date
       if (pruned.submissions.length !== submissions.length) {
         await writeSubmissions(pruned.submissions);
       }
-      for (const imageKey of pruned.removedImageKeys) {
-        const expiredImagePath = path.resolve(
-          config.submissionsDirectory,
-          ...imageKey.split("/"),
-        );
-        if (
-          expiredImagePath.startsWith(
-            `${path.resolve(config.submissionsDirectory)}${path.sep}`,
-          )
-        ) {
-          await rm(expiredImagePath, { force: true }).catch(() => undefined);
-        }
-      }
+      await removeCommunitySubmissionImages(config, pruned.removedImageKeys);
       return submissions.length - pruned.submissions.length;
     },
   );
@@ -1295,16 +1354,7 @@ async function assertDailySubmissionAvailable(config, dailyRateKey) {
   return withCommunitySubmissionIndexLock(
     config.submissionsDirectory,
     async ({ submissions }) => {
-      const dailyCount = submissions.filter(
-        (item) => item?.dailyRateKey === dailyRateKey,
-      ).length;
-      if (dailyCount >= maximumDailySubmissions) {
-        throw new CommunityRequestError(
-          429,
-          "本日の投稿上限に達しました。明日もう一度お試しください。",
-          "DAILY_RATE_LIMIT",
-        );
-      }
+      assertDailySubmissionLimit(submissions, dailyRateKey);
     },
   );
 }
@@ -1327,111 +1377,122 @@ function uploadedFile(form, required) {
   return value;
 }
 
-export async function acceptCommunitySubmission(form, context) {
-  const now = context.now instanceof Date ? context.now : new Date(context.now ?? Date.now());
-  validateBotFields(form, now);
-
-  const kindText = requiredFormText(form, "kind", "投稿の種類", 16);
-  let kind;
-  let payload;
+function parseSubmittedPayloadJson(payloadText) {
   try {
-    kind = parseCommunitySubmissionKind(kindText);
+    return JSON.parse(payloadText);
+  } catch {
+    throw new CommunitySubmissionValidationError(
+      "投稿内容のJSONが正しくありません。",
+    );
+  }
+}
+
+function invalidPayloadRequestError(error) {
+  return error instanceof CommunitySubmissionValidationError
+    ? new CommunityRequestError(400, error.message, "INVALID_PAYLOAD")
+    : error;
+}
+
+function parseSubmittedKindAndPayload(form) {
+  const kindText = requiredFormText(form, "kind", "投稿の種類", 16);
+  try {
+    const kind = parseCommunitySubmissionKind(kindText);
     const payloadText = requiredFormText(
       form,
       "payload",
       "投稿内容",
       maximumPayloadCharacters,
     );
-    let decodedPayload;
-    try {
-      decodedPayload = JSON.parse(payloadText);
-    } catch {
-      throw new CommunitySubmissionValidationError(
-        "投稿内容のJSONが正しくありません。",
-      );
-    }
-    payload = parseCommunitySubmissionPayload(kind, decodedPayload);
+    const decodedPayload = parseSubmittedPayloadJson(payloadText);
+    return { kind, payload: parseCommunitySubmissionPayload(kind, decodedPayload) };
   } catch (error) {
-    if (error instanceof CommunitySubmissionValidationError) {
-      throw new CommunityRequestError(400, error.message, "INVALID_PAYLOAD");
-    }
-    throw error;
+    throw invalidPayloadRequestError(error);
   }
+}
 
-  const file = uploadedFile(form, kind === "photo");
-  let creditName = null;
-  if (file) {
-    try {
-      const submittedCreditName = optionalFormText(form, "creditName", 60);
-      creditName = submittedCreditName
-        ? parseCommunityCreditName(submittedCreditName)
-        : "匿名";
-    } catch (error) {
-      if (error instanceof CommunitySubmissionValidationError) {
-        throw new CommunityRequestError(400, error.message, "INVALID_PAYLOAD");
-      }
-      throw error;
-    }
+function parseSubmittedCreditName(form, file) {
+  if (!file) return null;
+  try {
+    const submittedCreditName = optionalFormText(form, "creditName", 60);
+    return submittedCreditName
+      ? parseCommunityCreditName(submittedCreditName)
+      : "匿名";
+  } catch (error) {
+    throw invalidPayloadRequestError(error);
   }
+}
 
+function assertSubmissionConsent(form, config) {
   const submittedConsentVersion = requiredFormText(
     form,
     "consentVersion",
     "同意内容の版",
     40,
   );
-  if (submittedConsentVersion !== context.config.consentVersion) {
+  if (submittedConsentVersion !== config.consentVersion) {
     throw new CommunityRequestError(
       409,
       "同意内容が更新されました。画面を再読み込みしてご確認ください。",
       "CONSENT_VERSION_MISMATCH",
     );
   }
-  if (requiredFormText(form, "consentAccepted", "投稿条件への同意", 8) !== "true") {
+  const consentAccepted = requiredFormText(
+    form,
+    "consentAccepted",
+    "投稿条件への同意",
+    8,
+  );
+  if (consentAccepted !== "true") {
     throw new CommunityRequestError(
       400,
       "投稿条件への同意が必要です。",
       "CONSENT_REQUIRED",
     );
   }
+}
 
-  const dailyRateKey = makeDailyRateKey(
-    context.ipAddress,
-    now,
-    context.config.rateLimitSecret,
-  );
-  // 大きな画像の再生成や外部認証より先に、明らかな上限超過を止めます。
-  // 保存時にも同じ確認を行い、同時投稿による競合を防ぎます。
-  await assertDailySubmissionAvailable(context.config, dailyRateKey);
-
-  const localTurnstileBypass = context.config.allowLocalTurnstileBypass &&
+function shouldBypassTurnstile(context) {
+  return context.config.allowLocalTurnstileBypass &&
     isLocalDevelopmentOrigin(context.origin) &&
     !context.config.turnstileSecret;
-  if (!localTurnstileBypass) {
-    await verifyTurnstile(
-      optionalFormText(form, "turnstileToken", 2_048),
-      context.ipAddress,
-      context.origin,
-      context.config,
-      context.fetchImplementation,
-      context.recordTurnstileFailure,
-      context.recordApiUsage,
-      context.turnstileWaitImplementation,
-    );
-  }
+}
 
-  let encodedImage = null;
-  let imageHash = null;
-  if (file) {
-    const originalBytes = Buffer.from(await file.arrayBuffer());
-    validateUploadedImage(originalBytes, String(file.type ?? ""));
-    encodedImage = await context.imageProcessor(originalBytes);
-    imageHash = createHash("sha256").update(encodedImage).digest("hex");
-  }
+async function verifySubmissionTurnstile(form, context) {
+  if (shouldBypassTurnstile(context)) return;
+  await verifyTurnstile(
+    optionalFormText(form, "turnstileToken", 2_048),
+    context.ipAddress,
+    context.origin,
+    context.config,
+    context.fetchImplementation,
+    context.recordTurnstileFailure,
+    context.recordApiUsage,
+    context.turnstileWaitImplementation,
+  );
+}
 
+async function encodeSubmittedImage(file, imageProcessor) {
+  if (!file) return { encodedImage: null, imageHash: null };
+  const originalBytes = Buffer.from(await file.arrayBuffer());
+  validateUploadedImage(originalBytes, String(file.type ?? ""));
+  const encodedImage = await imageProcessor(originalBytes);
+  const imageHash = createHash("sha256").update(encodedImage).digest("hex");
+  return { encodedImage, imageHash };
+}
+
+function pendingCommunitySubmission({
+  kind,
+  payload,
+  encodedImage,
+  imageHash,
+  creditName,
+  consentVersion,
+  dailyRateKey,
+  now,
+}) {
   const id = randomUUID();
   const createdAt = now.toISOString();
-  const submission = {
+  return {
     id,
     kind,
     status: "pending",
@@ -1441,7 +1502,7 @@ export async function acceptCommunitySubmission(form, context) {
     imageSize: encodedImage?.length ?? null,
     imageSha256: imageHash,
     creditName,
-    consentVersion: context.config.consentVersion,
+    consentVersion,
     consentAt: createdAt,
     dailyRateKey,
     createdAt,
@@ -1449,13 +1510,50 @@ export async function acceptCommunitySubmission(form, context) {
     reviewedBy: null,
     reviewNote: null,
   };
+}
+
+export async function acceptCommunitySubmission(form, context) {
+  const now = context.now instanceof Date ? context.now : new Date(context.now ?? Date.now());
+  validateBotFields(form, now);
+  const { kind, payload } = parseSubmittedKindAndPayload(form);
+  const file = uploadedFile(form, kind === "photo");
+  const creditName = parseSubmittedCreditName(form, file);
+  assertSubmissionConsent(form, context.config);
+  const dailyRateKey = makeDailyRateKey(
+    context.ipAddress,
+    now,
+    context.config.rateLimitSecret,
+  );
+  // 大きな画像の再生成や外部認証より先に、明らかな上限超過を止めます。
+  // 保存時にも同じ確認を行い、同時投稿による競合を防ぎます。
+  await assertDailySubmissionAvailable(context.config, dailyRateKey);
+  await verifySubmissionTurnstile(form, context);
+  const { encodedImage, imageHash } = await encodeSubmittedImage(
+    file,
+    context.imageProcessor,
+  );
+  const submission = pendingCommunitySubmission({
+    kind,
+    payload,
+    encodedImage,
+    imageHash,
+    creditName,
+    consentVersion: context.config.consentVersion,
+    dailyRateKey,
+    now,
+  });
 
   await persistCommunitySubmission({
     config: context.config,
     submission,
     imageBytes: encodedImage,
   });
-  return { id, kind, status: "pending", createdAt };
+  return {
+    id: submission.id,
+    kind,
+    status: "pending",
+    createdAt: submission.createdAt,
+  };
 }
 
 const turnstileSubmissionErrorCodes = new Set([
@@ -1486,6 +1584,153 @@ function submissionRejectionUsage(category) {
   };
 }
 
+function handleCommunityHealthRequest(pathname, request, response) {
+  if (pathname !== "/health") return false;
+  if (request.method !== "GET") {
+    sendJson(response, 405, { error: "Method not allowed" });
+    return true;
+  }
+  sendJson(response, 200, {
+    status: "ok",
+    application: "hasunosora-community-receiver",
+    schemaVersion: 1,
+  });
+  return true;
+}
+
+function communitySubmissionEndpoint(pathname) {
+  if (pathname === "/api/submissions") return "public";
+  if (pathname === "/api/ui-test-submissions") return "ui-test";
+  return "";
+}
+
+function rejectUnsupportedCommunityRequest(
+  request,
+  response,
+  endpoint,
+  origin,
+  config,
+) {
+  if (!endpoint) {
+    sendJson(response, 404, { error: "Not found" });
+    return true;
+  }
+  if (!isAllowedSubmissionOrigin(origin, config)) {
+    sendJson(response, 403, { error: "このサイトからは投稿できません。" });
+    return true;
+  }
+  if (request.method === "OPTIONS") {
+    sendPreflight(response, origin);
+    return true;
+  }
+  if (request.method === "POST") return false;
+  sendJson(response, 405, { error: "Method not allowed" }, origin);
+  return true;
+}
+
+function communityRequestRuntime(config, endpoint, options, requestNow) {
+  const isUiTestSubmission = endpoint === "ui-test";
+  const requestConfig = isUiTestSubmission
+    ? { ...config, submissionsDirectory: path.join(config.submissionsDirectory, "ui-test") }
+    : config;
+  const recordApiUsage = isUiTestSubmission
+    ? async () => undefined
+    : options.recordApiUsage ??
+      ((delta) => recordCommunityApiUsage(config, delta, { now: requestNow }));
+  return { recordApiUsage, requestConfig };
+}
+
+async function rejectWhenSubmissionCapacityReached(response, origin, recordApiUsage) {
+  if (activeSubmissionRequests < maximumConcurrentSubmissions) return false;
+  await tryRecordCommunityApiUsage(
+    recordApiUsage,
+    submissionRejectionUsage("system"),
+  );
+  sendJson(
+    response,
+    503,
+    { error: "投稿受付が混み合っています。少し待ってからお試しください。" },
+    origin,
+  );
+  return true;
+}
+
+function communitySubmissionAcceptanceContext(
+  request,
+  origin,
+  requestNow,
+  requestConfig,
+  recordApiUsage,
+  options,
+) {
+  return {
+    config: requestConfig,
+    origin,
+    ipAddress: clientAddress(request),
+    now: requestNow,
+    fetchImplementation: options.fetchImplementation ?? fetch,
+    imageProcessor: options.imageProcessor ?? reencodeCommunityImage,
+    recordTurnstileFailure: options.recordTurnstileFailure ??
+      ((diagnostic) => appendTurnstileFailureDiagnostic(requestConfig, diagnostic)),
+    recordApiUsage,
+    turnstileWaitImplementation: options.turnstileWaitImplementation,
+  };
+}
+
+async function sendCommunitySubmissionError(error, response, origin, recordApiUsage) {
+  const knownError = error instanceof CommunityRequestError;
+  const status = knownError ? error.status : 500;
+  await tryRecordCommunityApiUsage(
+    recordApiUsage,
+    submissionRejectionUsage(submissionRejectionCategory(error)),
+  );
+  if (!knownError) {
+    console.error("Community submission request failed", {
+      error: error instanceof Error ? error.name : "UnknownError",
+    });
+  }
+  sendJson(
+    response,
+    status,
+    {
+      error: knownError
+        ? error.message
+        : "投稿を保存できませんでした。少し待ってから再度お試しください。",
+    },
+    origin,
+  );
+}
+
+async function processCommunitySubmissionRequest(
+  request,
+  response,
+  origin,
+  requestNow,
+  requestConfig,
+  recordApiUsage,
+  options,
+) {
+  activeSubmissionRequests += 1;
+  try {
+    const form = await parseMultipartForm(request);
+    const context = communitySubmissionAcceptanceContext(
+      request,
+      origin,
+      requestNow,
+      requestConfig,
+      recordApiUsage,
+      options,
+    );
+    const submission = await acceptCommunitySubmission(form, context);
+    await tryRecordCommunityApiUsage(recordApiUsage, { submissionAccepted: 1 });
+    sendJson(response, 201, { submission }, origin);
+  } catch (error) {
+    await sendCommunitySubmissionError(error, response, origin, recordApiUsage);
+  } finally {
+    activeSubmissionRequests -= 1;
+  }
+}
+
 export async function handleCommunityRequest(
   request,
   response,
@@ -1494,103 +1739,27 @@ export async function handleCommunityRequest(
   const config = options.config ?? loadCommunityServerConfig();
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const origin = normalizeOrigin(singleHeader(request, "origin"));
-
-  if (url.pathname === "/health") {
-    if (request.method !== "GET") {
-      sendJson(response, 405, { error: "Method not allowed" });
-      return;
-    }
-    sendJson(response, 200, {
-      status: "ok",
-      application: "hasunosora-community-receiver",
-      schemaVersion: 1,
-    });
-    return;
-  }
-
-  const isUiTestSubmission = url.pathname === "/api/ui-test-submissions";
-  if (url.pathname !== "/api/submissions" && !isUiTestSubmission) {
-    sendJson(response, 404, { error: "Not found" });
-    return;
-  }
-  if (!isAllowedSubmissionOrigin(origin, config)) {
-    sendJson(response, 403, { error: "このサイトからは投稿できません。" });
-    return;
-  }
-  if (request.method === "OPTIONS") {
-    sendPreflight(response, origin);
-    return;
-  }
-  if (request.method !== "POST") {
-    sendJson(response, 405, { error: "Method not allowed" }, origin);
-    return;
-  }
-
+  if (handleCommunityHealthRequest(url.pathname, request, response)) return;
+  const endpoint = communitySubmissionEndpoint(url.pathname);
+  if (rejectUnsupportedCommunityRequest(request, response, endpoint, origin, config)) return;
   const requestNow = options.now?.() ?? new Date();
-  const requestConfig = isUiTestSubmission
-    ? { ...config, submissionsDirectory: path.join(config.submissionsDirectory, "ui-test") }
-    : config;
-  const recordApiUsage = isUiTestSubmission
-    ? async () => undefined
-    : options.recordApiUsage ?? ((delta) => recordCommunityApiUsage(config, delta, { now: requestNow }));
+  const { recordApiUsage, requestConfig } = communityRequestRuntime(
+    config,
+    endpoint,
+    options,
+    requestNow,
+  );
   await tryRecordCommunityApiUsage(recordApiUsage, { submissionRequests: 1 });
-
-  if (activeSubmissionRequests >= maximumConcurrentSubmissions) {
-    await tryRecordCommunityApiUsage(
-      recordApiUsage,
-      submissionRejectionUsage("system"),
-    );
-    sendJson(
-      response,
-      503,
-      { error: "投稿受付が混み合っています。少し待ってからお試しください。" },
-      origin,
-    );
-    return;
-  }
-
-  activeSubmissionRequests += 1;
-  try {
-    const form = await parseMultipartForm(request);
-    const submission = await acceptCommunitySubmission(form, {
-      config: requestConfig,
-      origin,
-      ipAddress: clientAddress(request),
-      now: requestNow,
-      fetchImplementation: options.fetchImplementation ?? fetch,
-      imageProcessor: options.imageProcessor ?? reencodeCommunityImage,
-      recordTurnstileFailure: options.recordTurnstileFailure ??
-        ((diagnostic) => appendTurnstileFailureDiagnostic(requestConfig, diagnostic)),
-      recordApiUsage,
-      turnstileWaitImplementation: options.turnstileWaitImplementation,
-    });
-    await tryRecordCommunityApiUsage(recordApiUsage, { submissionAccepted: 1 });
-    sendJson(response, 201, { submission }, origin);
-  } catch (error) {
-    const knownError = error instanceof CommunityRequestError;
-    const status = knownError ? error.status : 500;
-    await tryRecordCommunityApiUsage(
-      recordApiUsage,
-      submissionRejectionUsage(submissionRejectionCategory(error)),
-    );
-    if (!knownError) {
-      console.error("Community submission request failed", {
-        error: error instanceof Error ? error.name : "UnknownError",
-      });
-    }
-    sendJson(
-      response,
-      status,
-      {
-        error: knownError
-          ? error.message
-          : "投稿を保存できませんでした。少し待ってから再度お試しください。",
-      },
-      origin,
-    );
-  } finally {
-    activeSubmissionRequests -= 1;
-  }
+  if (await rejectWhenSubmissionCapacityReached(response, origin, recordApiUsage)) return;
+  await processCommunitySubmissionRequest(
+    request,
+    response,
+    origin,
+    requestNow,
+    requestConfig,
+    recordApiUsage,
+    options,
+  );
 }
 
 export function createCommunitySubmissionServer(options = {}) {

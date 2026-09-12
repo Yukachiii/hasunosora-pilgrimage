@@ -42,6 +42,10 @@ export type PlannerSnapshot = {
 };
 
 const travelModes: TravelMode[] = ["WALKING", "DRIVING", "TRANSIT", "BICYCLING"];
+const plannerDraftCookieLimit = 3_800;
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const strictTimePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+const storedTimePattern = /^\d{2}:\d{2}$/;
 
 type CompactPlannerDraft = {
   v: 2 | 3;
@@ -107,81 +111,98 @@ function compactPlannerDraft(snapshot: PlannerSnapshot): CompactPlannerDraft {
   };
 }
 
-function encodedDraft(payload: CompactPlannerDraft) {
+function encodedDraft(payload: CompactPlannerDraft): string {
   return encodeURIComponent(JSON.stringify(payload));
 }
 
-export function serializePlannerDraftCookie(snapshot: PlannerSnapshot) {
+export function serializePlannerDraftCookie(snapshot: PlannerSnapshot): string {
   const payload = compactPlannerDraft(snapshot);
   let encoded = encodedDraft(payload);
-  if (encoded.length <= 3800) return encoded;
+  if (encoded.length <= plannerDraftCookieLimit) return encoded;
 
   payload.p = [];
   encoded = encodedDraft(payload);
-  if (encoded.length <= 3800) return encoded;
+  if (encoded.length <= plannerDraftCookieLimit) return encoded;
 
   payload.x = [];
   encoded = encodedDraft(payload);
-  if (encoded.length <= 3800) return encoded;
+  if (encoded.length <= plannerDraftCookieLimit) return encoded;
 
   payload.s = [];
   return encodedDraft(payload);
 }
 
-export function parsePlannerDraftCookie(
-  cookieHeader: string,
-  validSpotIds: Set<string>,
-) {
-  const encoded = cookieHeader
+function findPlannerDraftCookieValue(cookieHeader: string): string | null {
+  return cookieHeader
     .split(";")
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${PLANNER_DRAFT_COOKIE_KEY}=`))
-    ?.slice(PLANNER_DRAFT_COOKIE_KEY.length + 1);
+    ?.slice(PLANNER_DRAFT_COOKIE_KEY.length + 1) ?? null;
+}
+
+function expandTransitLegProgress(value: unknown): Record<string, unknown> {
+  if (!Array.isArray(value)) return {};
+  return Object.fromEntries(value.flatMap((entry) => {
+    if (!Array.isArray(entry) || entry.length !== 4) return [];
+    return [[entry[0], {
+      date: entry[1],
+      time: entry[2],
+      confirmed: entry[3] === 1,
+    }]];
+  }));
+}
+
+function expandPlannerDays(
+  compact: Partial<CompactPlannerDraft>,
+): unknown[] | undefined {
+  if (compact.v !== 3 || !Array.isArray(compact.q)) return undefined;
+  return compact.q.map((day) => ({
+    id: day?.[0],
+    visitDate: day?.[1],
+    startTime: day?.[2],
+    endTime: day?.[3],
+    itineraryIds: day?.[4],
+    hotelName: day?.[5],
+    appointments: Array.isArray(day?.[6])
+      ? day[6].map((appointment) => ({
+        id: appointment?.[0],
+        title: appointment?.[1],
+        time: appointment?.[2],
+        durationMinutes: appointment?.[3],
+      }))
+      : [],
+  }));
+}
+
+function expandCompactPlannerDraft(compact: Partial<CompactPlannerDraft>): unknown {
+  return {
+    itineraryIds: compact.i,
+    stayMinutes: Object.fromEntries(Array.isArray(compact.s) ? compact.s : []),
+    travelMode: compact.m,
+    optimizeOrder: compact.o === 1,
+    sourceStationId: compact.r,
+    visitDate: compact.d,
+    startTime: compact.t,
+    itineraryCollaborationId: compact.c,
+    completedSpotIds: compact.x,
+    todayOffsetMinutes: compact.f,
+    transitLegProgress: expandTransitLegProgress(compact.p),
+    plannerDays: expandPlannerDays(compact),
+    activeDayIndex: compact.a,
+  };
+}
+
+export function parsePlannerDraftCookie(
+  cookieHeader: string,
+  validSpotIds: Set<string>,
+): PlannerSnapshot | null {
+  const encoded = findPlannerDraftCookieValue(cookieHeader);
   if (!encoded) return null;
 
   try {
     const compact = JSON.parse(decodeURIComponent(encoded)) as Partial<CompactPlannerDraft>;
     if (compact.v !== 2 && compact.v !== 3) return null;
-    const transitLegProgress = Object.fromEntries(
-      Array.isArray(compact.p)
-        ? compact.p.flatMap((entry) => Array.isArray(entry) && entry.length === 4
-          ? [[entry[0], { date: entry[1], time: entry[2], confirmed: entry[3] === 1 }]]
-          : [])
-        : [],
-    );
-    const plannerDays = compact.v === 3 && Array.isArray(compact.q)
-      ? compact.q.map((day) => ({
-        id: day?.[0],
-        visitDate: day?.[1],
-        startTime: day?.[2],
-        endTime: day?.[3],
-        itineraryIds: day?.[4],
-        hotelName: day?.[5],
-        appointments: Array.isArray(day?.[6])
-          ? day[6].map((appointment) => ({
-            id: appointment?.[0],
-            title: appointment?.[1],
-            time: appointment?.[2],
-            durationMinutes: appointment?.[3],
-          }))
-          : [],
-      }))
-      : undefined;
-    return sanitizePlannerSnapshot({
-      itineraryIds: compact.i,
-      stayMinutes: Object.fromEntries(Array.isArray(compact.s) ? compact.s : []),
-      travelMode: compact.m,
-      optimizeOrder: compact.o === 1,
-      sourceStationId: compact.r,
-      visitDate: compact.d,
-      startTime: compact.t,
-      itineraryCollaborationId: compact.c,
-      completedSpotIds: compact.x,
-      todayOffsetMinutes: compact.f,
-      transitLegProgress,
-      plannerDays,
-      activeDayIndex: compact.a,
-    }, validSpotIds);
+    return sanitizePlannerSnapshot(expandCompactPlannerDraft(compact), validSpotIds);
   } catch {
     return null;
   }
@@ -191,7 +212,7 @@ function sanitizePlannerAppointment(value: unknown, index: number): PlannerAppoi
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Partial<PlannerAppointment>;
   const title = typeof candidate.title === "string" ? candidate.title.trim().slice(0, 80) : "";
-  if (!title || typeof candidate.time !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(candidate.time)) {
+  if (!title || typeof candidate.time !== "string" || !strictTimePattern.test(candidate.time)) {
     return null;
   }
   return {
@@ -213,7 +234,7 @@ function sanitizePlannerDay(
 ): PlannerDaySnapshot | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Partial<PlannerDaySnapshot>;
-  const visitDate = typeof candidate.visitDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(candidate.visitDate)
+  const visitDate = typeof candidate.visitDate === "string" && datePattern.test(candidate.visitDate)
     ? candidate.visitDate
     : "";
   if (!visitDate) return null;
@@ -222,10 +243,10 @@ function sanitizePlannerDay(
       ? candidate.id
       : `day-${index + 1}`,
     visitDate,
-    startTime: typeof candidate.startTime === "string" && /^\d{2}:\d{2}$/.test(candidate.startTime)
+    startTime: typeof candidate.startTime === "string" && storedTimePattern.test(candidate.startTime)
       ? candidate.startTime
       : "09:00",
-    endTime: typeof candidate.endTime === "string" && /^\d{2}:\d{2}$/.test(candidate.endTime)
+    endTime: typeof candidate.endTime === "string" && storedTimePattern.test(candidate.endTime)
       ? candidate.endTime
       : "18:00",
     itineraryIds: Array.isArray(candidate.itineraryIds)
@@ -259,9 +280,9 @@ function sanitizeTransitLegProgress(value: unknown): TransitLegProgress {
         const candidate = progress as Record<string, unknown>;
         if (
           typeof candidate.date !== "string" ||
-          !/^\d{4}-\d{2}-\d{2}$/.test(candidate.date) ||
+          !datePattern.test(candidate.date) ||
           typeof candidate.time !== "string" ||
-          !/^([01]\d|2[0-3]):[0-5]\d$/.test(candidate.time)
+          !strictTimePattern.test(candidate.time)
         ) return [];
         return [[id, {
           date: candidate.date,
@@ -272,60 +293,107 @@ function sanitizeTransitLegProgress(value: unknown): TransitLegProgress {
   );
 }
 
+function sanitizeItineraryIds(value: unknown, validSpotIds: ReadonlySet<string>): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === "string" && validSpotIds.has(id));
+}
+
+function sanitizedPlannerDays(
+  value: unknown,
+  validSpotIds: Set<string>,
+): PlannerDaySnapshot[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, 7)
+    .map((day, index) => sanitizePlannerDay(day, validSpotIds, index))
+    .filter((day): day is PlannerDaySnapshot => Boolean(day));
+}
+
+function fallbackPlannerDay(
+  candidate: Partial<PlannerSnapshot>,
+  itineraryIds: string[],
+): PlannerDaySnapshot | null {
+  const visitDate = typeof candidate.visitDate === "string" && datePattern.test(candidate.visitDate)
+    ? candidate.visitDate
+    : "";
+  if (!visitDate) return null;
+
+  return {
+    id: "day-1",
+    visitDate,
+    startTime: typeof candidate.startTime === "string" && storedTimePattern.test(candidate.startTime)
+      ? candidate.startTime
+      : "09:00",
+    endTime: "18:00",
+    itineraryIds,
+    hotelName: "",
+    appointments: [],
+  };
+}
+
+function normalizePlannerDays(
+  candidate: Partial<PlannerSnapshot>,
+  itineraryIds: string[],
+  validSpotIds: Set<string>,
+): PlannerDaySnapshot[] {
+  const plannerDays = sanitizedPlannerDays(candidate.plannerDays, validSpotIds);
+  if (plannerDays.length) return plannerDays;
+  const fallback = fallbackPlannerDay(candidate, itineraryIds);
+  return fallback ? [fallback] : [];
+}
+
+function normalizeActiveDayIndex(value: unknown, dayCount: number): number {
+  if (!Number.isInteger(value)) return 0;
+  return Math.max(0, Math.min(dayCount - 1, Number(value)));
+}
+
+function sanitizeStayMinutes(
+  value: unknown,
+  validSpotIds: ReadonlySet<string>,
+): Record<string, number> {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([id, minutes]) => {
+      if (!validSpotIds.has(id) || !Number.isFinite(minutes)) return [];
+      return [[id, Math.max(0, Math.min(480, Math.round(Number(minutes))))]];
+    }),
+  );
+}
+
+function sanitizeTravelMode(value: unknown): TravelMode {
+  return travelModes.includes(value as TravelMode) ? value as TravelMode : "WALKING";
+}
+
+function sanitizeCompletedSpotIds(
+  value: unknown,
+  itineraryIds: ReadonlySet<string>,
+): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === "string" && itineraryIds.has(id));
+}
+
+function sanitizeTodayOffsetMinutes(value: unknown): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-1440, Math.min(1440, Math.round(Number(value))));
+}
+
 export function sanitizePlannerSnapshot(
   value: unknown,
   validSpotIds: Set<string>,
 ): PlannerSnapshot | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<PlannerSnapshot>;
-  const itineraryIds = Array.isArray(candidate.itineraryIds)
-    ? candidate.itineraryIds.filter((id): id is string => typeof id === "string" && validSpotIds.has(id))
-    : [];
-  const plannerDays = Array.isArray(candidate.plannerDays)
-    ? candidate.plannerDays
-      .slice(0, 7)
-      .map((day, index) => sanitizePlannerDay(day, validSpotIds, index))
-      .filter((day): day is PlannerDaySnapshot => Boolean(day))
-    : [];
-  const fallbackVisitDate = typeof candidate.visitDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(candidate.visitDate)
-    ? candidate.visitDate
-    : "";
-  const normalizedDays = plannerDays.length
-    ? plannerDays
-    : fallbackVisitDate
-      ? [{
-        id: "day-1",
-        visitDate: fallbackVisitDate,
-        startTime: typeof candidate.startTime === "string" && /^\d{2}:\d{2}$/.test(candidate.startTime)
-          ? candidate.startTime
-          : "09:00",
-        endTime: "18:00",
-        itineraryIds,
-        hotelName: "",
-        appointments: [],
-      }]
-      : [];
+  const itineraryIds = sanitizeItineraryIds(candidate.itineraryIds, validSpotIds);
+  const normalizedDays = normalizePlannerDays(candidate, itineraryIds, validSpotIds);
   if (!normalizedDays.length) return null;
-  const activeDayIndex = Number.isInteger(candidate.activeDayIndex)
-    ? Math.max(0, Math.min(normalizedDays.length - 1, Number(candidate.activeDayIndex)))
-    : 0;
+  const activeDayIndex = normalizeActiveDayIndex(candidate.activeDayIndex, normalizedDays.length);
   const activeDay = normalizedDays[activeDayIndex];
   const allItineraryIds = new Set(normalizedDays.flatMap((day) => day.itineraryIds));
 
-  const stayMinutes = Object.fromEntries(
-    Object.entries(candidate.stayMinutes ?? {}).flatMap(([id, minutes]) => {
-      if (!validSpotIds.has(id) || !Number.isFinite(minutes)) return [];
-      return [[id, Math.max(0, Math.min(480, Math.round(Number(minutes))))]];
-    }),
-  );
-  const travelMode = travelModes.includes(candidate.travelMode as TravelMode)
-    ? candidate.travelMode as TravelMode
-    : "WALKING";
-
   return {
     itineraryIds: activeDay.itineraryIds,
-    stayMinutes,
-    travelMode,
+    stayMinutes: sanitizeStayMinutes(candidate.stayMinutes, validSpotIds),
+    travelMode: sanitizeTravelMode(candidate.travelMode),
     optimizeOrder: candidate.optimizeOrder === true,
     sourceStationId: typeof candidate.sourceStationId === "string" ? candidate.sourceStationId : "",
     visitDate: activeDay.visitDate,
@@ -333,12 +401,8 @@ export function sanitizePlannerSnapshot(
     itineraryCollaborationId: typeof candidate.itineraryCollaborationId === "string"
       ? candidate.itineraryCollaborationId
       : "",
-    completedSpotIds: Array.isArray(candidate.completedSpotIds)
-      ? candidate.completedSpotIds.filter((id): id is string => typeof id === "string" && allItineraryIds.has(id))
-      : [],
-    todayOffsetMinutes: Number.isFinite(candidate.todayOffsetMinutes)
-      ? Math.max(-1440, Math.min(1440, Math.round(Number(candidate.todayOffsetMinutes))))
-      : 0,
+    completedSpotIds: sanitizeCompletedSpotIds(candidate.completedSpotIds, allItineraryIds),
+    todayOffsetMinutes: sanitizeTodayOffsetMinutes(candidate.todayOffsetMinutes),
     transitLegProgress: sanitizeTransitLegProgress(candidate.transitLegProgress),
     plannerDays: normalizedDays,
     activeDayIndex,

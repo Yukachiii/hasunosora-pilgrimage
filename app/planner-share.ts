@@ -54,11 +54,54 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function uniqueValidSpotIds(value: unknown, validSpotIds: ReadonlySet<string>) {
+function uniqueValidSpotIds(value: unknown, validSpotIds: ReadonlySet<string>): string[] {
   if (!Array.isArray(value)) return [];
   return Array.from(new Set(value.filter(
     (id): id is string => typeof id === "string" && validSpotIds.has(id),
   ))).slice(0, maximumSharedStopsPerDay);
+}
+
+function clampSharedStayMinutes(minutes: number): number {
+  return Math.max(0, Math.min(maximumSharedStayMinutes, Math.round(minutes)));
+}
+
+function sanitizeSharedPlanDay(
+  value: unknown,
+  validSpotIds: ReadonlySet<string>,
+): SharedPlanDaySnapshot | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.startTime !== "string" || !timePattern.test(value.startTime)) return null;
+  if (typeof value.endTime !== "string" || !timePattern.test(value.endTime)) return null;
+  if (
+    value.visitDate !== undefined &&
+    (typeof value.visitDate !== "string" || !datePattern.test(value.visitDate))
+  ) return null;
+
+  return {
+    itineraryIds: uniqueValidSpotIds(value.itineraryIds, validSpotIds),
+    startTime: value.startTime,
+    endTime: value.endTime,
+    ...(typeof value.visitDate === "string" ? { visitDate: value.visitDate } : {}),
+  };
+}
+
+function sanitizeSharedStayMinutes(
+  value: unknown,
+  includedSpotIds: ReadonlySet<string>,
+): Record<string, number> {
+  if (!isRecord(value)) return {};
+
+  const stayMinutes: Record<string, number> = {};
+  for (const [id, rawMinutes] of Object.entries(value)) {
+    if (!includedSpotIds.has(id) || !Number.isFinite(rawMinutes)) continue;
+    stayMinutes[id] = clampSharedStayMinutes(Number(rawMinutes));
+  }
+  return stayMinutes;
+}
+
+function normalizeActiveDayIndex(value: unknown, dayCount: number): number {
+  if (!Number.isInteger(value)) return 0;
+  return Math.max(0, Math.min(dayCount - 1, Number(value)));
 }
 
 /**
@@ -98,7 +141,7 @@ export function createSharedPlanSnapshot(
   const stayMinutes = Object.fromEntries(
     Object.entries(snapshot.stayMinutes).flatMap(([id, minutes]) =>
       includedSpotIds.has(id) && Number.isFinite(minutes)
-        ? [[id, Math.max(0, Math.min(maximumSharedStayMinutes, Math.round(minutes)))]]
+        ? [[id, clampSharedStayMinutes(minutes)]]
         : []),
   );
 
@@ -128,43 +171,16 @@ export function sanitizeSharedPlanSnapshot(
 
   const days: SharedPlanDaySnapshot[] = [];
   for (const rawDay of value.days) {
-    if (!isRecord(rawDay)) return null;
-    if (
-      typeof rawDay.startTime !== "string" ||
-      !timePattern.test(rawDay.startTime) ||
-      typeof rawDay.endTime !== "string" ||
-      !timePattern.test(rawDay.endTime)
-    ) return null;
-    if (
-      rawDay.visitDate !== undefined &&
-      (typeof rawDay.visitDate !== "string" || !datePattern.test(rawDay.visitDate))
-    ) return null;
-
-    days.push({
-      itineraryIds: uniqueValidSpotIds(rawDay.itineraryIds, validSpotIds),
-      startTime: rawDay.startTime,
-      endTime: rawDay.endTime,
-      ...(typeof rawDay.visitDate === "string" ? { visitDate: rawDay.visitDate } : {}),
-    });
+    const day = sanitizeSharedPlanDay(rawDay, validSpotIds);
+    if (!day) return null;
+    days.push(day);
   }
 
   const includedSpotIds = new Set(days.flatMap((day) => day.itineraryIds));
   if (!includedSpotIds.size) return null;
 
-  const stayMinutes: Record<string, number> = {};
-  if (isRecord(value.stayMinutes)) {
-    for (const [id, rawMinutes] of Object.entries(value.stayMinutes)) {
-      if (!includedSpotIds.has(id) || !Number.isFinite(rawMinutes)) continue;
-      stayMinutes[id] = Math.max(
-        0,
-        Math.min(maximumSharedStayMinutes, Math.round(Number(rawMinutes))),
-      );
-    }
-  }
-
-  const activeDayIndex = Number.isInteger(value.activeDayIndex)
-    ? Math.max(0, Math.min(days.length - 1, Number(value.activeDayIndex)))
-    : 0;
+  const stayMinutes = sanitizeSharedStayMinutes(value.stayMinutes, includedSpotIds);
+  const activeDayIndex = normalizeActiveDayIndex(value.activeDayIndex, days.length);
 
   return {
     version: SHARED_PLAN_VERSION,
@@ -176,7 +192,7 @@ export function sanitizeSharedPlanSnapshot(
   };
 }
 
-function dateWithDayOffset(value: string, days: number) {
+function dateWithDayOffset(value: string, days: number): string {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
   return date.toISOString().slice(0, 10);
@@ -255,7 +271,7 @@ function expandCompactSharedPlan(value: unknown): unknown {
   };
 }
 
-function bytesToBase64Url(bytes: Uint8Array) {
+function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
   const chunkSize = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
@@ -269,7 +285,7 @@ function bytesToBase64Url(bytes: Uint8Array) {
 
 // This checksum detects a damaged share token. It is not an authenticity
 // signature: the shared plan contains public, strictly sanitized data only.
-function tokenChecksum(bytes: Uint8Array) {
+function tokenChecksum(bytes: Uint8Array): string {
   let hash = 0x811c9dc5;
   for (const byte of bytes) {
     hash ^= byte;
@@ -278,7 +294,7 @@ function tokenChecksum(bytes: Uint8Array) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function base64UrlToBytes(value: string) {
+function base64UrlToBytes(value: string): Uint8Array | null {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
   const paddingLength = (4 - (value.length % 4)) % 4;
   const encoded = value.replaceAll("-", "+").replaceAll("_", "/") + "=".repeat(paddingLength);
@@ -294,7 +310,7 @@ function base64UrlToBytes(value: string) {
 export function encodeSharedPlanSnapshot(
   snapshot: SharedPlanSnapshot,
   validSpotIds: ReadonlySet<string>,
-) {
+): string | null {
   const sanitized = sanitizeSharedPlanSnapshot(snapshot, validSpotIds);
   if (!sanitized) return null;
   const bytes = new TextEncoder().encode(JSON.stringify(compactSharedPlan(sanitized)));
@@ -306,7 +322,7 @@ export function encodeSharedPlanSnapshot(
 export function decodeSharedPlanSnapshot(
   token: string,
   validSpotIds: ReadonlySet<string>,
-) {
+): SharedPlanSnapshot | null {
   if (!token || token.length > SHARED_PLAN_MAX_TOKEN_LENGTH) return null;
   const parts = token.split(".");
   if (parts.length !== 2 || !/^[a-f0-9]{8}$/.test(parts[1])) return null;
