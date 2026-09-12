@@ -757,7 +757,9 @@ function ExploreFeature({ model }: { model: ExploreRenderModel }): ReactElement 
   return (
     <div className="ui-trial__feature">
       {selectedId && selectedSpot && !selectedSpotPhoto ? <EmptySpotPhoto className="ui-trial__feature-photo-empty" spotName={selectedSpot.name} /> : <img key={selectedId && selectedSpot ? selectedSpot.id : "empty"} src={selectedSpotPhoto ?? fallbackPhoto} alt={selectedId && selectedSpot ? `${selectedSpot.name}の写真` : "金沢市内のメインビジュアル"} />}
-      <div className="ui-trial__feature-brand" aria-label="蓮ノ旅"><span aria-hidden="true">蓮</span><span><strong>蓮ノ旅</strong><small>HASUNOSORA PILGRIMAGE GUIDE</small></span></div>
+      <div className="ui-trial__feature-brand">
+        <img className="ui-trial__feature-logo" src={assetUrl("brand/hero-logo-c.png")} alt="蓮ノ旅" />
+      </div>
       {selectedId && selectedSpot ? <div className="ui-trial__feature-title"><small>{selectedSpot.area} / {selectedSpot.category}</small><h2><SpotName name={selectedSpot.name} /></h2></div> : null}
       {selectedId && selectedSpot ? <article><small>{exploreChoices.find((choice) => choice.mode === mode)?.label.toUpperCase()} / {String(selectedNumber).padStart(2, "0")}</small><h2><SpotName name={selectedSpot.name} /></h2><p>{selectedSpot.area}　·　{selectedSpot.category}</p>{selectedCollaborationLocation ? <p className="ui-trial__feature-context">{selectedCollaborationLocation.role}{selectedCollaborationLocation.members?.length ? ` / ${selectedCollaborationLocation.members.join("・")}` : ""}</p> : null}<p>{selectedSpot.description}</p><div className="ui-trial__feature-actions"><button className={selectedIsPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!selectedIsPlanned && planned.length >= maximumItineraryStops} onClick={() => onTogglePlanned(selectedSpot)}>{selectedIsPlanned ? "予定から外す" : "予定に追加"} <span aria-hidden="true">{selectedIsPlanned ? "−" : "+"}</span></button><a href="#/explore/map">地図で見る <span aria-hidden="true">→</span></a></div></article> : null}
     </div>

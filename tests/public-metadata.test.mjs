@@ -70,7 +70,9 @@ test("public metadata and guide pages refer only to existing assets", async () =
     ...site.heroImages,
     ...manifest.icons.map((icon) => `/${icon.src}`),
     "/og.png",
-    "/favicon.svg",
+    "/favicon-32.png",
+    "/apple-touch-icon.png",
+    "/brand/hero-logo-c.png",
   ].filter(Boolean));
   await Promise.all([...assetPaths].map((assetPath) =>
     access(new URL(`../public/${assetPath.replace(/^\//, "")}`, import.meta.url))));
