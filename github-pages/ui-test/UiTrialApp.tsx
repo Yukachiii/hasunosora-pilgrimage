@@ -68,8 +68,11 @@ type ModalState =
   | { kind: "image"; src: string; alt: string; credit?: string; copyright?: string }
   | { kind: "share"; url: string; includeDates: boolean }
   | { kind: "spot"; spot: PilgrimageSpot; photos: string[]; credits: Record<string, string> }
+  | { kind: "card"; card: CardModelLocation; spot?: PilgrimageSpot }
   | { kind: "spot-map"; spot: PilgrimageSpot }
   | null;
+
+type OpenImageHandler = (src: string, alt: string, credit?: string, copyright?: string) => void;
 
 type UiTrialAppProps = {
   spots: PilgrimageSpot[];
@@ -334,7 +337,8 @@ type ExplorePageProps = {
   onNavigate: (page: TrialPage) => void;
   onOpenMap: () => void;
   onOpenSpot: (spot: PilgrimageSpot) => void;
-  onOpenImage: (src: string, alt: string, credit?: string, copyright?: string) => void;
+  onOpenCard: (card: CardModelLocation, spot?: PilgrimageSpot) => void;
+  onOpenImage: OpenImageHandler;
   onFillCollaboration: (collaboration: PilgrimageCollaboration) => void;
 };
 
@@ -792,13 +796,17 @@ function ExploreModalFilters({ model }: { model: ExploreRenderModel }): ReactEle
 }
 
 function ExploreCardResult({ card, model }: { card: CardModelLocation; model: ExploreRenderModel }): ReactElement {
-  const { onOpenImage, onTogglePlanned, planned, spots } = model.props;
+  const { onOpenCard, onOpenImage, onTogglePlanned, planned, spots } = model.props;
   const spot = spots.find((item) => item.id === card.spotId);
   const isPlanned = Boolean(spot && planned.some((item) => item.id === spot.id));
+  const openDetails = (): void => {
+    if (spot) model.setSelectedId(spot.id);
+    onOpenCard(card, spot);
+  };
   return (
-    <article className={spot ? (model.selectedId === spot.id ? "is-selected" : "") : "is-unlinked"} onClick={spot ? () => model.setSelectedId(spot.id) : undefined}>
+    <article className={spot && model.selectedId === spot.id ? "is-selected" : ""} onClick={openDetails}>
       {card.imageUrl ? <button className="ui-trial__card-image-button" type="button" aria-label={`${card.card}のカードイラストを拡大表示`} onClick={(event) => { event.stopPropagation(); onOpenImage(displayAssetUrl(card.imageUrl!), card.card, undefined, CARD_ILLUSTRATION_COPYRIGHT); }}><img src={displayAssetUrl(card.imageUrl)} alt="" loading="lazy" /><small>{CARD_ILLUSTRATION_COPYRIGHT}</small></button> : null}
-      <div><small>{card.card}</small><strong><SpotName name={card.model} /></strong><span>{spot ? <SpotName name={spot.name} /> : "スポット未登録"}</span><em>{card.characters.join("・")}</em><p>{card.address}</p>{card.note ? <p>{card.note}</p> : null}<a href={card.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>出典を開く <span aria-hidden="true">↗</span></a></div>
+      <div><small>{card.card}</small><strong><SpotName name={card.model} /></strong><span>{spot ? <SpotName name={spot.name} /> : "スポット未登録"}</span><em>{card.characters.join("・")}</em><p>{card.address}</p>{card.note ? <p>{card.note}</p> : null}<button className="ui-trial__spot-detail-link" type="button" onClick={(event) => { event.stopPropagation(); openDetails(); }}>詳細を見る <span aria-hidden="true">→</span></button><a href={card.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>出典を開く <span aria-hidden="true">↗</span></a></div>
       {spot ? <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && planned.length >= maximumItineraryStops} onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button> : null}
     </article>
   );
@@ -806,13 +814,13 @@ function ExploreCardResult({ card, model }: { card: CardModelLocation; model: Ex
 
 function ExploreSpotResult({ model, spot }: { model: ExploreRenderModel; spot: PilgrimageSpot }): ReactElement {
   const { currentCollaboration, openExploreModal, selectedId } = model;
-  const { onOpenImage, onOpenSpot, onTogglePlanned, photoCredits, planned, spotPhotoGroups } = model.props;
+  const { onOpenSpot, onTogglePlanned, planned, spotPhotoGroups } = model.props;
   const isPlanned = planned.some((item) => item.id === spot.id);
   const source = spotPhoto(spot, spotPhotoGroups);
   const collaborationLocation = openExploreModal === "collaboration" ? currentCollaboration?.locations.find((location) => location.spotId === spot.id) : undefined;
   return (
     <article className={selectedId === spot.id ? "is-selected" : ""} onClick={() => { model.setSelectedId(spot.id); if (window.matchMedia("(max-width: 760px)").matches) onOpenSpot(spot); }}>
-      {openExploreModal !== "collaboration" ? source ? <button className="ui-trial__spot-result-photo" type="button" aria-label={`${spot.name}の写真を拡大表示`} onClick={(event) => { event.stopPropagation(); onOpenImage(source, `${spot.name}の写真`, photoCredits[source]); }}><img src={source} alt="" loading="lazy" /></button> : <EmptySpotPhoto className="ui-trial__spot-result-photo" spotName={spot.name} /> : null}
+      {openExploreModal !== "collaboration" ? source ? <span className="ui-trial__spot-result-photo" aria-hidden="true"><img src={source} alt="" loading="lazy" /></span> : <EmptySpotPhoto className="ui-trial__spot-result-photo" spotName={spot.name} /> : null}
       <div><small>{spot.area} · {spot.category}</small><strong><SpotName name={spot.name} /></strong><span>{collaborationLocation?.role ?? spot.address}</span>{collaborationLocation?.members?.length ? <em>等身パネル：{collaborationLocation.members.join("・")}</em> : null}{openExploreModal === "spots" ? <><em>{formatOpeningHours(spot)}</em>{publicSpotDescription(spot.description) ? <p>{publicSpotDescription(spot.description)}</p> : null}{spot.activityRecords?.length ? <p>活動記録：{spot.activityRecords.join("・")}</p> : null}{spot.sehasEpisodes?.length ? <p>せーはす！：{spot.sehasEpisodes.join("・")}</p> : null}{spot.withMeetsEpisodes?.length ? <p>With×MEETS：{spot.withMeetsEpisodes.join("・")}</p> : null}{spot.appearances?.length ? <p>登場：{spot.appearances.join("・")}</p> : null}{spot.collaborationIds?.length ? <p>コラボ：{spot.collaborationIds.map((id) => collaborations.find((collaboration) => collaboration.id === id)?.name).filter(Boolean).join("・")}</p> : null}<button className="ui-trial__spot-detail-link" type="button" onClick={(event) => { event.stopPropagation(); onOpenSpot(spot); }}>詳細を見る <span aria-hidden="true">→</span></button><a href={spot.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>場所・公式情報 <span aria-hidden="true">↗</span></a></> : null}</div>
       <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && planned.length >= maximumItineraryStops} onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
     </article>
@@ -1554,12 +1562,14 @@ type OpenModalState = Exclude<ModalState, null>;
 type ImageModalState = Extract<OpenModalState, { kind: "image" }>;
 type ShareModalState = Extract<OpenModalState, { kind: "share" }>;
 type SpotModalState = Extract<OpenModalState, { kind: "spot" }>;
+type CardModalState = Extract<OpenModalState, { kind: "card" }>;
 type SpotMapModalState = Extract<OpenModalState, { kind: "spot-map" }>;
 type ModalDragState = { pointerId: number; startY: number; dragged: boolean };
 
 function modalTitle(modal: OpenModalState): string {
   if (modal.kind === "share") return "予定を共有";
   if (modal.kind === "image") return modal.alt;
+  if (modal.kind === "card") return modal.card.card;
   if (modal.kind === "spot-map") return `${modal.spot.name}の地図`;
   return modal.spot.name;
 }
@@ -1613,7 +1623,7 @@ function finishModalDrag(
   }
   if (drag.dragged && deltaY >= 90) {
     dialog.classList.add("is-closing");
-    dialog.style.transform = "translateY(calc(100% + 24px))";
+    dialog.style.transform = "translateY(var(--ui-trial-modal-close-distance, calc(100% + 24px)))";
     window.setTimeout(onClose, 190);
     return;
   }
@@ -1652,6 +1662,40 @@ function ImageModalContent({ modal }: { modal: ImageModalState }): ReactElement 
   );
 }
 
+function CardModalIllustration({ card }: { card: CardModelLocation }): ReactElement | null {
+  if (!card.imageUrl) return null;
+  return (
+    <div className="ui-trial__spot-detail-photos ui-trial__card-detail-photo">
+      <figure><img src={displayAssetUrl(card.imageUrl)} alt={`${card.card}のカードイラスト`} /><figcaption>{CARD_ILLUSTRATION_COPYRIGHT}</figcaption></figure>
+    </div>
+  );
+}
+
+function CardModalContent({ modal, onToggleSpot, plannedSpotIds }: {
+  modal: CardModalState;
+  onToggleSpot: (spotId: string) => void;
+  plannedSpotIds: string[];
+}): ReactElement {
+  const { card, spot } = modal;
+  const isPlanned = Boolean(spot && plannedSpotIds.includes(spot.id));
+  return (
+    <div className="ui-trial__spot-detail-dialog">
+      <CardModalIllustration card={card} />
+      <div className="ui-trial__spot-detail-copy">
+        <small>CARD MODEL</small><h2>{card.card}</h2>
+        <p>{card.characters.join("・")}</p>
+        <div className="ui-trial__spot-facts"><span>モデル地：{card.model}</span>{spot ? <span>関連スポット：{spot.name}</span> : null}<span>所在地：{card.address}</span></div>
+        {card.note ? <p>{card.note}</p> : null}
+        <div className="ui-trial__spot-detail-actions">
+          {spot ? <a href={`https://www.google.com/maps/search/?api=1&query=${spot.lat},${spot.lng}`} target="_blank" rel="noreferrer">地図で開く <span aria-hidden="true">↗</span></a> : null}
+          {spot ? <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && plannedSpotIds.length >= maximumItineraryStops} onClick={() => onToggleSpot(spot.id)}>{isPlanned ? "予定から外す −" : "予定に追加 ＋"}</button> : null}
+          <a href={card.sourceUrl} target="_blank" rel="noreferrer">出典を開く <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ShareModalContent({ modal, feedback, onCopy, onShare, onUpdateShareDates }: {
   modal: ShareModalState;
   feedback: string;
@@ -1674,7 +1718,7 @@ function ShareModalContent({ modal, feedback, onCopy, onShare, onUpdateShareDate
 
 function SpotModalContent({ modal, onOpenImage, plannedSpotIds, onToggleSpot }: {
   modal: SpotModalState;
-  onOpenImage: (src: string, alt: string, credit?: string) => void;
+  onOpenImage: OpenImageHandler;
   plannedSpotIds: string[];
   onToggleSpot: (spotId: string) => void;
 }): ReactElement {
@@ -1705,7 +1749,7 @@ function SpotModalContent({ modal, onOpenImage, plannedSpotIds, onToggleSpot }: 
 
 function SpotModalPhotos({ modal, onOpenImage }: {
   modal: SpotModalState;
-  onOpenImage: (src: string, alt: string, credit?: string) => void;
+  onOpenImage: OpenImageHandler;
 }): ReactElement {
   return (
     <div className="ui-trial__spot-detail-photos">
@@ -1737,7 +1781,7 @@ function ModalContent({ modal, feedback, onCopy, onOpenImage, onShare, onToggleS
   modal: OpenModalState;
   feedback: string;
   onCopy: () => void;
-  onOpenImage: (src: string, alt: string, credit?: string) => void;
+  onOpenImage: OpenImageHandler;
   onShare: () => void;
   onToggleSpot: (spotId: string) => void;
   onUpdateShareDates: (includeDates: boolean) => void;
@@ -1746,13 +1790,14 @@ function ModalContent({ modal, feedback, onCopy, onOpenImage, onShare, onToggleS
   if (modal.kind === "image") return <ImageModalContent modal={modal} />;
   if (modal.kind === "share") return <ShareModalContent modal={modal} feedback={feedback} onCopy={onCopy} onShare={onShare} onUpdateShareDates={onUpdateShareDates} />;
   if (modal.kind === "spot") return <SpotModalContent modal={modal} onOpenImage={onOpenImage} plannedSpotIds={plannedSpotIds} onToggleSpot={onToggleSpot} />;
+  if (modal.kind === "card") return <CardModalContent modal={modal} plannedSpotIds={plannedSpotIds} onToggleSpot={onToggleSpot} />;
   return <SpotMapModalContent modal={modal} plannedSpotIds={plannedSpotIds} />;
 }
 
 function TrialModal({ modal, onClose, onOpenImage, onUpdateShareDates, plannedSpotIds, onToggleSpot }: {
   modal: ModalState;
   onClose: () => void;
-  onOpenImage: (src: string, alt: string, credit?: string) => void;
+  onOpenImage: OpenImageHandler;
   onUpdateShareDates: (includeDates: boolean) => void;
   plannedSpotIds: string[];
   onToggleSpot: (spotId: string) => void;
@@ -1766,7 +1811,7 @@ function TrialModal({ modal, onClose, onOpenImage, onUpdateShareDates, plannedSp
   if (!modal) return null;
 
   return (
-    <div className="ui-trial__modal" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className={`ui-trial__modal ui-trial__modal--${modal.kind}`} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section
         ref={dialogRef}
         className={`ui-trial__modal-dialog ui-trial__modal-dialog--${modal.kind}`}
@@ -1916,7 +1961,7 @@ function TrialContent({ app, actions, heroImage, location, onReorderStateChange,
   const { exploreMapView, sharedPlan, sharedPlanKey, view } = location;
   return (
     <main>
-      {view === "explore" ? <ExplorePage spots={spots} spotPhotoGroups={spotPhotoGroups} photoCredits={photoCredits} fallbackPhoto={heroImage} planned={planner.itinerarySpots} mapView={exploreMapView} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={actions.navigate} onOpenMap={actions.openExploreMap} onOpenSpot={(spot) => setModal({ kind: "spot", spot, photos: spotPhotoGroups[spot.id]?.length ? spotPhotoGroups[spot.id] : spot.imageUrl ? [spot.imageUrl] : [], credits: photoCredits })} onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })} onFillCollaboration={(collaboration) => { planner.addToActiveItinerary(collaboration.locations.map((item) => item.spotId)); actions.navigate("planner"); }} /> : null}
+      {view === "explore" ? <ExplorePage spots={spots} spotPhotoGroups={spotPhotoGroups} photoCredits={photoCredits} fallbackPhoto={heroImage} planned={planner.itinerarySpots} mapView={exploreMapView} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={actions.navigate} onOpenMap={actions.openExploreMap} onOpenSpot={(spot) => setModal({ kind: "spot", spot, photos: spotPhotoGroups[spot.id]?.length ? spotPhotoGroups[spot.id] : spot.imageUrl ? [spot.imageUrl] : [], credits: photoCredits })} onOpenCard={(card, spot) => setModal({ kind: "card", card, spot })} onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })} onFillCollaboration={(collaboration) => { planner.addToActiveItinerary(collaboration.locations.map((item) => item.spotId)); actions.navigate("planner"); }} /> : null}
       {view === "planner" ? <PlannerPage planner={planner} onOpenShare={actions.openShare} onReorderStateChange={onReorderStateChange} /> : null}
       {view === "today" ? <TodayPage planner={planner} onOpenPlanner={() => actions.navigate("planner")} onOpenSpotMap={(spot) => setModal({ kind: "spot-map", spot })} /> : null}
       {view === "guide" ? <GuidePage onNavigate={actions.navigate} onOpenImage={(src, alt) => setModal({ kind: "image", src, alt })} communitySubmissionsEnabled={communitySubmissionsEnabled} /> : null}
@@ -1942,7 +1987,7 @@ function TrialShell(props: TrialShellProps): ReactElement {
       <TrialContent {...props} />
       <footer className="ui-trial__site-footer"><span>蓮ノ旅 Ver.{app.siteVersion}</span><small>非公式の聖地巡礼ガイドです。</small></footer>
       <TrialNavigation page={page} itineraryCount={allPlannedSpotCount} onNavigate={actions.navigate} />
-      <TrialModal modal={modal} onClose={closeModal} onOpenImage={(src, alt, credit) => setModal({ kind: "image", src, alt, credit })} onUpdateShareDates={actions.updateShareDates} plannedSpotIds={planner.itineraryIds} onToggleSpot={planner.toggleSpot} />
+      <TrialModal modal={modal} onClose={closeModal} onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })} onUpdateShareDates={actions.updateShareDates} plannedSpotIds={planner.itineraryIds} onToggleSpot={planner.toggleSpot} />
     </div>
   );
 }

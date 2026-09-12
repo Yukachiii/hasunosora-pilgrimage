@@ -1887,10 +1887,6 @@ a {
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
-.ui-trial__card-results article.is-unlinked {
-  cursor: default;
-}
-
 .ui-trial__spot-results article:hover,
 .ui-trial__card-results article:hover,
 .ui-trial__spot-results article.is-selected,
@@ -2666,12 +2662,12 @@ a {
   border: 0;
   border-radius: 11px 11px 11px 3px;
   background: #e5ebe7;
-  cursor: zoom-in;
 }
 
 .ui-trial__spot-result-photo {
   width: 92px;
   height: 74px;
+  cursor: pointer;
 }
 
 .ui-trial__spot-result-photo img {
@@ -2759,9 +2755,14 @@ a {
   cursor: default;
 }
 
+.ui-trial__spot-results article > .ui-trial__spot-result-photo.is-empty {
+  cursor: pointer;
+}
+
 .ui-trial__card-image-button {
   width: 92px;
   height: 70px;
+  cursor: zoom-in;
 }
 
 .ui-trial__card-results article {
@@ -3804,6 +3805,11 @@ a {
   height: 280px;
   max-height: none;
   object-fit: cover;
+}
+
+.ui-trial__modal-dialog .ui-trial__card-detail-photo img {
+  height: min(52dvh, 520px);
+  object-fit: contain;
 }
 
 .ui-trial__spot-detail-photos figcaption {
@@ -5320,7 +5326,8 @@ a {
     font-size: 8px;
   }
 
-  .ui-trial__spot-results .ui-trial__spot-detail-link {
+  .ui-trial__spot-results .ui-trial__spot-detail-link,
+  .ui-trial__card-results .ui-trial__spot-detail-link {
     display: inline-flex;
     width: fit-content;
     min-height: 27px;
@@ -5361,7 +5368,7 @@ a {
 
   .ui-trial__planner-fields {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
     overflow: visible;
     margin-top: 18px;
@@ -5369,6 +5376,7 @@ a {
 
   .ui-trial__planner-fields label {
     display: grid;
+    min-width: 0;
     gap: 5px;
   }
 
@@ -5379,8 +5387,9 @@ a {
   .ui-trial__planner-fields input,
   .ui-trial__planner-fields select {
     width: 100%;
+    min-width: 0;
     min-height: 44px;
-    max-width: none;
+    max-width: 100%;
     padding: 0 11px;
     border: 1px solid var(--trial-line);
     border-radius: 11px;
@@ -5513,6 +5522,10 @@ a {
     height: 220px;
   }
 
+  .ui-trial__modal-dialog .ui-trial__card-detail-photo img {
+    height: min(42dvh, 300px);
+  }
+
   .ui-trial__spot-detail-photo-empty {
     height: 220px;
   }
@@ -5544,6 +5557,27 @@ a {
 
   .ui-trial__spot-detail-actions {
     grid-template-columns: 1fr;
+  }
+
+  .ui-trial__modal--image {
+    align-items: center;
+    padding: 17px;
+  }
+
+  .ui-trial__modal--image .ui-trial__modal-dialog--image {
+    --ui-trial-modal-close-distance: calc(50dvh + 50% + 24px);
+    width: min(100%, 620px);
+    max-height: calc(100dvh - 34px);
+    border-radius: 24px;
+    animation-name: ui-trial-spot-window-enter;
+  }
+
+  .ui-trial__modal--image .ui-trial__modal-handle {
+    display: none;
+  }
+
+  .ui-trial__modal--image .ui-trial__modal-dialog--image figure {
+    max-height: calc(100dvh - 96px);
   }
 
   .ui-trial__single-spot-map {
