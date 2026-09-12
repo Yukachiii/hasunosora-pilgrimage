@@ -49,6 +49,7 @@ import {
   filterTrialCards,
   hasValidTimeWindow,
   hasValidVisitDate,
+  isItineraryComplete,
   orderItemsByIds,
 } from "./trial-utils";
 
@@ -456,13 +457,19 @@ function ExplorePage({
       : filteredStandardSpots.length;
   const noopRouteResult = useCallback(() => undefined, []);
 
+  const closeExploreModal = useCallback(() => {
+    exploreSheetDragRef.current = null;
+    setExploreSheetExpanded(false);
+    setOpenExploreModal(null);
+  }, []);
+
   useEffect(() => {
     if (!openExploreModal) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const focusTimer = window.setTimeout(() => exploreModalCloseRef.current?.focus(), 0);
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenExploreModal(null);
+      if (event.key === "Escape") closeExploreModal();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -470,7 +477,7 @@ function ExplorePage({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [openExploreModal]);
+  }, [closeExploreModal, openExploreModal]);
 
   function beginExploreSheetDrag(event: ReactPointerEvent<HTMLElement>) {
     if (window.innerWidth > 760 || !event.isPrimary || event.button !== 0) return;
@@ -537,7 +544,7 @@ function ExplorePage({
     if (drag.dragged && deltaY >= closeDistance) {
       dialog.classList.add("is-closing");
       dialog.style.transform = "translateY(calc(100% + 24px))";
-      window.setTimeout(() => setOpenExploreModal(null), 190);
+      window.setTimeout(closeExploreModal, 190);
       return;
     }
     dialog.style.removeProperty("height");
@@ -547,7 +554,6 @@ function ExplorePage({
   }
 
   function openMode(nextMode: Exclude<ExploreMode, "map">) {
-    setExploreSheetExpanded(false);
     setModalFiltersExpanded(false);
     exploreSheetDragRef.current = null;
     if (mode !== nextMode) {
@@ -569,7 +575,7 @@ function ExplorePage({
 
   function selectExploreMode(nextMode: ExploreMode) {
     if (nextMode === "map") {
-      setOpenExploreModal(null);
+      closeExploreModal();
       openMainMap();
       return;
     }
@@ -578,7 +584,7 @@ function ExplorePage({
 
   function openMainMap() {
     if (window.matchMedia("(max-width: 760px)").matches && !mapView) {
-      setOpenExploreModal(null);
+      closeExploreModal();
       window.setTimeout(() => document.getElementById("ui-trial-main-map")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
       return;
     }
@@ -800,7 +806,7 @@ function ExplorePage({
       {openExploreModal ? (
         <div
           className="ui-trial__modal ui-trial__explore-window"
-          onClick={(event) => { if (event.target === event.currentTarget) setOpenExploreModal(null); }}
+          onClick={(event) => { if (event.target === event.currentTarget) closeExploreModal(); }}
         >
           <section
             ref={exploreModalDialogRef}
@@ -820,7 +826,7 @@ function ExplorePage({
                 <strong id="ui-trial-explore-window-title">{modalTitle}</strong>
                 <span>{modalResultCount}件</span>
               </div>
-              <button ref={exploreModalCloseRef} type="button" onClick={() => setOpenExploreModal(null)} aria-label={`${modalTitle}を閉じる`}>×</button>
+              <button ref={exploreModalCloseRef} type="button" onClick={closeExploreModal} aria-label={`${modalTitle}を閉じる`}>×</button>
             </header>
             <ExploreModeTabs activeMode={openExploreModal} onSelect={selectExploreMode} />
             {openExploreModal === "collaboration" ? (
@@ -1348,6 +1354,7 @@ function TodayPage({ planner, onOpenPlanner, onOpenSpotMap }: {
 }) {
   const todaySpots = planner.routeIsCurrent ? planner.plannedSpots : planner.itinerarySpots;
   const completedCount = planner.itineraryIds.filter((id) => planner.completedSpotIds.includes(id)).length;
+  const activeDayIsComplete = isItineraryComplete(planner.itineraryIds, planner.completedSpotIds);
   const nextEntry = planner.schedule?.entries.find((entry) => !planner.completedSpotIds.includes(entry.spot.id));
   const nextSpot = nextEntry?.spot ?? todaySpots.find((spot) => !planner.completedSpotIds.includes(spot.id));
   const mapsUrl = nextSpot
@@ -1403,7 +1410,7 @@ function TodayPage({ planner, onOpenPlanner, onOpenSpotMap }: {
                 : `滞在 ${planner.stayMinutes[nextSpot.id] ?? recommendedStayMinutes(nextSpot)}分`}</small>
             </div>
           </article>
-        ) : planner.schedule && planner.itinerarySpots.length ? (
+        ) : activeDayIsComplete ? (
           <div className="ui-trial__today-empty"><strong>本日の予定はすべて訪問済みです</strong><button type="button" onClick={() => planner.completedSpotIds.forEach(planner.toggleCompleted)}>訪問済みをリセット</button></div>
         ) : (
           <div className="ui-trial__today-empty"><strong>{planner.routeResult.state === "loading" ? "経路を計算しています" : "計算済みの予定がありません"}</strong><p>{planner.routeResult.state === "loading" ? "Mapboxから移動時間を取得しています。" : "予定タブで2か所以上を選び、経路を計算してください。"}</p><button type="button" onClick={onOpenPlanner}>予定を開く</button></div>

@@ -6,6 +6,7 @@ import {
   filterTrialCards,
   hasValidTimeWindow,
   hasValidVisitDate,
+  isItineraryComplete,
   mergeItineraryIds,
   orderItemsByIds,
   retainCompletedSpotIds,
@@ -90,6 +91,14 @@ test("reordering one day keeps completed spots from every remaining day", () => 
     ),
     ["active-stop", "other-day-stop"],
   );
+});
+
+test("an itinerary is complete only when it has stops and every stop is completed", () => {
+  assert.equal(isItineraryComplete([], []), false);
+  assert.equal(isItineraryComplete(["station"], []), false);
+  assert.equal(isItineraryComplete(["station"], ["station"]), true);
+  assert.equal(isItineraryComplete(["station", "market"], ["station"]), false);
+  assert.equal(isItineraryComplete(["station", "market"], ["market", "station", "other-day-stop"]), true);
 });
 
 test("optimized route ids control the displayed stop order", () => {
