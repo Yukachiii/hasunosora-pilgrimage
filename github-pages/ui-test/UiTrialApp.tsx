@@ -78,8 +78,6 @@ type UiTrialAppProps = {
   spots: PilgrimageSpot[];
   spotPhotoGroups: Record<string, string[]>;
   photoCredits: Record<string, string>;
-  heroImages: string[];
-  initialHeroIndex: number;
   siteVersion: string;
   communityApiUrl: string;
   turnstileSiteKey: string;
@@ -180,8 +178,55 @@ function spotPhoto(spot: PilgrimageSpot | undefined, spotPhotoGroups: Record<str
   return source ? displayAssetUrl(source) : undefined;
 }
 
-function publicSpotDescription(description: string): string {
-  return description.replace(/期間限定[^。]*。?/g, "").trim();
+type SpotEpisodeGroup = {
+  label: string;
+  entries: string[];
+};
+
+function normalizeEpisodeEntries(entries: string[] | undefined): string[] {
+  return entries?.map((entry) => entry.trim()).filter(Boolean) ?? [];
+}
+
+function spotEpisodeGroups(spot: PilgrimageSpot): SpotEpisodeGroup[] {
+  return [
+    { label: "活動記録", entries: normalizeEpisodeEntries(spot.activityRecords) },
+    { label: "せーはす！", entries: normalizeEpisodeEntries(spot.sehasEpisodes) },
+    { label: "With×MEETS", entries: normalizeEpisodeEntries(spot.withMeetsEpisodes) },
+  ].filter((group) => group.entries.length > 0);
+}
+
+function SpotEpisodeReferences({ compact = false, spot }: { compact?: boolean; spot: PilgrimageSpot }): ReactElement | null {
+  const groups = spotEpisodeGroups(spot);
+  if (groups.length === 0) return null;
+  const Root = compact ? "div" : "section";
+  return (
+    <Root className={`ui-trial__spot-episodes${compact ? " is-compact" : ""}`} aria-label={compact ? undefined : "関連エピソード"}>
+      <small>関連エピソード</small>
+      <dl>{groups.map((group) => <div key={group.label}><dt>{group.label}</dt><dd>{group.entries.map((entry, index) => <span key={`${entry}-${index}`}>{entry}</span>)}</dd></div>)}</dl>
+    </Root>
+  );
+}
+
+const genericSpotVisitNotes = new Set([
+  "訪問前に営業時間・利用案内を確認",
+  "通行や周辺の生活に配慮して訪問",
+  "営業時間・休業日・入浴案内を確認",
+  "最新の運行・施設情報を確認",
+  "開館時間・休館日を確認",
+  "営業時間・休業日・商品在庫を確認",
+  "営業時間・定休日を公式サイトで確認。店内撮影は店舗の案内を優先",
+  "天候・足元・立入案内を確認",
+]);
+
+function spotVisitNote(spot: PilgrimageSpot): string | undefined {
+  const note = spot.accessNote.trim();
+  return note && !genericSpotVisitNotes.has(note) ? note : undefined;
+}
+
+function SpotVisitNotice({ compact = false, spot }: { compact?: boolean; spot: PilgrimageSpot }): ReactElement | null {
+  const note = spotVisitNote(spot);
+  if (!note) return null;
+  return <section className={`ui-trial__spot-visit-note${compact ? " is-compact" : ""}`}><strong>現地情報</strong><span>{note}</span></section>;
 }
 
 function collaborationStatus(collaboration: PilgrimageCollaboration): string {
@@ -326,7 +371,6 @@ type ExplorePageProps = {
   spots: PilgrimageSpot[];
   spotPhotoGroups: Record<string, string[]>;
   photoCredits: Record<string, string>;
-  fallbackPhoto: string;
   planned: PilgrimageSpot[];
   mapView: boolean;
   onTogglePlanned: (spot: PilgrimageSpot) => void;
@@ -397,11 +441,6 @@ type ExploreRenderModel = {
   mapSelectedSpot: PilgrimageSpot | undefined;
   mapSelectedCards: CardModelLocation[];
   mapSelectedPhoto: string | undefined;
-  selectedSpot: PilgrimageSpot | undefined;
-  selectedSpotPhoto: string | undefined;
-  selectedIsPlanned: boolean;
-  selectedCollaborationLocation: PilgrimageCollaboration["locations"][number] | undefined;
-  selectedNumber: number;
   modalFilterCount: number;
   modalTitle: string;
   modalEyebrow: string;
@@ -437,9 +476,9 @@ function availableExploreCollaborations(today: string): PilgrimageCollaboration[
 
 function matchesExploreSource(spot: PilgrimageSpot, filter: ExploreSourceFilter): boolean {
   if (filter === "all") return true;
-  if (filter === "activity") return Boolean(spot.activityRecords?.length);
-  if (filter === "sehas") return Boolean(spot.sehasEpisodes?.length);
-  return Boolean(spot.withMeetsEpisodes?.length);
+  if (filter === "activity") return normalizeEpisodeEntries(spot.activityRecords).length > 0;
+  if (filter === "sehas") return normalizeEpisodeEntries(spot.sehasEpisodes).length > 0;
+  return normalizeEpisodeEntries(spot.withMeetsEpisodes).length > 0;
 }
 
 function filterStandardSpots(spots: PilgrimageSpot[], filters: ExploreFilters): PilgrimageSpot[] {
@@ -449,7 +488,7 @@ function filterStandardSpots(spots: PilgrimageSpot[], filters: ExploreFilters): 
     if (filters.spotCategoryFilter !== "all" && spot.category !== filters.spotCategoryFilter) return false;
     if (!matchesExploreSource(spot, filters.spotSourceFilter)) return false;
     if (!normalizedQuery) return true;
-    return [spot.name, spot.shortName, spot.area, spot.category, spot.address, spot.description, spot.accessNote, ...(spot.activityRecords ?? []), ...(spot.sehasEpisodes ?? []), ...(spot.withMeetsEpisodes ?? []), ...(spot.appearances ?? [])]
+    return [spot.name, spot.shortName, spot.area, spot.category, spot.address, spotVisitNote(spot) ?? "", ...(spot.activityRecords ?? []), ...(spot.sehasEpisodes ?? []), ...(spot.withMeetsEpisodes ?? [])]
       .some((value) => value.toLocaleLowerCase("ja").includes(normalizedQuery));
   });
 }
@@ -457,7 +496,7 @@ function filterStandardSpots(spots: PilgrimageSpot[], filters: ExploreFilters): 
 function buildMapSearchResults(spots: PilgrimageSpot[], query: string): MapSearchResult[] {
   const normalizedQuery = query.trim().toLocaleLowerCase("ja");
   if (!normalizedQuery) return [];
-  const spotResults: MapSearchResult[] = spots.map((spot) => ({ kind: "spot", id: spot.id, spot, title: spot.name, subtitle: spot.address, values: [spot.name, spot.shortName, spot.address, spot.area, ...(spot.activityRecords ?? []), ...(spot.sehasEpisodes ?? []), ...(spot.withMeetsEpisodes ?? [])] }));
+  const spotResults: MapSearchResult[] = spots.map((spot) => ({ kind: "spot", id: spot.id, spot, title: spot.name, subtitle: spot.address, values: [spot.name, spot.shortName, spot.address, spot.area, spotVisitNote(spot) ?? "", ...(spot.activityRecords ?? []), ...(spot.sehasEpisodes ?? []), ...(spot.withMeetsEpisodes ?? [])] }));
   const cardResults: MapSearchResult[] = cardModels.flatMap((card) => {
     const spot = spots.find((item) => item.id === card.spotId);
     return spot ? [{ kind: "card", id: card.id, spot, title: card.card, subtitle: `${card.model} · ${card.characters.join("・")}`, values: [card.card, card.model, card.address, card.note, ...card.characters, spot.name] }] : [];
@@ -561,9 +600,8 @@ type ExploreState = {
 
 type ExploreDerivedModel = Pick<ExploreRenderModel,
   "filteredStandardSpots" | "filteredSpots" | "filteredCards" | "mapSearchResults"
-  | "mapSelectedSpot" | "mapSelectedCards" | "mapSelectedPhoto" | "selectedSpot"
-  | "selectedSpotPhoto" | "selectedIsPlanned" | "selectedCollaborationLocation"
-  | "selectedNumber" | "modalFilterCount" | "modalTitle" | "modalEyebrow" | "modalResultCount"
+  | "mapSelectedSpot" | "mapSelectedCards" | "mapSelectedPhoto"
+  | "modalFilterCount" | "modalTitle" | "modalEyebrow" | "modalResultCount"
 >;
 
 type ExploreActions = Pick<ExploreRenderModel, "closeExploreModal" | "openMode" | "openMainMap" | "selectExploreMode">;
@@ -584,19 +622,6 @@ function useExploreState(spots: PilgrimageSpot[]): ExploreState {
   };
 }
 
-function selectExploreSpot(
-  mode: Exclude<ExploreMode, "map">,
-  selectedCandidate: PilgrimageSpot | undefined,
-  filteredCards: CardModelLocation[],
-  filteredSpots: PilgrimageSpot[],
-  spots: PilgrimageSpot[],
-): PilgrimageSpot | undefined {
-  if (mode !== "cards") return filteredSpots.find((spot) => spot.id === selectedCandidate?.id) ?? filteredSpots[0];
-  const cardSpotIds = new Set(filteredCards.flatMap((card) => card.spotId ? [card.spotId] : []));
-  if (selectedCandidate && cardSpotIds.has(selectedCandidate.id)) return selectedCandidate;
-  return spots.find((spot) => spot.id === filteredCards[0]?.spotId);
-}
-
 function exploreModalPresentation(state: ExploreState, derivedCounts: { standard: number; active: number; spots: number; cards: number }): Pick<ExploreDerivedModel, "modalFilterCount" | "modalTitle" | "modalEyebrow" | "modalResultCount"> {
   const { openExploreModal } = state;
   return {
@@ -608,7 +633,7 @@ function exploreModalPresentation(state: ExploreState, derivedCounts: { standard
 }
 
 function deriveExploreModel(props: ExplorePageProps, state: ExploreState): ExploreDerivedModel {
-  const { planned, spots, spotPhotoGroups } = props;
+  const { spots, spotPhotoGroups } = props;
   const { currentCollaboration, filters, mode, openExploreModal, selectedId } = state;
   const collaborationSpotIds = new Set(currentCollaboration?.locations.map((location) => location.spotId) ?? []);
   const filteredStandardSpots = filterStandardSpots(spots, filters);
@@ -621,22 +646,12 @@ function deriveExploreModel(props: ExplorePageProps, state: ExploreState): Explo
   const selectedCandidate = spots.find((spot) => spot.id === selectedId);
   const mapSelectedSpot = selectedCandidate ?? spots[0];
   const mapSelectedCards = mapSelectedSpot ? cardModels.filter((card) => card.spotId === mapSelectedSpot.id) : [];
-  const selectedSpot = selectExploreSpot(mode, selectedCandidate, filteredCards, filteredSpots, spots);
-  const selectedCollaborationLocation = mode === "collaboration"
-    ? currentCollaboration?.locations.find((location) => location.spotId === selectedSpot?.id)
-    : undefined;
-  const selectedNumber = Math.max(0, mode === "cards"
-    ? filteredCards.findIndex((card) => card.spotId === selectedSpot?.id)
-    : filteredSpots.findIndex((spot) => spot.id === selectedSpot?.id)) + 1;
   const active = Number(Boolean(filters.query.trim())) + Number(filters.areaFilter !== "all") + Number(filters.categoryFilter !== "all") + Number(filters.cardCharacterFilter !== "all");
   const standard = Number(Boolean(filters.spotQuery.trim())) + Number(filters.spotAreaFilter !== "all") + Number(filters.spotCategoryFilter !== "all") + Number(filters.spotSourceFilter !== "all");
   const modalSpots = openExploreModal === "collaboration" ? filteredSpots.length : filteredStandardSpots.length;
   return {
     filteredStandardSpots, filteredSpots, filteredCards, mapSearchResults, mapSelectedSpot, mapSelectedCards,
-    mapSelectedPhoto: spotPhoto(mapSelectedSpot, spotPhotoGroups), selectedSpot,
-    selectedSpotPhoto: spotPhoto(selectedSpot, spotPhotoGroups),
-    selectedIsPlanned: Boolean(selectedSpot && planned.some((spot) => spot.id === selectedSpot.id)),
-    selectedCollaborationLocation, selectedNumber,
+    mapSelectedPhoto: spotPhoto(mapSelectedSpot, spotPhotoGroups),
     ...exploreModalPresentation(state, { standard, active, spots: modalSpots, cards: filteredCards.length }),
   };
 }
@@ -706,8 +721,9 @@ function ExploreMapDetail({ model }: { model: ExploreRenderModel }): ReactElemen
       {mapSelectedPhoto ? <button className="ui-trial__map-page-photo" type="button" onClick={() => onOpenImage(mapSelectedPhoto, `${mapSelectedSpot.name}の写真`, photoCredits[mapSelectedPhoto])}><img src={mapSelectedPhoto} alt={`${mapSelectedSpot.name}の写真`} /></button> : <EmptySpotPhoto className="ui-trial__map-page-photo" spotName={mapSelectedSpot.name} />}
       <div>
         <small>{mapSelectedSpot.area} · {mapSelectedSpot.category}</small><h2><SpotName name={mapSelectedSpot.name} /></h2><p>{mapSelectedSpot.address}</p>
-        {publicSpotDescription(mapSelectedSpot.description) ? <p>{publicSpotDescription(mapSelectedSpot.description)}</p> : null}
-        <div className="ui-trial__spot-facts"><span>{formatOpeningHours(mapSelectedSpot)}</span>{mapSelectedSpot.activityRecords?.length ? <span>活動記録：{mapSelectedSpot.activityRecords.join("・")}</span> : null}{mapSelectedSpot.sehasEpisodes?.length ? <span>せーはす！：{mapSelectedSpot.sehasEpisodes.join("・")}</span> : null}{mapSelectedSpot.withMeetsEpisodes?.length ? <span>With×MEETS：{mapSelectedSpot.withMeetsEpisodes.join("・")}</span> : null}{mapSelectedSpot.appearances?.length ? <span>登場：{mapSelectedSpot.appearances.join("・")}</span> : null}{mapSelectedSpot.collaborationIds?.length ? <span>コラボ：{mapSelectedSpot.collaborationIds.map((id) => collaborations.find((collaboration) => collaboration.id === id)?.name).filter(Boolean).join("・")}</span> : null}</div>
+        <div className="ui-trial__spot-facts"><span>{formatOpeningHours(mapSelectedSpot)}</span>{mapSelectedSpot.collaborationIds?.length ? <span>コラボ：{mapSelectedSpot.collaborationIds.map((id) => collaborations.find((collaboration) => collaboration.id === id)?.name).filter(Boolean).join("・")}</span> : null}</div>
+        <SpotVisitNotice spot={mapSelectedSpot} />
+        <SpotEpisodeReferences spot={mapSelectedSpot} />
         {(spotPhotoGroups[mapSelectedSpot.id]?.length ?? 0) > 1 ? <div className="ui-trial__spot-photo-strip" aria-label="この場所の写真">{spotPhotoGroups[mapSelectedSpot.id].map((imageUrl, index) => <button type="button" aria-label={`${mapSelectedSpot.name}の写真${index + 1}を拡大表示`} onClick={() => onOpenImage(imageUrl, `${mapSelectedSpot.name}の写真 ${index + 1}`, photoCredits[imageUrl])} key={imageUrl}><img src={imageUrl} alt="" loading="lazy" /><span>{String(index + 1).padStart(2, "0")}</span></button>)}</div> : null}
         {mapSelectedCards.length ? <section className="ui-trial__map-related-cards" aria-label="この場所に関連するカード"><header><strong>関連するカード</strong><span>{mapSelectedCards.length}件</span></header><div>{mapSelectedCards.map((card) => card.imageUrl ? <button type="button" onClick={() => onOpenImage(displayAssetUrl(card.imageUrl!), card.card, undefined, CARD_ILLUSTRATION_COPYRIGHT)} key={card.id}><img src={displayAssetUrl(card.imageUrl)} alt="" loading="lazy" /><span>{card.card}</span></button> : <span key={card.id}>{card.card}</span>)}</div></section> : null}
         <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && planned.length >= maximumItineraryStops} onClick={() => onTogglePlanned(mapSelectedSpot)}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
@@ -747,29 +763,13 @@ function ExploreHomeMap({ model }: { model: ExploreRenderModel }): ReactElement 
   );
 }
 
-function ExploreFeature({ model }: { model: ExploreRenderModel }): ReactElement {
-  const { mode, selectedCollaborationLocation, selectedId, selectedIsPlanned, selectedNumber, selectedSpot, selectedSpotPhoto } = model;
-  const { fallbackPhoto, onTogglePlanned, planned } = model.props;
-  return (
-    <div className="ui-trial__feature">
-      {selectedId && selectedSpot && !selectedSpotPhoto ? <EmptySpotPhoto className="ui-trial__feature-photo-empty" spotName={selectedSpot.name} /> : <img key={selectedId && selectedSpot ? selectedSpot.id : "empty"} src={selectedSpotPhoto ?? fallbackPhoto} alt={selectedId && selectedSpot ? `${selectedSpot.name}の写真` : "金沢市内のメインビジュアル"} />}
-      <div className="ui-trial__feature-brand">
-        <img className="ui-trial__feature-logo" src={assetUrl("brand/hero-logo-c.png")} alt="蓮ノ旅" />
-      </div>
-      {selectedId && selectedSpot ? <div className="ui-trial__feature-title"><small>{selectedSpot.area} / {selectedSpot.category}</small><h2><SpotName name={selectedSpot.name} /></h2></div> : null}
-      {selectedId && selectedSpot ? <article><small>{exploreChoices.find((choice) => choice.mode === mode)?.label.toUpperCase()} / {String(selectedNumber).padStart(2, "0")}</small><h2><SpotName name={selectedSpot.name} /></h2><p>{selectedSpot.area}　·　{selectedSpot.category}</p>{selectedCollaborationLocation ? <p className="ui-trial__feature-context">{selectedCollaborationLocation.role}{selectedCollaborationLocation.members?.length ? ` / ${selectedCollaborationLocation.members.join("・")}` : ""}</p> : null}<p>{selectedSpot.description}</p><div className="ui-trial__feature-actions"><button className={selectedIsPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!selectedIsPlanned && planned.length >= maximumItineraryStops} onClick={() => onTogglePlanned(selectedSpot)}>{selectedIsPlanned ? "予定から外す" : "予定に追加"} <span aria-hidden="true">{selectedIsPlanned ? "−" : "+"}</span></button><a href="#/explore/map">地図で見る <span aria-hidden="true">→</span></a></div></article> : null}
-    </div>
-  );
-}
-
 function ExploreLandingPage({ model }: { model: ExploreRenderModel }): ReactElement {
   const { openExploreModal, openMainMap, openMode } = model;
-  const { fallbackPhoto, onNavigate } = model.props;
+  const { onNavigate } = model.props;
   return (
-    <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title" aria-hidden={openExploreModal ? true : undefined} style={{ "--ui-trial-hero": `url("${fallbackPhoto}")` } as React.CSSProperties}>
+    <section className="ui-trial__page ui-trial__explore" aria-labelledby="ui-trial-explore-title" aria-hidden={openExploreModal ? true : undefined}>
       <div className="ui-trial__explore-copy"><p className="ui-trial__eyebrow">ISHIKAWA / KANAZAWA</p><h1 id="ui-trial-explore-title">作品の景色を、<br />旅の予定へ。</h1><p className="ui-trial__explore-lead">蓮ノ空に関連するスポットから、行きたい場所を見つけて、そのまま予定へ追加できます。</p><h2>探し方を選ぶ</h2><div className="ui-trial__choices">{exploreChoices.map((choice) => choice.mode === "map" ? <button type="button" onClick={openMainMap} key={choice.number}><small>{choice.number}</small><strong>{choice.label}</strong><span>{choice.note}</span><i aria-hidden="true">→</i></button> : <button className={openExploreModal === choice.mode ? "is-active" : ""} type="button" key={choice.number} onClick={() => openMode(choice.mode)}><small>{choice.number}</small><strong>{choice.label}</strong><span>{choice.note}</span><i aria-hidden="true">→</i></button>)}</div></div>
       <ExploreHomeMap model={model} />
-      <ExploreFeature model={model} />
       <button className="ui-trial__explore-plan-link" type="button" onClick={() => onNavigate("planner")}>予定を確認する</button>
     </section>
   );
@@ -817,9 +817,23 @@ function ExploreSpotResult({ model, spot }: { model: ExploreRenderModel; spot: P
   const source = spotPhoto(spot, spotPhotoGroups);
   const collaborationLocation = openExploreModal === "collaboration" ? currentCollaboration?.locations.find((location) => location.spotId === spot.id) : undefined;
   return (
-    <article className={selectedId === spot.id ? "is-selected" : ""} onClick={() => { model.setSelectedId(spot.id); if (window.matchMedia("(max-width: 760px)").matches) onOpenSpot(spot); }}>
+    <article className={selectedId === spot.id ? "is-selected" : ""} onClick={() => { model.setSelectedId(spot.id); onOpenSpot(spot); }}>
       {openExploreModal !== "collaboration" ? source ? <span className="ui-trial__spot-result-photo" aria-hidden="true"><img src={source} alt="" loading="lazy" /></span> : <EmptySpotPhoto className="ui-trial__spot-result-photo" spotName={spot.name} /> : null}
-      <div><small>{spot.area} · {spot.category}</small><strong><SpotName name={spot.name} /></strong><span>{collaborationLocation?.role ?? spot.address}</span>{collaborationLocation?.members?.length ? <em>等身パネル：{collaborationLocation.members.join("・")}</em> : null}{openExploreModal === "spots" ? <><em>{formatOpeningHours(spot)}</em>{publicSpotDescription(spot.description) ? <p>{publicSpotDescription(spot.description)}</p> : null}{spot.activityRecords?.length ? <p>活動記録：{spot.activityRecords.join("・")}</p> : null}{spot.sehasEpisodes?.length ? <p>せーはす！：{spot.sehasEpisodes.join("・")}</p> : null}{spot.withMeetsEpisodes?.length ? <p>With×MEETS：{spot.withMeetsEpisodes.join("・")}</p> : null}{spot.appearances?.length ? <p>登場：{spot.appearances.join("・")}</p> : null}{spot.collaborationIds?.length ? <p>コラボ：{spot.collaborationIds.map((id) => collaborations.find((collaboration) => collaboration.id === id)?.name).filter(Boolean).join("・")}</p> : null}<button className="ui-trial__spot-detail-link" type="button" onClick={(event) => { event.stopPropagation(); onOpenSpot(spot); }}>詳細を見る <span aria-hidden="true">→</span></button><a href={spot.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>場所・公式情報 <span aria-hidden="true">↗</span></a></> : null}</div>
+      <div>
+        <small>{spot.area} · {spot.category}</small>
+        <strong><SpotName name={spot.name} /></strong>
+        <span>{collaborationLocation?.role ?? spot.address}</span>
+        {collaborationLocation?.members?.length ? <em>等身パネル：{collaborationLocation.members.join("・")}</em> : null}
+        {openExploreModal === "spots" ? <>
+          <em>{formatOpeningHours(spot)}</em>
+          <SpotVisitNotice compact spot={spot} />
+          <SpotEpisodeReferences compact spot={spot} />
+          {spot.collaborationIds?.length ? <p>コラボ：{spot.collaborationIds.map((id) => collaborations.find((collaboration) => collaboration.id === id)?.name).filter(Boolean).join("・")}</p> : null}
+          <button className="ui-trial__spot-detail-link" type="button" onClick={(event) => { event.stopPropagation(); onOpenSpot(spot); }}>詳細を見る <span aria-hidden="true">→</span></button>
+          <a href={spot.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>場所・公式情報 <span aria-hidden="true">↗</span></a>
+        </> : null}
+        {openExploreModal === "collaboration" ? <button className="ui-trial__spot-detail-link" type="button" onClick={(event) => { event.stopPropagation(); onOpenSpot(spot); }}>スポット詳細を見る <span aria-hidden="true">→</span></button> : null}
+      </div>
       <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && planned.length >= maximumItineraryStops} onClick={(event) => { event.stopPropagation(); onTogglePlanned(spot); }}>{isPlanned ? "予定から外す" : "予定に追加"}</button>
     </article>
   );
@@ -1294,7 +1308,9 @@ function TodayNextSpot({ mapsUrl, nextEntry, nextSpot, planner, status }: {
       <small>{nextEntry ? `NEXT SPOT / ${displayClock(nextEntry.arrival + planner.todayOffsetMinutes)}到着予定` : "NEXT SPOT / 次の訪問先"}</small>
       <h2><SpotName name={nextSpot.name} /></h2><p>{nextSpot.address}</p>
       {status ? <span className={`is-${status.kind}`}>{status.label}</span> : null}
-      <div className="ui-trial__next-spot-details"><p>{nextSpot.area} · {nextSpot.category}</p>{publicSpotDescription(nextSpot.description) ? <p>{publicSpotDescription(nextSpot.description)}</p> : null}<p>{formatOpeningHours(nextSpot)}</p>{nextSpot.accessNote ? <p>{nextSpot.accessNote}</p> : null}</div>
+      <div className="ui-trial__next-spot-details"><p>{nextSpot.area} · {nextSpot.category}</p><p>{formatOpeningHours(nextSpot)}</p></div>
+      <SpotVisitNotice spot={nextSpot} />
+      <SpotEpisodeReferences spot={nextSpot} />
       <div><a href={mapsUrl} target="_blank" rel="noreferrer">Google Mapsで向かう <span aria-hidden="true">↗</span></a><button type="button" onClick={() => planner.toggleCompleted(nextSpot.id)}>訪問済みにする ✓</button><small>{nextEntry ? `滞在 ${nextEntry.stay}分　/　${displayClock(nextEntry.departure + planner.todayOffsetMinutes)} 出発` : `滞在 ${planner.stayMinutes[nextSpot.id] ?? recommendedStayMinutes(nextSpot)}分`}</small></div>
     </article>
   );
@@ -1728,14 +1744,9 @@ function SpotModalContent({ modal, onOpenImage, plannedSpotIds, onToggleSpot }: 
         <small>{modal.spot.area} · {modal.spot.category}</small>
         <h2><SpotName name={modal.spot.name} /></h2>
         <p>{modal.spot.address}</p>
-        {publicSpotDescription(modal.spot.description) ? <p>{publicSpotDescription(modal.spot.description)}</p> : null}
-        <div className="ui-trial__spot-facts">
-          <span>{formatOpeningHours(modal.spot)}</span>
-          {modal.spot.accessNote ? <span>{modal.spot.accessNote}</span> : null}
-          {modal.spot.activityRecords?.length ? <span>活動記録：{modal.spot.activityRecords.join("・")}</span> : null}
-          {modal.spot.sehasEpisodes?.length ? <span>せーはす！：{modal.spot.sehasEpisodes.join("・")}</span> : null}
-          {modal.spot.withMeetsEpisodes?.length ? <span>With×MEETS：{modal.spot.withMeetsEpisodes.join("・")}</span> : null}
-        </div>
+        <div className="ui-trial__spot-facts"><span>{formatOpeningHours(modal.spot)}</span></div>
+        <SpotVisitNotice spot={modal.spot} />
+        <SpotEpisodeReferences spot={modal.spot} />
         <div className="ui-trial__spot-detail-actions">
           <a href={`https://www.google.com/maps/search/?api=1&query=${modal.spot.lat},${modal.spot.lng}`} target="_blank" rel="noreferrer">地図で開く <span aria-hidden="true">↗</span></a>
           <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && plannedSpotIds.length >= maximumItineraryStops} onClick={() => onToggleSpot(modal.spot.id)}>{isPlanned ? "予定から外す −" : "予定に追加 ＋"}</button>
@@ -1947,19 +1958,18 @@ function createTrialActions(planner: LivePlanner, location: TrialLocationState, 
 type TrialContentProps = {
   app: UiTrialAppProps;
   actions: TrialActions;
-  heroImage: string;
   location: TrialLocationState;
   onReorderStateChange: (isReordering: boolean) => void;
   planner: LivePlanner;
   setModal: Dispatch<SetStateAction<ModalState>>;
 };
 
-function TrialContent({ app, actions, heroImage, location, onReorderStateChange, planner, setModal }: TrialContentProps): ReactElement {
+function TrialContent({ app, actions, location, onReorderStateChange, planner, setModal }: TrialContentProps): ReactElement {
   const { communityApiUrl, communitySubmissionsEnabled, photoCredits, spots, spotPhotoGroups, turnstileSiteKey } = app;
   const { exploreMapView, sharedPlan, sharedPlanKey, view } = location;
   return (
     <main>
-      {view === "explore" ? <ExplorePage spots={spots} spotPhotoGroups={spotPhotoGroups} photoCredits={photoCredits} fallbackPhoto={heroImage} planned={planner.itinerarySpots} mapView={exploreMapView} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={actions.navigate} onOpenMap={actions.openExploreMap} onOpenSpot={(spot) => setModal({ kind: "spot", spot, photos: spotPhotoGroups[spot.id]?.length ? spotPhotoGroups[spot.id] : spot.imageUrl ? [spot.imageUrl] : [], credits: photoCredits })} onOpenCard={(card, spot) => setModal({ kind: "card", card, spot })} onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })} onFillCollaboration={(collaboration) => { planner.addToActiveItinerary(collaboration.locations.map((item) => item.spotId)); actions.navigate("planner"); }} /> : null}
+      {view === "explore" ? <ExplorePage spots={spots} spotPhotoGroups={spotPhotoGroups} photoCredits={photoCredits} planned={planner.itinerarySpots} mapView={exploreMapView} onTogglePlanned={(spot) => planner.toggleSpot(spot.id)} onNavigate={actions.navigate} onOpenMap={actions.openExploreMap} onOpenSpot={(spot) => setModal({ kind: "spot", spot, photos: spotPhotoGroups[spot.id]?.length ? spotPhotoGroups[spot.id] : spot.imageUrl ? [spot.imageUrl] : [], credits: photoCredits })} onOpenCard={(card, spot) => setModal({ kind: "card", card, spot })} onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })} onFillCollaboration={(collaboration) => { planner.addToActiveItinerary(collaboration.locations.map((item) => item.spotId)); actions.navigate("planner"); }} /> : null}
       {view === "planner" ? <PlannerPage planner={planner} onOpenShare={actions.openShare} onReorderStateChange={onReorderStateChange} /> : null}
       {view === "today" ? <TodayPage planner={planner} onOpenPlanner={() => actions.navigate("planner")} onOpenSpotMap={(spot) => setModal({ kind: "spot-map", spot })} /> : null}
       {view === "guide" ? <GuidePage onNavigate={actions.navigate} onOpenImage={(src, alt) => setModal({ kind: "image", src, alt })} communitySubmissionsEnabled={communitySubmissionsEnabled} /> : null}
@@ -1992,8 +2002,6 @@ function TrialShell(props: TrialShellProps): ReactElement {
 
 export function UiTrialApp(app: UiTrialAppProps): ReactElement {
   const planner = useLivePlanner(app.spots);
-  const heroImage = app.heroImages[app.initialHeroIndex]
-    ?? assetUrl("photos/hero/20260806-074048-78b958e5201d8916-watermarked.webp");
   const [modal, setModal] = useState<ModalState>(null);
   const [isReordering, setIsReordering] = useState(false);
   const location = useTrialLocation(app.spots, setModal);
@@ -2008,7 +2016,6 @@ export function UiTrialApp(app: UiTrialAppProps): ReactElement {
       app={app}
       actions={actions}
       closeModal={closeModal}
-      heroImage={heroImage}
       location={location}
       modal={modal}
       onReorderStateChange={handleReorderStateChange}

@@ -25,29 +25,6 @@ function resolvePhotoUrl(source?: string | null) {
   return photoModules[`../../public${source}`];
 }
 
-function uniquePhotoUrls(sources: Array<string | undefined>) {
-  return Array.from(new Set(sources.filter((source): source is string => Boolean(source))));
-}
-
-function chooseHeroIndex(heroImages: string[]) {
-  if (heroImages.length < 2) return 0;
-  const storageKey = "hasunosora-pilgrimage.ui-test-hero-image.v1";
-  let previousImage = "";
-  try {
-    previousImage = window.localStorage.getItem(storageKey) ?? "";
-  } catch {
-    // The random image still works when storage is unavailable.
-  }
-  const candidates = heroImages.flatMap((image, index) => image === previousImage ? [] : [index]);
-  const index = candidates[Math.floor(Math.random() * candidates.length)] ?? 0;
-  try {
-    window.localStorage.setItem(storageKey, heroImages[index]);
-  } catch {
-    // No persistence is needed for the test itself.
-  }
-  return index;
-}
-
 const publicSpots = spots.map((spot) => ({ ...spot, imageUrl: resolvePhotoUrl(spot.imageUrl) }));
 const spotPhotoGroups = publicMediaAssets.reduce<Record<string, string[]>>((groups, asset) => {
   if (asset.placement !== "spot" || !asset.spotId) return groups;
@@ -62,10 +39,6 @@ const photoCredits = publicMediaAssets.reduce<Record<string, string>>((credits, 
   if (imageUrl && asset.creditName?.trim()) credits[imageUrl] = asset.creditName.trim();
   return credits;
 }, {});
-const heroImages = uniquePhotoUrls([
-  resolvePhotoUrl(siteSettings.heroImage),
-  ...siteSettings.heroImages.map(resolvePhotoUrl),
-]);
 const communityApiUrl = import.meta.env.VITE_COMMUNITY_API_URL?.trim() ?? "";
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
 
@@ -101,8 +74,6 @@ createRoot(document.getElementById("root")!).render(
         spots={publicSpots}
         spotPhotoGroups={spotPhotoGroups}
         photoCredits={photoCredits}
-        heroImages={heroImages}
-        initialHeroIndex={chooseHeroIndex(heroImages)}
         siteVersion={siteSettings.version}
         communityApiUrl={communityApiUrl}
         turnstileSiteKey={turnstileSiteKey}
