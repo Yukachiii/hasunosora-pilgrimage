@@ -21,7 +21,7 @@ test("Mapbox uses the Japanese street map and both supported route endpoints", a
   const map = await readFile(new URL("../app/MapboxPilgrimageMap.tsx", import.meta.url), "utf8");
 
   assert.ok(map.includes('style: "mapbox://styles/mapbox/streets-v12"'));
-  assert.match(map, /map\.on\("style\.load"[\s\S]+map\.setLanguage\("ja"\)/);
+  assert.match(map, /\.on\("style\.load"[\s\S]+\.setLanguage\("ja"\)/);
   assert.ok(map.includes("api.mapbox.com/optimized-trips/v1/"));
   assert.ok(map.includes("api.mapbox.com/directions/v5/"));
 });

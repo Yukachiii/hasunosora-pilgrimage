@@ -564,6 +564,14 @@ async function publishToGitHub() {
   if (!status.branch) throw new AdminError("現在のGitブランチを取得できません。");
 
   return withWriteLock(async () => {
+    const staged = gitProcess(["diff", "--cached", "--name-only", "--no-renames", "-z"]);
+    if (staged.status !== 0) throw new AdminError(`ステージ済みの変更を確認できませんでした: ${safeGitMessage(staged)}`);
+    const unrelatedStagedChanges = staged.stdout.split("\0").some((filePath) =>
+      filePath && !filePath.startsWith("content/") && !filePath.startsWith("public/photos/"),
+    );
+    if (unrelatedStagedChanges) {
+      throw new AdminError("公開対象外の変更がステージされています。既存のステージ状態を保持して公開を中止しました。Codexで変更を整理してから再度お試しください。");
+    }
     const added = gitProcess(["add", "--", "content", "public/photos"]);
     if (added.status !== 0) throw new AdminError(`公開データの追加に失敗しました: ${safeGitMessage(added)}`);
     const diff = gitProcess(["diff", "--cached", "--quiet"]);

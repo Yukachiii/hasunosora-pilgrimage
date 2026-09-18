@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import {
@@ -82,6 +82,16 @@ function waitForExit(child, timeoutMs = 10_000) {
     }
     child.once("exit", onExit);
   });
+}
+
+function fixtureGit(directory, gitArguments) {
+  const result = spawnSync("git", ["-C", directory, ...gitArguments], {
+    encoding: "utf8",
+    windowsHide: true,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+  });
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  return result.stdout;
 }
 
 function pendingSubmission({ id, kind, payload, imageBytes = null }) {
@@ -409,6 +419,105 @@ test("local admin imports reviewed photos and spots, and rejects without publish
       ).then((bytes) => bytes.length > 0),
       true,
     );
+  } finally {
+    if (child && child.exitCode === null) {
+      child.kill();
+      await waitForExit(child).catch(() => null);
+    }
+    await rm(testDirectory, { recursive: true, force: true });
+  }
+});
+
+test("publishing rejects unrelated staged changes without modifying the index, then publishes only public changes", {
+  timeout: 30_000,
+}, async () => {
+  const testDirectory = await mkdtemp(
+    path.join(projectDirectory, ".community-admin-publish-test-"),
+  );
+  const repositoryDirectory = path.join(testDirectory, "repository");
+  const remoteDirectory = path.join(testDirectory, "remote.git");
+  let child = null;
+
+  try {
+    await mkdir(repositoryDirectory);
+    await copyFile(
+      path.join(projectDirectory, "server.mjs"),
+      path.join(repositoryDirectory, "server.mjs"),
+    );
+    await mkdir(path.join(repositoryDirectory, "admin-dist"));
+    await writeFile(
+      path.join(repositoryDirectory, "admin-dist", "index.html"),
+      "<!doctype html><title>Publish QA</title>",
+      "utf8",
+    );
+    await mkdir(path.join(repositoryDirectory, "public", "photos"), { recursive: true });
+    await writeJson(path.join(repositoryDirectory, "content", "spots.json"), []);
+    await writeJson(path.join(repositoryDirectory, "content", "media.json"), []);
+    await writeFile(path.join(repositoryDirectory, "developer-notes.txt"), "Original notes\n", "utf8");
+    fixtureGit(testDirectory, ["init", "--bare", remoteDirectory]);
+    fixtureGit(repositoryDirectory, ["init", "--initial-branch=main"]);
+    fixtureGit(repositoryDirectory, ["config", "user.name", "Publish QA"]);
+    fixtureGit(repositoryDirectory, ["config", "user.email", "publish-qa@example.invalid"]);
+    fixtureGit(repositoryDirectory, ["config", "core.hooksPath", "NUL"]);
+    fixtureGit(repositoryDirectory, ["config", "commit.gpgsign", "false"]);
+    fixtureGit(repositoryDirectory, ["add", "--", "content", "developer-notes.txt"]);
+    fixtureGit(repositoryDirectory, ["commit", "-m", "Initial fixture"]);
+    fixtureGit(repositoryDirectory, ["remote", "add", "origin", remoteDirectory]);
+    fixtureGit(repositoryDirectory, ["push", "--set-upstream", "origin", "main"]);
+
+    await writeJson(path.join(repositoryDirectory, "content", "spots.json"), [{ id: "public-change" }]);
+    await writeFile(path.join(repositoryDirectory, "public", "photos", "candidate.webp"), "Public photo\n", "utf8");
+    await writeFile(path.join(repositoryDirectory, "developer-notes.txt"), "Private development notes\n", "utf8");
+    fixtureGit(repositoryDirectory, ["add", "--", "developer-notes.txt"]);
+    const initialHead = fixtureGit(repositoryDirectory, ["rev-parse", "HEAD"]);
+    const initialIndex = fixtureGit(repositoryDirectory, ["diff", "--cached", "--binary"]);
+    const initialUnstaged = fixtureGit(repositoryDirectory, ["diff", "--binary"]);
+
+    const port = await freeLoopbackPort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    child = spawn(process.execPath, [path.join(repositoryDirectory, "server.mjs"), "--port", String(port)], {
+      cwd: repositoryDirectory,
+      env: {
+        ...process.env,
+        COMMUNITY_SUBMISSIONS_DIRECTORY: path.join(repositoryDirectory, "private", "community-submissions"),
+      },
+      stdio: ["ignore", "ignore", "pipe"],
+      windowsHide: true,
+    });
+    await waitForReady(child, baseUrl);
+    const statusResponse = await fetch(`${baseUrl}/api/admin/publish-status`);
+    assert.equal(statusResponse.status, 200);
+    const { publishToken } = await statusResponse.json();
+    const publish = () => fetch(`${baseUrl}/api/admin/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ publishToken }),
+    });
+
+    const refusedResponse = await publish();
+    assert.equal(refusedResponse.status, 400);
+    assert.match((await refusedResponse.json()).error, /公開対象外.*ステージ/);
+    assert.equal(fixtureGit(repositoryDirectory, ["rev-parse", "HEAD"]), initialHead);
+    assert.equal(fixtureGit(remoteDirectory, ["rev-parse", "refs/heads/main"]), initialHead);
+    assert.equal(fixtureGit(repositoryDirectory, ["diff", "--cached", "--binary"]), initialIndex);
+    assert.equal(fixtureGit(repositoryDirectory, ["diff", "--binary"]), initialUnstaged);
+
+    fixtureGit(repositoryDirectory, ["reset", "--", "developer-notes.txt"]);
+    fixtureGit(repositoryDirectory, ["add", "--", "public/photos/candidate.webp"]);
+    const publishedResponse = await publish();
+    assert.equal(publishedResponse.status, 200);
+    assert.deepEqual(await publishedResponse.json(), {
+      committed: true,
+      pushed: true,
+      revision: fixtureGit(repositoryDirectory, ["rev-parse", "--short", "HEAD"]).trim(),
+    });
+    assert.deepEqual(
+      fixtureGit(repositoryDirectory, ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"]).trim().split(/\r?\n/),
+      ["content/spots.json", "public/photos/candidate.webp"],
+    );
+    assert.equal(fixtureGit(remoteDirectory, ["rev-parse", "refs/heads/main"]), fixtureGit(repositoryDirectory, ["rev-parse", "HEAD"]));
+    assert.equal(fixtureGit(repositoryDirectory, ["show", "HEAD:developer-notes.txt"]), "Original notes\n");
+    assert.equal(await readFile(path.join(repositoryDirectory, "developer-notes.txt"), "utf8"), "Private development notes\n");
   } finally {
     if (child && child.exitCode === null) {
       child.kill();

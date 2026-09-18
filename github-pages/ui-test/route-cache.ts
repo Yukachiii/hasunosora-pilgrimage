@@ -1,6 +1,8 @@
 import type { RouteRequest, RouteResult } from "../../app/MapboxPilgrimageMap";
 import type { PilgrimageSpot } from "../../app/spots";
-import type { RouteLocation, TravelMode } from "../../app/route-planner";
+import { recommendedStayMinutes, type RouteLocation, type TravelMode } from "../../app/route-planner.ts";
+import type { PlannerDaySnapshot, PlannerSnapshot } from "../../app/planner-storage";
+import { hasValidTimeWindow, hasValidVisitDate } from "./trial-utils.ts";
 
 export const DEFAULT_TRANSIT_ROUTE_MESSAGE = "公共交通は各区間を外部の乗換案内で確認してください。";
 
@@ -8,6 +10,76 @@ export type DayRouteCache = Record<string, {
   request: RouteRequest;
   result: RouteResult;
 }>;
+
+type PlannerRouteSettings = Pick<PlannerSnapshot,
+  "stayMinutes" | "travelMode" | "optimizeOrder" | "sourceStationId"
+>;
+
+function routeSignature(
+  stopIds: readonly string[],
+  stay: readonly number[],
+  travelMode: TravelMode,
+  optimizeOrder: boolean,
+  sourceStationId: string,
+  departureTime: string,
+): string {
+  return JSON.stringify({
+    stops: stopIds,
+    stay: travelMode === "TRANSIT" ? stay : [],
+    travelMode,
+    optimizeWaypointOrder: travelMode !== "TRANSIT" && optimizeOrder,
+    accessOriginId: travelMode === "TRANSIT" ? sourceStationId : "",
+    departureTime: travelMode === "TRANSIT" ? departureTime : "",
+  });
+}
+
+export function requestedRouteSignature(request: RouteRequest | null): string {
+  if (!request) return "";
+  return routeSignature(
+    request.stops.map((spot) => spot.id),
+    request.stops.map((spot) => request.stayMinutes[spot.id] ?? recommendedStayMinutes(spot)),
+    request.travelMode,
+    request.optimizeWaypointOrder,
+    request.accessOrigin?.id ?? "",
+    request.departureTime,
+  );
+}
+
+export function plannerDayRouteSignature(
+  day: PlannerDaySnapshot | undefined,
+  allSpots: readonly PilgrimageSpot[],
+  settings: PlannerRouteSettings,
+): string {
+  const stopIds = day?.itineraryIds ?? [];
+  const spotsById = new Map(allSpots.map((spot) => [spot.id, spot]));
+  const departureTime = settings.travelMode === "TRANSIT" && day
+    && hasValidVisitDate(day.visitDate) && hasValidTimeWindow(day.startTime, day.endTime)
+    ? new Date(`${day.visitDate}T${day.startTime}:00+09:00`).toISOString()
+    : "";
+  return routeSignature(
+    stopIds,
+    stopIds.map((id) => {
+      const spot = spotsById.get(id);
+      return settings.stayMinutes[id] ?? (spot ? recommendedStayMinutes(spot) : 0);
+    }),
+    settings.travelMode,
+    settings.optimizeOrder,
+    settings.sourceStationId,
+    departureTime,
+  );
+}
+
+export function matchingDayRoute(
+  cached: DayRouteCache[string] | undefined,
+  day: PlannerDaySnapshot | undefined,
+  allSpots: readonly PilgrimageSpot[],
+  settings: PlannerRouteSettings,
+): DayRouteCache[string] | null {
+  if (!cached || !day || !hasValidVisitDate(day.visitDate) || !hasValidTimeWindow(day.startTime, day.endTime)) return null;
+  return requestedRouteSignature(cached.request) === plannerDayRouteSignature(day, allSpots, settings)
+    ? cached
+    : null;
+}
 
 export function routeCacheAfterDayRemoval(
   routes: DayRouteCache,

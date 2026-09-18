@@ -24,6 +24,42 @@ export type ProductionPlannerRestore = {
   discardFallbacks: boolean;
 };
 
+export function formatJapanDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+export function dateAfter(value: string, days: number): string {
+  const date = new Date(`${value}T12:00:00+09:00`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatJapanDate(date);
+}
+
+export function restorePastProductionPlan(snapshot: PlannerSnapshot, today: string): PlannerSnapshot {
+  const firstDate = snapshot.plannerDays[0]?.visitDate ?? today;
+  // A trip already in progress must keep its original dates when revisited.
+  if (firstDate >= today || snapshot.plannerDays.some((day) => day.visitDate >= today)) return snapshot;
+
+  const plannerDays = snapshot.plannerDays.map((day, index) => ({
+    ...day,
+    visitDate: dateAfter(today, index),
+    transitLegProgress: {},
+  }));
+  const activeDay = plannerDays[snapshot.activeDayIndex] ?? plannerDays[0];
+  return {
+    ...snapshot,
+    visitDate: activeDay?.visitDate ?? today,
+    plannerDays,
+    completedSpotIds: [],
+    todayOffsetMinutes: 0,
+    transitLegProgress: {},
+  };
+}
+
 export function serializeStoredPlanner(
   snapshot: PlannerSnapshot,
   now = Date.now(),

@@ -33,19 +33,25 @@ import {
 } from "./trial-utils";
 import {
   DEFAULT_TRANSIT_ROUTE_MESSAGE,
+  matchingDayRoute,
   mergeCachedStayMinutes,
+  plannerDayRouteSignature,
+  requestedRouteSignature as signatureForRouteRequest,
   restoreRouteCache,
   routeCacheAfterDayRemoval,
   routeResultAfterMapUpdate,
   type DayRouteCache,
 } from "./route-cache";
 import {
+  dateAfter,
+  formatJapanDate,
   LEGACY_PLANNER_DRAFT_STORAGE_KEY,
   normalizePlannerSourceStation,
   PLANNER_STORAGE_MAX_AGE_SECONDS,
   PRODUCTION_PLANNER_STORAGE_KEY,
   productionPlannerStorageValues,
   resolveProductionPlannerSnapshot,
+  restorePastProductionPlan,
 } from "./planner-persistence";
 
 const TEST_PLANNER_STORAGE_KEY = "hasunosora-pilgrimage.ui-test-planner.v1";
@@ -85,7 +91,6 @@ type PlannerSnapshotValues = {
   sourceStationId: string;
   stayMinutes: Record<string, number>;
   todayOffsetMinutes: number;
-  transitLegProgress: TransitLegProgress;
   travelMode: TravelMode;
 };
 
@@ -158,8 +163,6 @@ type PlannerState = {
   setCompletedSpotIds: Dispatch<SetStateAction<string[]>>;
   todayOffsetMinutes: number;
   setTodayOffsetMinutes: Dispatch<SetStateAction<number>>;
-  transitLegProgress: TransitLegProgress;
-  setTransitLegProgress: Dispatch<SetStateAction<TransitLegProgress>>;
   routeRequest: RouteRequest | null;
   setRouteRequest: Dispatch<SetStateAction<RouteRequest | null>>;
   routeResult: RouteResult;
@@ -197,15 +200,6 @@ type RouteCalculationActions = Pick<LivePlanner, "calculateRoute" | "handleRoute
 type TodayActions = Pick<LivePlanner, "toggleCompleted" | "updateTransitLeg" | "alignScheduleToNow" | "resetTodayOffset" | "resetCompleted">;
 type ShareActions = Pick<LivePlanner, "createShareUrl" | "importSharedPlan">;
 
-function formatJapanDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
 export function japanDate(daysFromToday = 0): string {
   return formatJapanDate(new Date(Date.now() + daysFromToday * 86_400_000));
 }
@@ -227,12 +221,6 @@ export function displayClock(totalMinutes: number): string {
   return `${day > 0 ? `翌${day > 1 ? day : ""}日 ` : ""}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function dateAfter(value: string, days: number): string {
-  const date = new Date(`${value}T12:00:00+09:00`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return formatJapanDate(date);
-}
-
 function createPlannerDay(index = 0, visitDate = japanDate()): PlannerDaySnapshot {
   return {
     id: `ui-test-day-${Date.now()}-${index}`,
@@ -245,43 +233,10 @@ function createPlannerDay(index = 0, visitDate = japanDate()): PlannerDaySnapsho
   };
 }
 
-function requestSignature(request: RouteRequest | null): string {
-  if (!request) return "";
-  return JSON.stringify({
-    stops: request.stops.map((spot) => spot.id),
-    stay: request.travelMode === "TRANSIT"
-      ? request.stops.map((spot) => request.stayMinutes[spot.id] ?? recommendedStayMinutes(spot))
-      : [],
-    travelMode: request.travelMode,
-    optimizeWaypointOrder: request.optimizeWaypointOrder,
-    accessOriginId: request.travelMode === "TRANSIT" ? request.accessOrigin?.id ?? "" : "",
-    departureTime: request.travelMode === "TRANSIT" ? request.departureTime : "",
-  });
-}
-
 type RestoredPlannerState = {
   snapshot: PlannerSnapshot;
   routes: DayRouteCache;
 };
-
-function restorePastProductionPlan(snapshot: PlannerSnapshot): PlannerSnapshot {
-  const today = japanDate();
-  const firstDate = snapshot.plannerDays[0]?.visitDate ?? today;
-  if (firstDate >= today) return snapshot;
-
-  const plannerDays = snapshot.plannerDays.map((day, index) => ({
-    ...day,
-    visitDate: dateAfter(today, index),
-  }));
-  const activeDay = plannerDays[snapshot.activeDayIndex] ?? plannerDays[0];
-  return {
-    ...snapshot,
-    visitDate: activeDay?.visitDate ?? today,
-    plannerDays,
-    completedSpotIds: [],
-    todayOffsetMinutes: 0,
-  };
-}
 
 function loadPlannerSnapshot(
   runtime: PlannerRuntime,
@@ -291,7 +246,7 @@ function loadPlannerSnapshot(
   const validStationIds = new Set(majorStations.map((station) => station.id));
   const prepareSnapshot = (snapshot: PlannerSnapshot): PlannerSnapshot => {
     const normalized = normalizePlannerSourceStation(snapshot, validStationIds);
-    return runtime === "production" ? restorePastProductionPlan(normalized) : normalized;
+    return runtime === "production" ? restorePastProductionPlan(normalized, japanDate()) : normalized;
   };
   if (runtime === "production") {
     let primaryValue: string | null = null;
@@ -380,34 +335,10 @@ function buildPlannerSnapshot(values: PlannerSnapshotValues): PlannerSnapshot {
     itineraryCollaborationId: values.itineraryCollaborationId,
     completedSpotIds: values.completedSpotIds,
     todayOffsetMinutes: values.todayOffsetMinutes,
-    transitLegProgress: values.transitLegProgress,
+    transitLegProgress: values.activeDay.transitLegProgress ?? {},
     plannerDays: values.plannerDays,
     activeDayIndex: values.activeDayIndex,
   };
-}
-
-function createCurrentRouteSignature(
-  activeDay: PlannerDaySnapshot | undefined,
-  allSpots: PilgrimageSpot[],
-  itineraryIds: string[],
-  optimizeOrder: boolean,
-  sourceStationId: string,
-  stayMinutes: Record<string, number>,
-  travelMode: TravelMode,
-): string {
-  return JSON.stringify({
-    stops: itineraryIds,
-    stay: travelMode === "TRANSIT" ? itineraryIds.map((id) => {
-      const spot = allSpots.find((item) => item.id === id);
-      return stayMinutes[id] ?? (spot ? recommendedStayMinutes(spot) : 0);
-    }) : [],
-    travelMode,
-    optimizeWaypointOrder: travelMode !== "TRANSIT" && optimizeOrder,
-    accessOriginId: travelMode === "TRANSIT" ? sourceStationId : "",
-    departureTime: travelMode === "TRANSIT" && activeDay
-      ? departureIso(activeDay.visitDate, activeDay.startTime)
-      : "",
-  });
 }
 
 function createSchedule(
@@ -448,7 +379,6 @@ function usePlannerState(allSpots: PilgrimageSpot[]): PlannerState {
   const [itineraryCollaborationId, setItineraryCollaborationId] = useState("");
   const [completedSpotIds, setCompletedSpotIds] = useState<string[]>([]);
   const [todayOffsetMinutes, setTodayOffsetMinutes] = useState(0);
-  const [transitLegProgress, setTransitLegProgress] = useState<TransitLegProgress>({});
   const [routeRequest, setRouteRequest] = useState<RouteRequest | null>(null);
   const [routeResult, setRouteResult] = useState<RouteResult>({ state: "idle" });
   const [dayRouteCache, setDayRouteCache] = useState<DayRouteCache>({});
@@ -458,14 +388,14 @@ function usePlannerState(allSpots: PilgrimageSpot[]): PlannerState {
     travelMode, setTravelModeState, optimizeOrder, setOptimizeOrderState,
     sourceStationId, setSourceStationIdState, itineraryCollaborationId, setItineraryCollaborationId,
     completedSpotIds, setCompletedSpotIds,
-    todayOffsetMinutes, setTodayOffsetMinutes, transitLegProgress, setTransitLegProgress,
+    todayOffsetMinutes, setTodayOffsetMinutes,
     routeRequest, setRouteRequest, routeResult, setRouteResult,
     dayRouteCache, setDayRouteCache, restored, setRestored,
   };
 }
 
 function usePlannerCoreDerived(allSpots: PilgrimageSpot[], state: PlannerState): PlannerCoreDerived {
-  const { activeDayIndex, completedSpotIds, itineraryCollaborationId, optimizeOrder, plannerDays, sourceStationId, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode } = state;
+  const { activeDayIndex, completedSpotIds, itineraryCollaborationId, optimizeOrder, plannerDays, sourceStationId, stayMinutes, todayOffsetMinutes, travelMode } = state;
   const validSpotIds = useMemo(() => new Set(allSpots.map((spot) => spot.id)), [allSpots]);
   const activeDay = plannerDays[activeDayIndex] ?? plannerDays[0];
   const activeDayId = activeDay?.id ?? "";
@@ -478,8 +408,8 @@ function usePlannerCoreDerived(allSpots: PilgrimageSpot[], state: PlannerState):
   );
   const plannerSnapshot = useMemo(() => activeDay ? buildPlannerSnapshot({
     activeDay, activeDayIndex, completedSpotIds, itineraryCollaborationId, itineraryIds, optimizeOrder, plannerDays,
-    sourceStationId, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode,
-  }) : null, [activeDay, activeDayIndex, completedSpotIds, itineraryCollaborationId, itineraryIds, optimizeOrder, plannerDays, sourceStationId, stayMinutes, todayOffsetMinutes, transitLegProgress, travelMode]);
+    sourceStationId, stayMinutes, todayOffsetMinutes, travelMode,
+  }) : null, [activeDay, activeDayIndex, completedSpotIds, itineraryCollaborationId, itineraryIds, optimizeOrder, plannerDays, sourceStationId, stayMinutes, todayOffsetMinutes, travelMode]);
   return { validSpotIds, activeDay, activeDayId, itineraryIds, itinerarySpots, plannerSnapshot };
 }
 
@@ -508,13 +438,13 @@ function createTransitLegs(
 }
 
 function usePlannerRouteDerived(allSpots: PilgrimageSpot[], state: PlannerState, core: PlannerCoreDerived): PlannerRouteDerived {
-  const { optimizeOrder, routeRequest, routeResult, sourceStationId, stayMinutes, transitLegProgress, travelMode } = state;
-  const { activeDay, itineraryIds, itinerarySpots } = core;
+  const { optimizeOrder, routeRequest, routeResult, sourceStationId, stayMinutes, travelMode } = state;
+  const { activeDay, itinerarySpots } = core;
   const currentRouteSignature = useMemo(
-    () => createCurrentRouteSignature(activeDay, allSpots, itineraryIds, optimizeOrder, sourceStationId, stayMinutes, travelMode),
-    [activeDay, allSpots, itineraryIds, optimizeOrder, sourceStationId, stayMinutes, travelMode],
+    () => plannerDayRouteSignature(activeDay, allSpots, { optimizeOrder, sourceStationId, stayMinutes, travelMode }),
+    [activeDay, allSpots, optimizeOrder, sourceStationId, stayMinutes, travelMode],
   );
-  const requestedRouteSignature = useMemo(() => requestSignature(routeRequest), [routeRequest]);
+  const requestedRouteSignature = useMemo(() => signatureForRouteRequest(routeRequest), [routeRequest]);
   const routeIsCurrent = requestedRouteSignature === currentRouteSignature
     && (routeResult.state === "success" || routeResult.state === "external");
   const plannedSpots = useMemo(() => {
@@ -526,8 +456,8 @@ function usePlannerRouteDerived(allSpots: PilgrimageSpot[], state: PlannerState,
     [activeDay, currentRouteSignature, plannedSpots, requestedRouteSignature, routeResult, stayMinutes],
   );
   const transitLegs = useMemo(
-    () => createTransitLegs(activeDay, routeIsCurrent, routeRequest, transitLegProgress),
-    [activeDay, routeIsCurrent, routeRequest, transitLegProgress],
+    () => createTransitLegs(activeDay, routeIsCurrent, routeRequest, activeDay?.transitLegProgress ?? {}),
+    [activeDay, routeIsCurrent, routeRequest],
   );
   return { currentRouteSignature, requestedRouteSignature, routeIsCurrent, plannedSpots, schedule, transitLegs };
 }
@@ -553,13 +483,14 @@ function usePlannerMutators(state: PlannerState, core: PlannerCoreDerived): Plan
 }
 
 function usePlannerRestoration(allSpots: PilgrimageSpot[], validSpotIds: ReadonlySet<string>, state: PlannerState, runtime: PlannerRuntime): void {
-  const { setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRestored, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTransitLegProgress, setTravelModeState } = state;
+  const { setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRestored, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTravelModeState } = state;
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const stored = loadStoredPlannerState(allSpots, validSpotIds, runtime);
       if (stored) {
         const { snapshot, routes } = stored;
-        const activeRoute = routes[snapshot.plannerDays[snapshot.activeDayIndex]?.id ?? ""];
+        const activeDay = snapshot.plannerDays[snapshot.activeDayIndex];
+        const activeRoute = matchingDayRoute(routes[activeDay?.id ?? ""], activeDay, allSpots, snapshot);
         setPlannerDays(snapshot.plannerDays);
         setActiveDayIndex(snapshot.activeDayIndex);
         setStayMinutes((current) => ({ ...current, ...snapshot.stayMinutes }));
@@ -569,7 +500,6 @@ function usePlannerRestoration(allSpots: PilgrimageSpot[], validSpotIds: Readonl
         setItineraryCollaborationId(snapshot.itineraryCollaborationId);
         setCompletedSpotIds(snapshot.completedSpotIds);
         setTodayOffsetMinutes(snapshot.todayOffsetMinutes);
-        setTransitLegProgress(snapshot.transitLegProgress);
         setDayRouteCache(routes);
         setRouteRequest(activeRoute?.request ?? null);
         setRouteResult(activeRoute?.result ?? { state: "idle" });
@@ -577,7 +507,7 @@ function usePlannerRestoration(allSpots: PilgrimageSpot[], validSpotIds: Readonl
       setRestored(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [allSpots, runtime, setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRestored, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTransitLegProgress, setTravelModeState, validSpotIds]);
+  }, [allSpots, runtime, setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRestored, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTravelModeState, validSpotIds]);
 }
 
 function usePlannerStorage(plannerSnapshot: PlannerSnapshot | null, dayRouteCache: DayRouteCache, restored: boolean, runtime: PlannerRuntime): void {
@@ -666,17 +596,19 @@ function useItineraryActions(state: PlannerState, core: PlannerCoreDerived, muta
   return { toggleSpot, replaceActiveItinerary, addToActiveItinerary };
 }
 
-function useDayLifecycleActions(state: PlannerState): DayLifecycleActions {
-  const { activeDayIndex, dayRouteCache, plannerDays, setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setPlannerDays, setRouteRequest, setRouteResult, setTodayOffsetMinutes, setTransitLegProgress } = state;
+function useDayLifecycleActions(state: PlannerState, allSpots: PilgrimageSpot[]): DayLifecycleActions {
+  const { activeDayIndex, dayRouteCache, plannerDays, setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setPlannerDays, setRouteRequest, setRouteResult, setTodayOffsetMinutes } = state;
+  const { optimizeOrder, sourceStationId, stayMinutes, travelMode } = state;
+  const settings = useMemo(() => ({ optimizeOrder, sourceStationId, stayMinutes, travelMode }), [optimizeOrder, sourceStationId, stayMinutes, travelMode]);
   const selectDay = useCallback((index: number): void => {
     if (index < 0 || index >= plannerDays.length || index === activeDayIndex) return;
-    const cachedRoute = dayRouteCache[plannerDays[index].id];
+    const day = plannerDays[index];
+    const cachedRoute = matchingDayRoute(dayRouteCache[day.id], day, allSpots, settings);
     setActiveDayIndex(index);
     setRouteRequest(cachedRoute?.request ?? null);
     setRouteResult(cachedRoute?.result ?? { state: "idle" });
     setTodayOffsetMinutes(0);
-    setTransitLegProgress({});
-  }, [activeDayIndex, dayRouteCache, plannerDays, setActiveDayIndex, setRouteRequest, setRouteResult, setTodayOffsetMinutes, setTransitLegProgress]);
+  }, [activeDayIndex, allSpots, dayRouteCache, plannerDays, settings, setActiveDayIndex, setRouteRequest, setRouteResult, setTodayOffsetMinutes]);
   const addDay = useCallback((): void => {
     if (plannerDays.length >= 7) return;
     const storedPreviousDate = plannerDays.at(-1)?.visitDate ?? "";
@@ -684,8 +616,8 @@ function useDayLifecycleActions(state: PlannerState): DayLifecycleActions {
     setPlannerDays((current) => [...current, createPlannerDay(current.length, dateAfter(previousDate, 1))]);
     setActiveDayIndex(plannerDays.length);
     setRouteRequest(null); setRouteResult({ state: "idle" });
-    setTodayOffsetMinutes(0); setTransitLegProgress({});
-  }, [plannerDays, setActiveDayIndex, setPlannerDays, setRouteRequest, setRouteResult, setTodayOffsetMinutes, setTransitLegProgress]);
+    setTodayOffsetMinutes(0);
+  }, [plannerDays, setActiveDayIndex, setPlannerDays, setRouteRequest, setRouteResult, setTodayOffsetMinutes]);
   const removeActiveDay = useCallback((): void => {
     if (plannerDays.length <= 1) return;
     const removedDayId = plannerDays[activeDayIndex]?.id;
@@ -697,15 +629,16 @@ function useDayLifecycleActions(state: PlannerState): DayLifecycleActions {
       removedDayId,
       next[nextActiveDayIndex]?.id,
     );
+    const activeRoute = matchingDayRoute(routeTransition.activeRoute ?? undefined, next[nextActiveDayIndex], allSpots, settings);
     setPlannerDays(next);
     setDayRouteCache(routeTransition.routes);
     setActiveDayIndex(nextActiveDayIndex);
-    setRouteRequest(routeTransition.activeRoute?.request ?? null);
-    setRouteResult(routeTransition.activeRoute?.result ?? { state: "idle" });
+    setRouteRequest(activeRoute?.request ?? null);
+    setRouteResult(activeRoute?.result ?? { state: "idle" });
     setTodayOffsetMinutes(0);
     const remainingIds = new Set(next.flatMap((day) => day.itineraryIds));
     setCompletedSpotIds((current) => current.filter((id) => !removedIds.has(id) || remainingIds.has(id)));
-  }, [activeDayIndex, dayRouteCache, plannerDays, setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setPlannerDays, setRouteRequest, setRouteResult, setTodayOffsetMinutes]);
+  }, [activeDayIndex, allSpots, dayRouteCache, plannerDays, settings, setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setPlannerDays, setRouteRequest, setRouteResult, setTodayOffsetMinutes]);
   return { selectDay, addDay, removeActiveDay };
 }
 
@@ -811,7 +744,10 @@ function createRouteRequest(
     stops: itinerarySpots,
     travelMode,
     optimizeWaypointOrder: travelMode !== "TRANSIT" && optimizeOrder,
-    stayMinutes: { ...stayMinutes },
+    stayMinutes: Object.fromEntries(itinerarySpots.map((spot) => [
+      spot.id,
+      stayMinutes[spot.id] ?? recommendedStayMinutes(spot),
+    ])),
     accessOrigin: travelMode === "TRANSIT"
       ? majorStations.find((station) => station.id === sourceStationId)
       : undefined,
@@ -865,19 +801,23 @@ function japanClockMinutes(): number {
   return hours * 60 + minutes;
 }
 
-function useTodayActions(state: PlannerState, route: PlannerRouteDerived): TodayActions {
-  const { completedSpotIds, setCompletedSpotIds, setTodayOffsetMinutes, setTransitLegProgress } = state;
+function useTodayActions(state: PlannerState, route: PlannerRouteDerived, mutators: PlannerMutators): TodayActions {
+  const { completedSpotIds, setCompletedSpotIds, setTodayOffsetMinutes } = state;
   const { schedule } = route;
+  const { updateActiveDay } = mutators;
   const updateTransitLeg = useCallback((id: string, update: Partial<TransitLegProgress[string]>): void => {
-    setTransitLegProgress((current) => ({
-      ...current,
-      [id]: {
-        date: update.date ?? current[id]?.date ?? japanDate(),
-        time: update.time ?? current[id]?.time ?? "09:00",
-        confirmed: update.confirmed ?? current[id]?.confirmed ?? false,
+    updateActiveDay((day) => ({
+      ...day,
+      transitLegProgress: {
+        ...day.transitLegProgress,
+        [id]: {
+          date: update.date ?? day.transitLegProgress?.[id]?.date ?? japanDate(),
+          time: update.time ?? day.transitLegProgress?.[id]?.time ?? "09:00",
+          confirmed: update.confirmed ?? day.transitLegProgress?.[id]?.confirmed ?? false,
+        },
       },
     }));
-  }, [setTransitLegProgress]);
+  }, [updateActiveDay]);
   const toggleCompleted = useCallback((spotId: string): void => {
     setCompletedSpotIds((current) => current.includes(spotId)
       ? current.filter((id) => id !== spotId)
@@ -905,7 +845,7 @@ function createPlannerShareUrl(plannerSnapshot: PlannerSnapshot | null, validSpo
 }
 
 function useShareActions(state: PlannerState, core: PlannerCoreDerived): ShareActions {
-  const { setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTransitLegProgress, setTravelModeState } = state;
+  const { setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTravelModeState } = state;
   const { plannerSnapshot, validSpotIds } = core;
   const createShareUrl = useCallback((includeDates: boolean): string => (
     createPlannerShareUrl(plannerSnapshot, validSpotIds, includeDates)
@@ -915,15 +855,15 @@ function useShareActions(state: PlannerState, core: PlannerCoreDerived): ShareAc
     if (!imported) return false;
     setPlannerDays(imported.plannerDays);
     setActiveDayIndex(imported.activeDayIndex);
-    setStayMinutes((current) => ({ ...current, ...imported.stayMinutes }));
+    setStayMinutes(imported.stayMinutes);
     setTravelModeState(imported.travelMode);
     setOptimizeOrderState(imported.optimizeOrder);
     setSourceStationIdState(imported.sourceStationId);
     setItineraryCollaborationId(imported.itineraryCollaborationId);
-    setCompletedSpotIds([]); setTodayOffsetMinutes(0); setTransitLegProgress({});
+    setCompletedSpotIds([]); setTodayOffsetMinutes(0);
     setRouteRequest(null); setRouteResult({ state: "idle" }); setDayRouteCache({});
     return true;
-  }, [setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTransitLegProgress, setTravelModeState, validSpotIds]);
+  }, [setActiveDayIndex, setCompletedSpotIds, setDayRouteCache, setItineraryCollaborationId, setOptimizeOrderState, setPlannerDays, setRouteRequest, setRouteResult, setSourceStationIdState, setStayMinutes, setTodayOffsetMinutes, setTravelModeState, validSpotIds]);
   return { createShareUrl, importSharedPlan };
 }
 
@@ -935,12 +875,12 @@ export function useLivePlanner(allSpots: PilgrimageSpot[], runtime: PlannerRunti
   usePlannerStorage(core.plannerSnapshot, state.dayRouteCache, state.restored, runtime);
   const route = usePlannerRouteDerived(allSpots, state, core);
   const itineraryActions = useItineraryActions(state, core, mutators);
-  const dayLifecycleActions = useDayLifecycleActions(state);
+  const dayLifecycleActions = useDayLifecycleActions(state, allSpots);
   const dayEditingActions = useDayEditingActions(state, core, mutators);
   const appointmentActions = useAppointmentActions(mutators);
   const routeSettingActions = useRouteSettingActions(state, mutators);
   const routeCalculationActions = useRouteCalculationActions(state, core, route);
-  const todayActions = useTodayActions(state, route);
+  const todayActions = useTodayActions(state, route, mutators);
   const shareActions = useShareActions(state, core);
   return {
     restored: state.restored,
@@ -963,7 +903,7 @@ export function useLivePlanner(allSpots: PilgrimageSpot[], runtime: PlannerRunti
     requestedRouteSignature: route.requestedRouteSignature,
     schedule: route.schedule,
     transitLegs: route.transitLegs,
-    transitLegProgress: state.transitLegProgress,
+    transitLegProgress: core.activeDay?.transitLegProgress ?? {},
     ...itineraryActions,
     ...dayLifecycleActions,
     ...dayEditingActions,

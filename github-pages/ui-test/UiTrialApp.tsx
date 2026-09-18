@@ -68,6 +68,7 @@ type ExploreSourceFilter = "all" | "activity" | "sehas" | "with-meets";
 type ModalState =
   | { kind: "image"; src: string; alt: string; credit?: string; copyright?: string }
   | { kind: "share"; url: string; includeDates: boolean }
+  | { kind: "import" }
   | { kind: "spot"; spot: PilgrimageSpot; photos: string[]; credits: Record<string, string> }
   | { kind: "card"; card: CardModelLocation; spot?: PilgrimageSpot }
   | { kind: "spot-map"; spot: PilgrimageSpot }
@@ -92,6 +93,10 @@ const cardModelSpotIds = Array.from(new Set(cardModels.flatMap((card) => card.sp
 const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() ?? "";
 const shareMessage = "訪問予定を共有します。\n#蓮ノ旅";
 const CARD_ILLUSTRATION_COPYRIGHT = "©︎PL!HS ©︎S ©︎2023 BNML ©︎ODD No.";
+const COMPACT_TOUCH_LAYOUT_QUERY = [
+  "(max-width: 900px)",
+  "(min-width: 901px) and (max-width: 1100px) and (max-aspect-ratio: 6/5)",
+].join(", ");
 const ignoreRouteResult = (): void => undefined;
 const pageLabels: Record<TrialPage, string> = {
   explore: "探す",
@@ -142,6 +147,14 @@ const guideSteps = [
   },
 ] as const;
 
+type ModalLifecycleEntry = {
+  dialog: HTMLElement;
+  closeRef: RefObject<HTMLButtonElement | null>;
+};
+
+const modalLifecycleStack: ModalLifecycleEntry[] = [];
+let modalPreviousBodyOverflow = "";
+
 function useModalLifecycle(
   isOpen: boolean,
   dialogRef: RefObject<HTMLElement | null>,
@@ -152,13 +165,19 @@ function useModalLifecycle(
 ): void {
   useEffect(() => {
     if (!isOpen) return undefined;
-    const previousOverflow = document.body.style.overflow;
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const entry = { dialog, closeRef };
+    if (modalLifecycleStack.length === 0) modalPreviousBodyOverflow = document.body.style.overflow;
+    modalLifecycleStack.push(entry);
     document.body.style.overflow = "hidden";
     const focusTimer = window.setTimeout(() => closeRef.current?.focus(), 0);
     const openTimer = onOpen ? window.setTimeout(onOpen, 0) : null;
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (modalLifecycleStack.at(-1) !== entry) return;
       if (event.key === "Escape") {
+        event.preventDefault();
         onClose();
         return;
       }
@@ -173,7 +192,10 @@ function useModalLifecycle(
       }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -186,8 +208,15 @@ function useModalLifecycle(
       window.clearTimeout(focusTimer);
       if (openTimer !== null) window.clearTimeout(openTimer);
       window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      if (trigger?.isConnected) trigger.focus();
+      const wasTop = modalLifecycleStack.at(-1) === entry;
+      const entryIndex = modalLifecycleStack.indexOf(entry);
+      if (entryIndex >= 0) modalLifecycleStack.splice(entryIndex, 1);
+      const remainingTop = modalLifecycleStack.at(-1);
+      if (!remainingTop) document.body.style.overflow = modalPreviousBodyOverflow;
+      if (wasTop) {
+        if (trigger?.isConnected && (!remainingTop || remainingTop.dialog.contains(trigger))) trigger.focus();
+        else remainingTop?.closeRef.current?.focus();
+      }
     };
   }, [closeRef, dialogRef, isOpen, lifecycleKey, onClose, onOpen]);
 }
@@ -444,6 +473,10 @@ type ExploreSheetDragState = {
   dragged: boolean;
 };
 
+function usesCompactTouchLayout(): boolean {
+  return window.matchMedia(COMPACT_TOUCH_LAYOUT_QUERY).matches;
+}
+
 type MapSearchResult = {
   kind: "spot" | "card";
   id: string;
@@ -540,7 +573,7 @@ function beginExploreSheetDrag(
   dialogRef: RefObject<HTMLElement | null>,
   bodyRef: RefObject<HTMLDivElement | null>,
 ): void {
-  if (window.innerWidth > 760 || !event.isPrimary || event.button !== 0) return;
+  if (!usesCompactTouchLayout() || !event.isPrimary || event.button !== 0) return;
   const target = event.target as HTMLElement;
   if (target.closest("button, a, input, select, textarea, label")) return;
   const dialog = dialogRef.current;
@@ -701,7 +734,7 @@ function useExploreActions(props: ExplorePageProps, state: ExploreState, derived
     setOpenExploreModal(nextMode);
   }
   function openMainMap(): void {
-    if (window.matchMedia("(max-width: 760px)").matches && !mapView) {
+    if (usesCompactTouchLayout() && !mapView) {
       closeExploreModal();
       window.setTimeout(() => document.getElementById("ui-trial-main-map")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
       return;
@@ -966,7 +999,7 @@ function rememberStopPositions(
 }
 
 function finishStopPointerDrag(
-  event: ReactPointerEvent<HTMLButtonElement>,
+  event: ReactPointerEvent<HTMLOListElement>,
   dragRef: RefObject<PlannerStopDragState | null>,
   scrollFrameRef: RefObject<number | null>,
   commit: boolean,
@@ -976,11 +1009,11 @@ function finishStopPointerDrag(
   setPreviewOrder: (spots: PilgrimageSpot[] | null) => void,
 ): void {
   const drag = dragRef.current;
-  if (!drag) return;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  dragRef.current = null;
   stopStopDragAutoScroll(scrollFrameRef);
   if (event.currentTarget.hasPointerCapture(drag.pointerId)) event.currentTarget.releasePointerCapture(drag.pointerId);
   drag.overlay.remove();
-  dragRef.current = null;
   setDraggedSpotId("");
   setPreviewOrder(null);
   if (commit && drag.startIndex !== drag.currentIndex) onReorder(drag.order.map((spot) => spot.id));
@@ -992,15 +1025,17 @@ function startStopPointerDrag(
   index: number,
   spotId: string,
   planned: PilgrimageSpot[],
+  listRef: RefObject<HTMLOListElement | null>,
   dragRef: RefObject<PlannerStopDragState | null>,
   onReorderStateChange: (isReordering: boolean) => void,
   setDraggedSpotId: (spotId: string) => void,
   setPreviewOrder: (spots: PilgrimageSpot[] | null) => void,
 ): void {
-  if (!event.isPrimary || event.button !== 0 || planned.length < 2) return;
+  if (!event.isPrimary || event.button !== 0 || planned.length < 2 || dragRef.current) return;
   event.preventDefault();
   const row = event.currentTarget.closest("li");
-  if (!row) return;
+  const list = listRef.current;
+  if (!row || !list) return;
   const rect = row.getBoundingClientRect();
   const overlay = row.cloneNode(true) as HTMLElement;
   overlay.classList.add("ui-trial__drag-overlay");
@@ -1009,7 +1044,8 @@ function startStopPointerDrag(
   overlay.inert = true;
   Object.assign(overlay.style, { position: "fixed", left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, zIndex: "200", pointerEvents: "none" });
   document.body.append(overlay);
-  event.currentTarget.setPointerCapture(event.pointerId);
+  // The keyed row moves during preview; capture on the list that stays in place.
+  list.setPointerCapture(event.pointerId);
   onReorderStateChange(true);
   setPreviewOrder(planned);
   dragRef.current = {
@@ -1102,7 +1138,7 @@ function syncStopDragAutoScroll(
 }
 
 function moveStopPointerDrag(
-  event: ReactPointerEvent<HTMLButtonElement>,
+  event: ReactPointerEvent<HTMLOListElement>,
   dragRef: RefObject<PlannerStopDragState | null>,
   listRef: RefObject<HTMLOListElement | null>,
   positionsRef: RefObject<Map<string, number>>,
@@ -1138,13 +1174,11 @@ function moveStopWithKeyboard(
   onReorder(next.map((spot) => spot.id));
 }
 
-function PlannerStopRow({ dragged, index, onFocus, onKeyMove, onPointerFinish, onPointerMove, onPointerStart, onRemove, onStayChange, schedule, spot, stayMinutes }: {
+function PlannerStopRow({ dragged, index, onFocus, onKeyMove, onPointerStart, onRemove, onStayChange, schedule, spot, stayMinutes }: {
   dragged: boolean;
   index: number;
   onFocus: (spotId: string) => void;
   onKeyMove: (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => void;
-  onPointerFinish: (event: ReactPointerEvent<HTMLButtonElement>, commit: boolean) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onPointerStart: (event: ReactPointerEvent<HTMLButtonElement>, index: number, spotId: string) => void;
   onRemove: (spotId: string) => void;
   onStayChange: (spotId: string, minutes: number) => void;
@@ -1156,7 +1190,7 @@ function PlannerStopRow({ dragged, index, onFocus, onKeyMove, onPointerFinish, o
     <li data-stop-index={index} data-stop-id={spot.id} className={dragged ? "is-dragging" : ""}>
       <span>{index + 1}</span><time>{schedule ? displayClock(schedule.entries.find((entry) => entry.spot.id === spot.id)?.arrival ?? 0) : "--:--"}</time>
       <div role="button" tabIndex={0} onClick={() => onFocus(spot.id)} onKeyDown={(event) => { if (event.key === "Enter") onFocus(spot.id); }}><strong><SpotName name={spot.name} /></strong><label onClick={(event) => event.stopPropagation()}>滞在<input type="number" min="0" max="480" step="5" value={stayMinutes[spot.id] ?? recommendedStayMinutes(spot)} onChange={(event) => onStayChange(spot.id, Number(event.target.value))} />分</label></div>
-      <div className="ui-trial__stop-actions"><button type="button" onClick={() => onRemove(spot.id)} aria-label={`${spot.name}を予定から外す`}>×</button><button type="button" aria-label={`${spot.name}をドラッグして並べ替え`} title="ドラッグまたは上下キーで並べ替え" onPointerDown={(event) => onPointerStart(event, index, spot.id)} onPointerMove={onPointerMove} onPointerUp={(event) => onPointerFinish(event, true)} onPointerCancel={(event) => onPointerFinish(event, false)} onLostPointerCapture={(event) => onPointerFinish(event, false)} onKeyDown={(event) => onKeyMove(event, index)}>☷</button></div>
+      <div className="ui-trial__stop-actions"><button type="button" onClick={() => onRemove(spot.id)} aria-label={`${spot.name}を予定から外す`}>×</button><button type="button" aria-label={`${spot.name}をドラッグして並べ替え`} title="ドラッグまたは上下キーで並べ替え" onPointerDown={(event) => onPointerStart(event, index, spot.id)} onKeyDown={(event) => onKeyMove(event, index)}>☷</button></div>
     </li>
   );
 }
@@ -1194,13 +1228,15 @@ function PlannerStops({ planned, schedule, stayMinutes, onReorder, onRemove, onS
   }, [onReorderStateChange]);
 
   return (
-    <ol className="ui-trial__stop-list" ref={listRef}>
+    <ol className="ui-trial__stop-list" ref={listRef}
+      onPointerMove={(event) => moveStopPointerDrag(event, dragRef, listRef, previousPositionsRef, scrollFrameRef, setPreviewOrder)}
+      onPointerUp={(event) => finishStopPointerDrag(event, dragRef, scrollFrameRef, true, onReorder, onReorderStateChange, setDraggedSpotId, setPreviewOrder)}
+      onPointerCancel={(event) => finishStopPointerDrag(event, dragRef, scrollFrameRef, false, onReorder, onReorderStateChange, setDraggedSpotId, setPreviewOrder)}
+      onLostPointerCapture={(event) => finishStopPointerDrag(event, dragRef, scrollFrameRef, false, onReorder, onReorderStateChange, setDraggedSpotId, setPreviewOrder)}>
       {displayedSpots.map((spot, index) => <PlannerStopRow
         dragged={draggedSpotId === spot.id} index={index} key={spot.id} onFocus={onFocus}
         onKeyMove={(event, rowIndex) => moveStopWithKeyboard(event, rowIndex, displayedSpots, listRef, previousPositionsRef, onReorder)}
-        onPointerFinish={(event, commit) => finishStopPointerDrag(event, dragRef, scrollFrameRef, commit, onReorder, onReorderStateChange, setDraggedSpotId, setPreviewOrder)}
-        onPointerMove={(event) => moveStopPointerDrag(event, dragRef, listRef, previousPositionsRef, scrollFrameRef, setPreviewOrder)}
-        onPointerStart={(event, rowIndex, spotId) => startStopPointerDrag(event, rowIndex, spotId, planned, dragRef, onReorderStateChange, setDraggedSpotId, setPreviewOrder)}
+        onPointerStart={(event, rowIndex, spotId) => startStopPointerDrag(event, rowIndex, spotId, planned, listRef, dragRef, onReorderStateChange, setDraggedSpotId, setPreviewOrder)}
         onRemove={onRemove} onStayChange={onStayChange} schedule={schedule} spot={spot} stayMinutes={stayMinutes}
       />)}
     </ol>
@@ -1750,6 +1786,7 @@ type ModalDragState = { pointerId: number; startY: number; dragged: boolean };
 
 function modalTitle(modal: OpenModalState): string {
   if (modal.kind === "share") return "予定を共有";
+  if (modal.kind === "import") return "予定を取り込む";
   if (modal.kind === "image") return modal.alt;
   if (modal.kind === "card") return modal.card.card;
   if (modal.kind === "spot-map") return `${modal.spot.name}の地図`;
@@ -1760,7 +1797,7 @@ function beginModalDrag(
   event: ReactPointerEvent<HTMLElement>,
   dragRef: RefObject<ModalDragState | null>,
 ): void {
-  if (window.innerWidth > 760 || !event.isPrimary || event.button !== 0) return;
+  if (!usesCompactTouchLayout() || !event.isPrimary || event.button !== 0) return;
   const target = event.target as HTMLElement;
   if (target.closest("button, a, input, select, textarea, label")) return;
   if (!target.closest("header, .ui-trial__modal-handle")) return;
@@ -1898,6 +1935,18 @@ function ShareModalContent({ modal, feedback, onCopy, onShare, onUpdateShareDate
   );
 }
 
+function ImportModalContent({ onClose, onConfirmImport }: {
+  onClose: () => void;
+  onConfirmImport: () => void;
+}): ReactElement {
+  return (
+    <div className="ui-trial__share-dialog">
+      <p id="ui-trial-import-warning">現在保存されている予定は、共有された予定で上書きされます。取り込みますか？</p>
+      <div><button type="button" onClick={onClose}>キャンセル</button><button type="button" onClick={onConfirmImport}>上書きして取り込む</button></div>
+    </div>
+  );
+}
+
 function SpotModalContent({ modal, onOpenImage, plannedSpotIds, onToggleSpot }: {
   modal: SpotModalState;
   onOpenImage: OpenImageHandler;
@@ -1905,6 +1954,8 @@ function SpotModalContent({ modal, onOpenImage, plannedSpotIds, onToggleSpot }: 
   onToggleSpot: (spotId: string) => void;
 }): ReactElement {
   const isPlanned = plannedSpotIds.includes(modal.spot.id);
+  const sourceUrl = modal.spot.sourceUrl?.trim();
+  const spotCollaborations = collaborations.filter((collaboration) => modal.spot.collaborationIds?.includes(collaboration.id));
   return (
     <div className="ui-trial__spot-detail-dialog">
       {modal.photos.length ? <SpotModalPhotos modal={modal} onOpenImage={onOpenImage} /> : <EmptySpotPhoto className="ui-trial__spot-detail-photo-empty" spotName={modal.spot.name} />}
@@ -1912,12 +1963,13 @@ function SpotModalContent({ modal, onOpenImage, plannedSpotIds, onToggleSpot }: 
         <small>{modal.spot.area} · {modal.spot.category}</small>
         <h2><SpotName name={modal.spot.name} /></h2>
         <p>{modal.spot.address}</p>
-        <div className="ui-trial__spot-facts"><span>{formatOpeningHours(modal.spot)}</span></div>
+        <div className="ui-trial__spot-facts"><span>{formatOpeningHours(modal.spot)}</span>{spotCollaborations.map((collaboration) => <span key={collaboration.id}>コラボ：{collaboration.name}（{collaborationStatus(collaboration)} / {formatCollaborationDate(collaboration.startDate)} — {formatCollaborationDate(collaboration.endDate)}）</span>)}</div>
         <SpotVisitNotice spot={modal.spot} />
         <SpotEpisodeReferences spot={modal.spot} />
         <div className="ui-trial__spot-detail-actions">
           <a href={`https://www.google.com/maps/search/?api=1&query=${modal.spot.lat},${modal.spot.lng}`} target="_blank" rel="noreferrer">地図で開く <span aria-hidden="true">↗</span></a>
           <button className={isPlanned ? "ui-trial__plan-toggle is-planned" : "ui-trial__plan-toggle"} type="button" disabled={!isPlanned && plannedSpotIds.length >= maximumItineraryStops} onClick={() => onToggleSpot(modal.spot.id)}>{isPlanned ? "予定から外す −" : "予定に追加 ＋"}</button>
+          {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer">場所・公式情報 <span aria-hidden="true">↗</span></a> : null}
         </div>
       </div>
     </div>
@@ -1954,9 +2006,11 @@ function SpotMapModalContent({ modal, plannedSpotIds }: {
   );
 }
 
-function ModalContent({ modal, feedback, onCopy, onOpenImage, onShare, onToggleSpot, onUpdateShareDates, plannedSpotIds }: {
+function ModalContent({ modal, feedback, onClose, onConfirmImport, onCopy, onOpenImage, onShare, onToggleSpot, onUpdateShareDates, plannedSpotIds }: {
   modal: OpenModalState;
   feedback: string;
+  onClose: () => void;
+  onConfirmImport: () => void;
   onCopy: () => void;
   onOpenImage: OpenImageHandler;
   onShare: () => void;
@@ -1966,14 +2020,16 @@ function ModalContent({ modal, feedback, onCopy, onOpenImage, onShare, onToggleS
 }): ReactElement {
   if (modal.kind === "image") return <ImageModalContent modal={modal} />;
   if (modal.kind === "share") return <ShareModalContent modal={modal} feedback={feedback} onCopy={onCopy} onShare={onShare} onUpdateShareDates={onUpdateShareDates} />;
+  if (modal.kind === "import") return <ImportModalContent onClose={onClose} onConfirmImport={onConfirmImport} />;
   if (modal.kind === "spot") return <SpotModalContent modal={modal} onOpenImage={onOpenImage} plannedSpotIds={plannedSpotIds} onToggleSpot={onToggleSpot} />;
   if (modal.kind === "card") return <CardModalContent modal={modal} plannedSpotIds={plannedSpotIds} onToggleSpot={onToggleSpot} />;
   return <SpotMapModalContent modal={modal} plannedSpotIds={plannedSpotIds} />;
 }
 
-function TrialModal({ modal, onClose, onOpenImage, onUpdateShareDates, plannedSpotIds, onToggleSpot }: {
+function TrialModal({ modal, onClose, onConfirmImport, onOpenImage, onUpdateShareDates, plannedSpotIds, onToggleSpot }: {
   modal: ModalState;
   onClose: () => void;
+  onConfirmImport: () => void;
   onOpenImage: OpenImageHandler;
   onUpdateShareDates: (includeDates: boolean) => void;
   plannedSpotIds: string[];
@@ -1995,6 +2051,7 @@ function TrialModal({ modal, onClose, onOpenImage, onUpdateShareDates, plannedSp
         role="dialog"
         aria-modal="true"
         aria-labelledby="ui-trial-modal-title"
+        aria-describedby={modal.kind === "import" ? "ui-trial-import-warning" : undefined}
         onPointerDown={(event) => beginModalDrag(event, dragRef)}
         onPointerMove={(event) => moveModalDrag(event, dragRef, dialogRef)}
         onPointerUp={(event) => finishModalDrag(event, dragRef, dialogRef, onClose)}
@@ -2008,6 +2065,8 @@ function TrialModal({ modal, onClose, onOpenImage, onUpdateShareDates, plannedSp
         <ModalContent
           modal={modal}
           feedback={shareFeedback}
+          onClose={onClose}
+          onConfirmImport={onConfirmImport}
           onCopy={() => { void copyShareUrl(modal, setShareFeedback); }}
           onOpenImage={onOpenImage}
           onShare={() => { void sharePlan(modal, setShareFeedback); }}
@@ -2121,8 +2180,7 @@ function createTrialActions(planner: LivePlanner, location: TrialLocationState, 
   };
   const importShared = (): void => {
     if (!location.sharedPlan || !planner.restored) return;
-    const confirmed = window.confirm("現在保存されている予定は、共有された予定で上書きされます。取り込みますか？");
-    if (!confirmed || !planner.importSharedPlan(location.sharedPlan)) return;
+    if (!planner.importSharedPlan(location.sharedPlan)) return;
     navigate("planner");
   };
   return { navigate, openExploreMap, openShare, updateShareDates, importShared };
@@ -2146,7 +2204,7 @@ function TrialContent({ app, actions, location, onReorderStateChange, planner, s
       {plannerMapEnabled ? <PlannerPage isVisible={view === "planner"} planner={planner} onOpenShare={actions.openShare} onReorderStateChange={onReorderStateChange} /> : null}
       {view === "today" ? <TodayPage planner={planner} onOpenPlanner={() => actions.navigate("planner")} onOpenSpotMap={(spot) => setModal({ kind: "spot-map", spot })} /> : null}
       {view === "guide" ? <GuidePage onNavigate={actions.navigate} onOpenImage={(src, alt) => setModal({ kind: "image", src, alt })} communitySubmissionsEnabled={communitySubmissionsEnabled} /> : null}
-      {view === "shared" ? <SharedPreviewPage key={sharedPlanKey} canImport={planner.restored} spots={spots} sharedPlan={sharedPlan} onImport={actions.importShared} onBack={() => actions.navigate("explore")} /> : null}
+      {view === "shared" ? <SharedPreviewPage key={sharedPlanKey} canImport={planner.restored} spots={spots} sharedPlan={sharedPlan} onImport={() => setModal({ kind: "import" })} onBack={() => actions.navigate("explore")} /> : null}
       <CommunityContributionPanel spots={spots} apiBaseUrl={communityApiUrl} submissionPath={submissionPath} turnstileSiteKey={turnstileSiteKey} enabled={communitySubmissionsEnabled} hidden={view !== "explore" || exploreMapView} />
     </main>
   );
@@ -2168,7 +2226,7 @@ function TrialShell(props: TrialShellProps): ReactElement {
       <TrialContent {...props} />
       <footer className="ui-trial__site-footer"><span>蓮ノ旅 Ver.{app.siteVersion}</span><small>非公式の聖地巡礼ガイドです。</small></footer>
       <TrialNavigation page={page} itineraryCount={allPlannedSpotCount} onNavigate={actions.navigate} />
-      <TrialModal modal={modal} onClose={closeModal} onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })} onUpdateShareDates={actions.updateShareDates} plannedSpotIds={planner.itineraryIds} onToggleSpot={planner.toggleSpot} />
+      <TrialModal modal={modal} onClose={closeModal} onConfirmImport={actions.importShared} onOpenImage={(src, alt, credit, copyright) => setModal({ kind: "image", src, alt, credit, copyright })} onUpdateShareDates={actions.updateShareDates} plannedSpotIds={planner.itineraryIds} onToggleSpot={planner.toggleSpot} />
     </div>
   );
 }

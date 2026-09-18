@@ -23,6 +23,7 @@ export type PlannerDaySnapshot = {
   itineraryIds: string[];
   hotelName: string;
   appointments: PlannerAppointment[];
+  transitLegProgress?: TransitLegProgress;
 };
 
 export type PlannerSnapshot = {
@@ -68,6 +69,7 @@ type CompactPlannerDraft = {
     string[],
     string,
     Array<[string, string, string, number]>,
+    Array<[string, string, string, 0 | 1]>?,
   ]>;
   a?: number;
 };
@@ -106,6 +108,13 @@ function compactPlannerDraft(snapshot: PlannerSnapshot): CompactPlannerDraft {
         appointment.time,
         appointment.durationMinutes,
       ]),
+      day.transitLegProgress === undefined ? undefined
+        : Object.entries(day.transitLegProgress).map(([id, progress]) => [
+            id,
+            progress.date,
+            progress.time,
+            progress.confirmed ? 1 : 0,
+          ]),
     ]),
     a: snapshot.activeDayIndex,
   };
@@ -121,6 +130,7 @@ export function serializePlannerDraftCookie(snapshot: PlannerSnapshot): string {
   if (encoded.length <= plannerDraftCookieLimit) return encoded;
 
   payload.p = [];
+  payload.q?.forEach((day) => day.splice(7, 1));
   encoded = encodedDraft(payload);
   if (encoded.length <= plannerDraftCookieLimit) return encoded;
 
@@ -171,6 +181,7 @@ function expandPlannerDays(
         durationMinutes: appointment?.[3],
       }))
       : [],
+    ...(Array.isArray(day?.[7]) ? { transitLegProgress: expandTransitLegProgress(day[7]) } : {}),
   }));
 }
 
@@ -261,6 +272,9 @@ function sanitizePlannerDay(
         .map((appointment, appointmentIndex) => sanitizePlannerAppointment(appointment, appointmentIndex))
         .filter((appointment): appointment is PlannerAppointment => Boolean(appointment))
       : [],
+    ...(candidate.transitLegProgress !== undefined
+      ? { transitLegProgress: sanitizeTransitLegProgress(candidate.transitLegProgress) }
+      : {}),
   };
 }
 
@@ -389,6 +403,12 @@ export function sanitizePlannerSnapshot(
   const normalizedDays = normalizePlannerDays(candidate, itineraryIds, validSpotIds);
   if (!normalizedDays.length) return null;
   const activeDayIndex = normalizeActiveDayIndex(candidate.activeDayIndex, normalizedDays.length);
+  const legacyTransitProgress = sanitizeTransitLegProgress(candidate.transitLegProgress);
+  const storedActiveDay = normalizedDays[activeDayIndex];
+  // Older drafts stored confirmation state only for the active day.
+  if (storedActiveDay.transitLegProgress === undefined && Object.keys(legacyTransitProgress).length) {
+    normalizedDays[activeDayIndex] = { ...storedActiveDay, transitLegProgress: legacyTransitProgress };
+  }
   const activeDay = normalizedDays[activeDayIndex];
   const allItineraryIds = new Set(normalizedDays.flatMap((day) => day.itineraryIds));
 
@@ -405,7 +425,7 @@ export function sanitizePlannerSnapshot(
       : "",
     completedSpotIds: sanitizeCompletedSpotIds(candidate.completedSpotIds, allItineraryIds),
     todayOffsetMinutes: sanitizeTodayOffsetMinutes(candidate.todayOffsetMinutes),
-    transitLegProgress: sanitizeTransitLegProgress(candidate.transitLegProgress),
+    transitLegProgress: activeDay.transitLegProgress ?? legacyTransitProgress,
     plannerDays: normalizedDays,
     activeDayIndex,
   };

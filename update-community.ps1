@@ -4,7 +4,9 @@ param(
     [string]$NpmExe = "",
     [string]$ReceiverTaskName = "Hasunosora Community Receiver",
     [ValidateRange(1, 65535)]
-    [int]$HealthPort = 8790
+    [int]$HealthPort = 8790,
+    [ValidateRange(1, 65535)]
+    [int]$AdminPort = 8766
 )
 
 Set-StrictMode -Version 2.0
@@ -15,11 +17,14 @@ $ServerFile = [IO.Path]::GetFullPath((Join-Path $ProjectDir "community-server.mj
 $StateDirectory = Join-Path $ProjectDir "private\community-update"
 $StateFile = Join-Path $StateDirectory "deployed-commit.txt"
 $DependencyStateFile = Join-Path $StateDirectory "dependency-hash.txt"
+$DependencyLockFile = Join-Path $StateDirectory "dependencies.lock"
+$DependencyPendingFile = Join-Path $StateDirectory "dependencies-pending.txt"
 $LogFile = Join-Path $StateDirectory "update.log"
 $LockFile = Join-Path $StateDirectory "update.lock"
 $HealthUrl = "http://127.0.0.1:${HealthPort}/health"
 $ExpectedOrigin = "https://github.com/Yukachiii/hasunosora-pilgrimage.git"
 $LockStream = $null
+$DependencyLockStream = $null
 
 New-Item -ItemType Directory -Path $StateDirectory -Force | Out-Null
 if ((Test-Path -LiteralPath $LogFile) -and
@@ -98,9 +103,17 @@ function Remove-FirstVersionFields([string]$Content, [int]$Count) {
     return $Content
 }
 
-function Get-DependencyHash {
-    $package = Get-Content -LiteralPath (Join-Path $script:ProjectDir "package.json") -Raw
-    $lock = Get-Content -LiteralPath (Join-Path $script:ProjectDir "package-lock.json") -Raw
+function Get-DependencyHash([string]$Revision = "") {
+    if ($Revision) {
+        $packageResult = Invoke-RepoGit -Arguments @("show", "${Revision}:package.json")
+        $lockResult = Invoke-RepoGit -Arguments @("show", "${Revision}:package-lock.json")
+        $package = ($packageResult.Output -join "`n") + "`n"
+        $lock = ($lockResult.Output -join "`n") + "`n"
+    }
+    else {
+        $package = Get-Content -LiteralPath (Join-Path $script:ProjectDir "package.json") -Raw
+        $lock = Get-Content -LiteralPath (Join-Path $script:ProjectDir "package-lock.json") -Raw
+    }
     $package = $package.Replace("`r`n", "`n").Replace("`r", "`n")
     $lock = $lock.Replace("`r`n", "`n").Replace("`r", "`n")
     $normalizedPackage = Remove-FirstVersionFields $package 1
@@ -126,6 +139,14 @@ function Test-ReceiverHealth {
     catch {
         return $false
     }
+}
+
+function Test-AdminRunning {
+    try {
+        $identity = Invoke-RestMethod -Uri "http://127.0.0.1:${AdminPort}/api/admin/identity" -TimeoutSec 2
+        return $identity.application -eq "hasunosora-pilgrimage-admin" -and $identity.schemaVersion -eq 1
+    }
+    catch { return $false }
 }
 
 function Get-VerifiedReceiverTask {
@@ -160,14 +181,34 @@ function Get-VerifiedReceiverTask {
 function Stop-ReceiverTask($Task) {
     if ($Task.State -eq "Running") {
         Stop-ScheduledTask -TaskName $script:ReceiverTaskName
-        for ($attempt = 0; $attempt -lt 40; $attempt += 1) {
-            Start-Sleep -Milliseconds 250
-            $state = (Get-ScheduledTask -TaskName $script:ReceiverTaskName).State
-            if ($state -ne "Running") {
-                return
-            }
-        }
-        throw "The receiver task did not stop within 10 seconds."
+    }
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+        $state = (Get-ScheduledTask -TaskName $script:ReceiverTaskName).State
+        if (($state -ne "Running") -and (-not (Test-ReceiverListening))) { return }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+    throw "The receiver task or its loopback listener did not stop within 10 seconds. Stop any manually launched receiver before retrying."
+}
+
+function Test-ReceiverListening {
+    $client = New-Object Net.Sockets.TcpClient
+    $connect = $null
+    try {
+        $connect = $client.BeginConnect("127.0.0.1", $script:HealthPort, $null, $null)
+        if (-not $connect.AsyncWaitHandle.WaitOne(3000)) { return $true }
+        $client.EndConnect($connect)
+        return $true
+    }
+    catch [Net.Sockets.SocketException] {
+        $socketException = $_.Exception.GetBaseException()
+        if (($socketException -is [Net.Sockets.SocketException]) -and
+            ($socketException.SocketErrorCode -eq [Net.Sockets.SocketError]::ConnectionRefused)) { return $false }
+        throw
+    }
+    finally {
+        if ($null -ne $connect) { $connect.AsyncWaitHandle.Close() }
+        $client.Close()
     }
 }
 
@@ -175,7 +216,8 @@ function Start-ReceiverTaskAndWait {
     Start-ScheduledTask -TaskName $script:ReceiverTaskName
     for ($attempt = 0; $attempt -lt 30; $attempt += 1) {
         Start-Sleep -Seconds 1
-        if (Test-ReceiverHealth) {
+        if (((Get-ScheduledTask -TaskName $script:ReceiverTaskName).State -eq "Running") -and
+            (Test-ReceiverHealth)) {
             return
         }
     }
@@ -229,6 +271,40 @@ try {
         }
     }
 
+    $deployedCommit = ""
+    if (Test-Path -LiteralPath $StateFile) {
+        $deployedCommit = ([string](Get-Content -LiteralPath $StateFile -Raw)).Trim()
+    }
+    $storedDependencyHash = ""
+    if (Test-Path -LiteralPath $DependencyStateFile) {
+        $storedDependencyHash = ([string](Get-Content -LiteralPath $DependencyStateFile -Raw)).Trim()
+    }
+    $nodeModulesMissing = -not (Test-Path -LiteralPath (Join-Path $ProjectDir "node_modules"))
+    # Inspect the candidate manifests before merge: a deferred update must leave
+    # the checkout, running receiver and successful-deployment state untouched.
+    $candidateRevision = ""
+    if ($localCommit -ne $remoteCommit) { $candidateRevision = $remoteCommit }
+    $currentDependencyHash = Get-DependencyHash $candidateRevision
+    $installDependencies = $nodeModulesMissing -or (-not $storedDependencyHash) -or
+        ($storedDependencyHash -ne $currentDependencyHash) -or
+        (Test-Path -LiteralPath $DependencyPendingFile)
+
+    if ($installDependencies) {
+        try {
+            $DependencyLockStream = [IO.File]::Open($DependencyLockFile,
+                [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        }
+        catch [IO.IOException] {
+            Write-UpdateLog "Dependency update deferred: the visible admin launcher is using node_modules. Retry after closing its window."
+            exit 0
+        }
+        # Also protect admins started with an older, non-cooperating launcher.
+        if (Test-AdminRunning) {
+            Write-UpdateLog "Dependency update deferred: an admin server is still running. Retry after stopping it."
+            exit 0
+        }
+    }
+
     if ($localCommit -ne $remoteCommit) {
         $ancestor = Invoke-RepoGit `
             -Arguments @("merge-base", "--is-ancestor", $localCommit, $remoteCommit) `
@@ -241,25 +317,6 @@ try {
     }
 
     $currentCommit = Get-Commit "HEAD"
-    $deployedCommit = ""
-    if (Test-Path -LiteralPath $StateFile) {
-        $deployedCommit = ([string](Get-Content -LiteralPath $StateFile -Raw)).Trim()
-    }
-
-    $nodeModulesMissing = -not (Test-Path -LiteralPath (Join-Path $ProjectDir "node_modules"))
-    $currentDependencyHash = ""
-    $storedDependencyHash = ""
-    if (Test-Path -LiteralPath $DependencyStateFile) {
-        $storedDependencyHash = ([string](Get-Content -LiteralPath $DependencyStateFile -Raw)).Trim()
-    }
-    if (($deployedCommit -ne $currentCommit) -or (-not $storedDependencyHash) -or $nodeModulesMissing) {
-        $currentDependencyHash = Get-DependencyHash
-    }
-    $installDependencies = $nodeModulesMissing -or
-        ($currentDependencyHash -and
-            $storedDependencyHash -and
-            ($storedDependencyHash -ne $currentDependencyHash)) -or
-        ($deployedCommit -and (-not $storedDependencyHash))
 
     $restartRequired = ($deployedCommit -ne $currentCommit) -or
         $installDependencies -or
@@ -267,11 +324,18 @@ try {
     if ($restartRequired) {
         $receiverTask = Get-VerifiedReceiverTask
         $restartError = $null
+        $dependenciesReady = -not $installDependencies
+        $receiverStopped = $false
         try {
+            if ($installDependencies) {
+                Set-Content -LiteralPath $DependencyPendingFile -Value $currentCommit -Encoding ASCII
+            }
             Stop-ReceiverTask $receiverTask
+            $receiverStopped = $true
             if ($installDependencies) {
                 Write-UpdateLog "Installing dependencies for $currentCommit."
                 $previousErrorActionPreference = $ErrorActionPreference
+                Push-Location -LiteralPath $ProjectDir
                 try {
                     $ErrorActionPreference = "Continue"
                     $npmOutput = @(& $ResolvedNpmExe ci --no-audit --no-fund 2>&1)
@@ -279,17 +343,21 @@ try {
                 }
                 finally {
                     $ErrorActionPreference = $previousErrorActionPreference
+                    Pop-Location
                 }
                 if ($npmExitCode -ne 0) {
                     throw "npm ci failed: $($npmOutput -join ' ')"
                 }
+                $dependenciesReady = $true
             }
         }
         catch {
             $restartError = $_
         }
         finally {
-            Start-ReceiverTaskAndWait
+            # npm ci may have partially removed node_modules on failure. Keep
+            # the receiver stopped and the admin waiting until a later repair.
+            if ($receiverStopped -and $dependenciesReady) { Start-ReceiverTaskAndWait }
         }
 
         if ($null -ne $restartError) {
@@ -300,6 +368,9 @@ try {
             Set-Content -LiteralPath $DependencyStateFile -Value $currentDependencyHash -Encoding ASCII
         }
         Set-Content -LiteralPath $StateFile -Value $currentCommit -Encoding ASCII
+        if (Test-Path -LiteralPath $DependencyPendingFile) {
+            Remove-Item -LiteralPath $DependencyPendingFile
+        }
         Write-UpdateLog "Receiver restarted successfully at $currentCommit."
     }
 }
@@ -312,6 +383,7 @@ catch {
     exit 1
 }
 finally {
+    if ($null -ne $DependencyLockStream) { $DependencyLockStream.Dispose() }
     if ($null -ne $LockStream) {
         $LockStream.Dispose()
     }

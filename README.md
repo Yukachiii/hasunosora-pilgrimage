@@ -15,7 +15,7 @@ PowerShellから起動する場合は次のとおりです。
 .\start-admin.ps1
 ```
 
-サーバー機では、先に管理サーバーを8766番で起動しておいてください。`yuimarine@192.168.0.4` のWindowsへログインしたとき自動起動させる場合は、サーバー機のプロジェクト直下で `install-admin-autostart.bat` を1回実行します。現在のプロジェクトを呼び出すBATが、そのWindowsユーザーのスタートアップフォルダーへ登録されます。
+サーバー機では、先に管理サーバーを8766番で起動しておいてください。`yuimarine@192.168.0.4` のWindowsへログインしたとき自動起動させる場合は、サーバー機のプロジェクト直下で `install-admin-autostart.bat` を1回実行します。`start-admin-server.bat` を呼び出すショートカットが、そのWindowsユーザーのスタートアップフォルダーへ登録されます。日本語を含むプロジェクトパスにも対応し、再登録しても起動エントリは増えません。
 
 PowerShellから登録する場合は次のとおりです。管理者権限やWindowsパスワードの入力は不要です。
 
@@ -25,6 +25,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\install-admin-autosta
 ```
 
 次回ログインから `start-admin-server.bat` のウィンドウが表示され、管理画面をビルドして `127.0.0.1:8766` で起動します。このウィンドウを閉じると管理サーバーも停止します。ログイン前には起動しないため、Windows再起動後は `Yuimarine` ユーザーでログインしてください。今すぐ起動するときは、サーバー機で `start-admin-server.bat` をダブルクリックします。
+
+BATは同じフォルダーの `start-admin-server.ps1` を呼び出し、ビルド中と管理サーバー稼働中は依存ファイルを保護する共有ロックを保持します。受付サーバーの依存更新中は、このウィンドウに待機メッセージを表示し、更新が正常に完了してから起動します。BATだけをスタートアップフォルダーへコピーせず、上記の登録用BATでショートカットを作成してください。
 
 SSHトンネルを使わず、このPCの作業コピーに対して管理画面を起動する開発用モードは次のとおりです。
 
@@ -88,7 +90,7 @@ tailscale funnel status
 
 ### GitHubへのプッシュ後に受付サーバーを自動更新する
 
-自宅サーバーで最初の1回だけ最新版を取得し、管理者権限で自動更新タスクを登録します。`install-community-auto-update.bat` をダブルクリックしてUACを許可するか、管理者PowerShellで次を実行してください。
+自宅サーバーで最初の1回だけ管理サーバーのウィンドウを閉じてから最新版を取得し、管理者権限で自動更新タスクを登録します。初回は既存の `node_modules` があっても `npm ci` で依存を検証します。`install-community-auto-update.bat` をダブルクリックしてUACを許可するか、管理者PowerShellで次を実行してください。登録が正常に完了したら `start-admin-server.bat` を開き直せます。
 
 ```powershell
 Set-Location -LiteralPath 'C:\Users\Yuimarine\pilgrimage-system'
@@ -98,7 +100,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\install-community-aut
 
 `Hasunosora Community Auto Update` がGitHubの `main` を1分ごとに確認します。新しいコミットがあればfast-forwardだけで取り込み、依存関係が変わった場合だけ `npm ci` を実行した後、`Hasunosora Community Receiver` を再起動して `/health` の成功まで確認します。追跡対象ファイルに未保存の変更がある場合や履歴が分岐している場合は更新しません。
 
-初回登録後は、GitHubへプッシュしてから通常1分以内に自宅サーバーへ反映されます。更新履歴と失敗理由は次の非公開ログで確認できます。
+管理サーバーと受付サーバーは同じ依存フォルダーを使います。依存が変わる更新は、管理サーバーの共有ロックまたは既存サーバーを検出した場合、Gitの取り込み・受付停止・依存の置き換えを行わず保留します。管理サーバーのウィンドウを閉じると、次の確認周期で再試行します。依存が変わらない通常の受付更新は、管理サーバー稼働中も継続します。自動更新タスクが管理サーバーを勝手に停止したり、SYSTEMユーザーで起動し直したりすることはありません。
+
+受付タスクを停止しても受付ポートのリスナーが残る場合は、依存の置き換え・再起動・成功状態の更新を行いません。以前手動で開いた `start-community.bat` などの受付ウィンドウが残っている場合は閉じてください。自動更新タスクが、その手動プロセスを強制終了することはありません。
+
+`npm ci` が失敗した場合は、途中の依存で管理サーバーを起動せず、受付も停止したまま次の周期で修復を試みます。非公開の `private/community-update/dependencies-pending.txt` は正常な依存インストール・受付のヘルスチェック・更新状態の保存まで保持されます。待機が続く場合は下記ログで原因を確認し、このファイルやロックを手動で削除して回避しないでください。
+
+初回登録後は、GitHubへプッシュしてから通常1分以内に更新確認が始まります。依存更新の保留中やインストール失敗時は、反映までさらに時間がかかります。更新履歴と失敗理由は次の非公開ログで確認できます。
 
 ```powershell
 Get-Content -LiteralPath '.\private\community-update\update.log' -Tail 20

@@ -265,6 +265,28 @@ function useMapRuntime(accessToken: string): MapRuntimeState {
   return { token, mapState, setMapState };
 }
 
+function createMapboxMap(container: HTMLDivElement, token: string): mapboxgl.Map {
+  return new mapboxgl.Map({
+    accessToken: token,
+    container,
+    style: "mapbox://styles/mapbox/streets-v12",
+    center: [136.6562, 36.5708],
+    zoom: 12.4,
+    attributionControl: true,
+    cooperativeGestures: true,
+    locale: {
+      "Map.Title": "地図",
+      "NavigationControl.ZoomIn": "拡大",
+      "NavigationControl.ZoomOut": "縮小",
+      "NavigationControl.ResetBearing": "北を上に戻す",
+      "AttributionControl.ToggleAttribution": "地図の提供元を表示",
+      "ScrollZoomBlocker.CtrlMessage": "Ctrlキーを押しながらスクロールで拡大・縮小",
+      "ScrollZoomBlocker.CmdMessage": "⌘キーを押しながらスクロールで拡大・縮小",
+      "TouchPanBlocker.Message": "2本の指で地図を動かせます",
+    },
+  });
+}
+
 function useMapboxInstance(
   token: string,
   mapElementRef: RefObject<HTMLDivElement | null>,
@@ -273,32 +295,60 @@ function useMapboxInstance(
 ): void {
   useEffect(() => {
     if (!token || !mapElementRef.current) return;
+    const container = mapElementRef.current;
     let cancelled = false;
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: mapElementRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [136.6562, 36.5708],
-      zoom: 12.4,
-      attributionControl: true,
-      cooperativeGestures: true,
+    let map: mapboxgl.Map | null = null;
+    let stopTracking = () => {};
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        map = createMapboxMap(container, token);
+        const instance = map;
+        mapRef.current = instance;
+        instance.on("style.load", () => {
+          if (!cancelled) instance.setLanguage("ja");
+        });
+        instance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), "top-right");
+        stopTracking = trackMapReadiness(instance, setMapState);
+      } catch {
+        if (mapRef.current === map) mapRef.current = null;
+        map?.remove();
+        map = null;
+        setMapState("error");
+      }
     });
-    map.on("style.load", () => {
-      if (!cancelled) map.setLanguage("ja");
-    });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), "top-right");
-    map.on("load", () => { if (!cancelled) setMapState("ready"); });
-    map.on("error", (event) => {
-      const message = event.error?.message ?? "";
-      if (!cancelled && /401|403|token|unauthorized|forbidden/i.test(message)) setMapState("error");
-    });
-    mapRef.current = map;
     return () => {
       cancelled = true;
+      stopTracking();
       if (mapRef.current === map) mapRef.current = null;
-      map.remove();
+      map?.remove();
     };
   }, [mapElementRef, mapRef, setMapState, token]);
+}
+
+function trackMapReadiness(
+  map: mapboxgl.Map,
+  setMapState: Dispatch<SetStateAction<MapState>>,
+): () => void {
+  let ready = false;
+  const timeout = window.setTimeout(() => setMapState("error"), 20_000);
+  const handleLoad = () => {
+    ready = true;
+    window.clearTimeout(timeout);
+    setMapState("ready");
+  };
+  const handleError = (event: { error?: Error }) => {
+    if (ready && !/401|403|token|unauthorized|forbidden/i.test(event.error?.message ?? "")) return;
+    window.clearTimeout(timeout);
+    setMapState("error");
+  };
+  map.on("load", handleLoad);
+  map.on("error", handleError);
+  return () => {
+    window.clearTimeout(timeout);
+    map.off("load", handleLoad);
+    map.off("error", handleError);
+  };
 }
 
 function removeRouteLayers(map: mapboxgl.Map): void {
@@ -613,11 +663,12 @@ function useMapboxRouteRequest(
       onRouteResult({ state: "loading" });
       clearRoute();
       if (!token) {
-        onRouteResult({ state: "fallback", message: "地図を準備しています。少し待ってから、もう一度お試しください。" });
+        onRouteResult({ state: "fallback", message: "地図を表示できないため、経路を取得できません。" });
         return;
       }
       try {
         const { route, orderedStopIds } = await fetchMapboxRoute(requestedRoute, token, controller.signal);
+        if (cancelled) return;
         drawRoute([route.geometry.coordinates as RouteLine]);
         onRouteResult(successfulRouteResult(route, orderedStopIds));
       } catch (error) {
@@ -681,7 +732,7 @@ function MapFallback({
       <div className="map-road map-road--one" />
       <div className="map-road map-road--two" />
       <div className="map-river" />
-      <div className="map-coast">JAPAN SEA</div>
+      <div className="map-coast">日本海</div>
       {spots.map((spot, index) => (
         <FallbackPin
           key={spot.id}
@@ -695,7 +746,7 @@ function MapFallback({
       ))}
       <div className="map-fallback__note">
         <span className="status-dot" />
-        {mapState === "error" ? "地図を読み込めませんでした" : "地図を準備中"}
+        {mapState === "error" ? "地図を読み込めませんでした" : "地図を表示できません"}
       </div>
     </div>
   );

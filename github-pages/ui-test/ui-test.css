@@ -4007,7 +4007,8 @@ a {
 .ui-trial__single-spot-map strong { font-family: var(--trial-serif); font-size: 18px; font-weight: 400; }
 .ui-trial__single-spot-map span { color: var(--trial-muted); font-size: 8px; }
 
-@media (max-width: 760px) {
+@media (max-width: 900px),
+  (min-width: 901px) and (max-width: 1100px) and (max-aspect-ratio: 6/5) {
   .ui-trial {
     padding-bottom: calc(92px + env(safe-area-inset-bottom));
   }
@@ -4883,7 +4884,8 @@ a {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px),
+  (min-width: 901px) and (max-width: 1100px) and (max-aspect-ratio: 6/5) {
   .ui-trial__explore-window-dialog {
     height: min(78dvh, 720px);
     max-height: 78dvh;
@@ -5174,7 +5176,8 @@ a {
 }
 
 /* Smartphone interaction pass: keep sheets, controls and map content distinct. */
-@media (max-width: 760px) {
+@media (max-width: 900px),
+  (min-width: 901px) and (max-width: 1100px) and (max-aspect-ratio: 6/5) {
   .ui-trial__explore-window {
     z-index: 130;
   }
@@ -5210,7 +5213,7 @@ a {
   }
 
   .ui-trial__explore-window-filters .ui-trial__search input {
-    font-size: 12px;
+    font-size: 16px;
   }
 
   .ui-trial__explore-window-filters .ui-trial__filter-toggle {
@@ -5245,7 +5248,7 @@ a {
 
   .ui-trial__explore-window-filters select {
     padding: 0 10px;
-    font-size: 11px;
+    font-size: 16px;
   }
 
   .ui-trial__spot-results article,
@@ -5599,6 +5602,135 @@ a {
 
   .ui-trial__stop-actions button:last-child:active {
     transform: none;
+  }
+}
+
+/* Pixel 10 Pro Fold and similarly square foldable screens: keep touch behavior while
+   using the extra inner-display width for paired controls and content. */
+@media (min-width: 600px) and (max-width: 900px),
+  (min-width: 901px) and (max-width: 1100px) and (max-aspect-ratio: 6/5) {
+  .ui-trial__explore,
+  .ui-trial__map-page,
+  .ui-trial__planner,
+  .ui-trial__today,
+  .ui-trial__guide,
+  .ui-trial__shared {
+    width: min(100% - 40px, 840px);
+    margin-inline: auto;
+  }
+
+  .ui-trial__choices,
+  .ui-trial__collaboration-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ui-trial__collaboration-options {
+    grid-auto-flow: row;
+    overflow: visible;
+  }
+
+  .ui-trial__map-page-detail {
+    grid-template-columns: minmax(150px, 0.38fr) minmax(0, 1fr);
+  }
+
+  .ui-trial__map-page-detail > .ui-trial__map-page-photo {
+    width: 100%;
+  }
+
+  .ui-trial__route-map {
+    height: min(44dvh, 380px);
+    min-height: 280px;
+  }
+
+  .ui-trial__planner {
+    display: grid;
+    grid-template-columns: minmax(230px, 0.95fr) minmax(280px, 1.05fr);
+    gap: 14px;
+    align-items: start;
+    padding-inline: 0;
+  }
+
+  .ui-trial__planner-days {
+    grid-column: 1 / -1;
+  }
+
+  .ui-trial__planner-summary {
+    display: none;
+  }
+
+  .ui-trial__mobile-planner-stops {
+    display: block;
+  }
+
+  .ui-trial__planner-controls {
+    margin-top: 0;
+    padding: 22px 18px 24px;
+  }
+
+  .ui-trial__planner-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ui-trial__explore-window-filters > .ui-trial__search-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ui-trial__explore-window-filters > .ui-trial__search-filters > label:nth-child(3) {
+    grid-column: auto;
+  }
+
+  .ui-trial__today {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.78fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .ui-trial__today-route {
+    padding: 24px 18px;
+    border-radius: 24px 24px 24px 6px;
+    background: var(--trial-surface);
+  }
+
+  .ui-trial__today-route > div {
+    display: block;
+  }
+
+  .ui-trial__guide {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.82fr);
+    gap: 24px 18px;
+    align-items: start;
+  }
+
+  .ui-trial__guide-route,
+  .ui-trial__guide-notice,
+  .ui-trial__guide-source {
+    grid-column: 1 / -1;
+  }
+
+  .ui-trial__guide-route {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .ui-trial__guide-route::before {
+    display: none;
+  }
+
+  .ui-trial__shared-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(270px, 0.82fr);
+    gap: 16px;
+  }
+
+  .ui-trial__shared-map {
+    height: min(56dvh, 460px);
+    min-height: 340px;
+  }
+
+  .community-contribution {
+    width: min(100% - 40px, 840px);
+    margin-inline: auto;
   }
 }
 

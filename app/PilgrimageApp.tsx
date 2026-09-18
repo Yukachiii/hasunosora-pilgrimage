@@ -1220,7 +1220,9 @@ function usePlannerSnapshot(
   return useMemo(() => ({
     itineraryIds, stayMinutes, travelMode, optimizeOrder, sourceStationId, visitDate,
     startTime, itineraryCollaborationId, completedSpotIds, todayOffsetMinutes,
-    transitLegProgress, plannerDays, activeDayIndex,
+    transitLegProgress,
+    plannerDays: plannerDays.map((day, index) => index === activeDayIndex ? { ...day, transitLegProgress } : day),
+    activeDayIndex,
   }), [activeDayIndex, completedSpotIds, itineraryCollaborationId, itineraryIds,
     optimizeOrder, plannerDays, sourceStationId, startTime, stayMinutes,
     todayOffsetMinutes, transitLegProgress, travelMode, visitDate]);
