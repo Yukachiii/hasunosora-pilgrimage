@@ -17,6 +17,72 @@ import {
   routeResultAfterMapUpdate,
 } from "../github-pages/ui-test/route-cache.ts";
 
+// Source contracts, not browser layout tests. Keep declarations scoped to their
+// rule and media query so a matching mobile rule cannot hide a desktop regression.
+function cssDeclarations(source, selector) {
+  const rules = [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+  const rule = rules.find((match) => match[1].trim() === selector);
+  assert.ok(rule, `Missing CSS rule: ${selector}`);
+  return Object.fromEntries(rule[2].split(";").filter((entry) => entry.trim()).map((entry) => {
+    const colon = entry.indexOf(":");
+    return [entry.slice(0, colon).trim(), entry.slice(colon + 1).trim().replace(/\s+/g, " ")];
+  }));
+}
+
+function assertCssContract(source, selector, expected) {
+  const declarations = cssDeclarations(source, selector);
+  for (const [property, value] of Object.entries(expected)) {
+    assert.equal(declarations[property], value, `${selector}: ${property}`);
+  }
+}
+
+test("explore modal keeps rounded corners and one shrinkable scroll region", async () => {
+  const css = await readFile(new URL("../github-pages/ui-test/ui-test.css", import.meta.url), "utf8");
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  assertCssContract(source, ".ui-trial__explore-window-dialog", {
+    "border-radius": "30px",
+    "grid-template-rows": "auto auto auto minmax(0, 1fr)",
+  });
+  assertCssContract(source, ".ui-trial__explore-window-body", {
+    "min-height": "0",
+    "overflow-y": "auto",
+    "overscroll-behavior": "contain",
+  });
+  assertCssContract(source, ".ui-trial__explore-window-body :is(.ui-trial__spot-results, .ui-trial__card-results)", {
+    "max-height": "none",
+    overflow: "visible",
+  });
+});
+
+test("desktop explore scrollbar clearance stays scoped to desktop and wide tablet viewports", async () => {
+  const css = await readFile(new URL("../github-pages/ui-test/ui-test.css", import.meta.url), "utf8");
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  // This block contains flat CSS rules; tolerate formatting, but pin all three
+  // width boundaries and the aspect-ratio guard (including the comma/AND grouping).
+  const media = source.match(/@media\s*\(min-width:\s*1101px\)\s*,\s*\(min-width:\s*901px\)\s+and\s*\(max-width:\s*1100px\)\s+and\s*\(min-aspect-ratio:\s*1201\s*\/\s*1000\)\s*\{((?:[^{}]|\{[^{}]*\})*)\}/);
+  assert.ok(media, "Missing desktop explore media query: >=1101px OR 901–1100px with aspect ratio >=1201/1000");
+  assertCssContract(media[1], ".ui-trial__explore-window-body", {
+    margin: "0 8px 8px 0",
+    padding: "18px 14px 18px 22px",
+    "scrollbar-color": "rgba(35, 56, 79, 0.48) transparent",
+    "scrollbar-gutter": "stable",
+    "scrollbar-width": "thin",
+  });
+  assertCssContract(media[1], ".ui-trial__explore-window-body::-webkit-scrollbar", {
+    width: "10px",
+  });
+  assertCssContract(media[1], ".ui-trial__explore-window-body::-webkit-scrollbar-track", {
+    "margin-block": "8px",
+    background: "transparent",
+  });
+  assertCssContract(media[1], ".ui-trial__explore-window-body::-webkit-scrollbar-thumb", {
+    border: "3px solid transparent",
+    "border-radius": "999px",
+    background: "rgba(35, 56, 79, 0.48)",
+    "background-clip": "padding-box",
+  });
+});
+
 test("the default trial card list includes every content record", async () => {
   const [cards, spots] = await Promise.all([
     readFile(new URL("../content/card-models.json", import.meta.url), "utf8").then(JSON.parse),
